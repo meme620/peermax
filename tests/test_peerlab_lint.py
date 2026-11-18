@@ -60,3 +60,7 @@ def test_deep_and_single_file_dirs_rejected() -> None:
     problems = lint.check_path_names(['a/b/c/x.py', 'solo/only.md'])
     assert any('层级' in p for p in problems)
     assert any('只装一个文件' in p for p in problems)
+
+def test_data_dir_with_single_file_allowed() -> None:
+    problems = lint.check_path_names(['data/external/reference.xlsx'])
+    assert not any('只装一个文件' in p for p in problems)

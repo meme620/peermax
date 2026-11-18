@@ -80,8 +80,11 @@ def check_path_names(paths) -> list:
             problems.append(f'{rel}: 目录层级超过 {MAX_DEPTH} 层')
     counts = collections.Counter(str(pathlib.PurePosixPath(p).parent) for p in paths)
     for directory, count in sorted(counts.items()):
-        if directory != '.' and count == 1:
-            problems.append(f'{directory}/: 目录只装一个文件')
+        if directory == '.' or count != 1:
+            continue
+        if directory == 'data' or directory.startswith('data/'):
+            continue  # 数据目录按载荷存放，允许只放一个参照文件
+        problems.append(f'{directory}/: 目录只装一个文件')
     return problems
 
 
