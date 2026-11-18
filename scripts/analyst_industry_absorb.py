@@ -18,8 +18,11 @@ import numpy as np
 import pandas as pd
 import pickle
 
-from analyst_cf_mom_replication import nw_t, _next_month, EDGES, RET, MEQ, NET_VER
+from dates import next_month as _next_month
+from analyst_cf_mom_replication import EDGES, RET, MEQ, NET_VER
+from statsutil import nw_t
 from analyst_meta import attach_meta
+from fileio import read_pickle
 
 DRIVE = Path('data/raw/drive')
 OUT = Path('reports/data_gates/G0/s3a_9h_absorb.json')
@@ -33,7 +36,7 @@ def month_end(df):
 
 
 def load_ind():
-    s = pickle.load(open(DRIVE / 'ind_code.pkl', 'rb'))
+    s = read_pickle(DRIVE / 'ind_code.pkl')
     # index '000001.SZ' -> 6 位码（与 ret 清洗后的 firm_id 对齐）
     firm = s.index.astype(str).str.split('.').str.get(0)
     s2 = pd.Series(s.values, index=firm, name='ind')
@@ -60,10 +63,10 @@ def main():
     print(f"ind_ret 覆盖: {ind_ret['ind_ret'].notna().mean():.2%} 行", flush=True)
 
     # Drive 控制变量（同 9C 口径）
-    mv = month_end(pickle.load(open(DRIVE / 'daily_a_share_market_val_3_20260630.pkl', 'rb')))
-    bm = month_end(pickle.load(open(DRIVE / 'daily_book_to_market_ratio_ttm_20260630.pkl', 'rb')))
-    tr = month_end(pickle.load(open(DRIVE / 'daily_turnover_rate_20260630.pkl', 'rb'))) / 100.0
-    am = month_end(pickle.load(open(DRIVE / 'daily_total_amount_20260630.pkl', 'rb')))
+    mv = month_end(read_pickle(DRIVE / 'daily_a_share_market_val_3_20260630.pkl'))
+    bm = month_end(read_pickle(DRIVE / 'daily_book_to_market_ratio_ttm_20260630.pkl'))
+    tr = month_end(read_pickle(DRIVE / 'daily_turnover_rate_20260630.pkl')) / 100.0
+    am = month_end(read_pickle(DRIVE / 'daily_total_amount_20260630.pkl'))
 
     def stack_drive(s, name):
         st = s.stack().rename(name).reset_index()

@@ -5,6 +5,7 @@
 用法: python scripts/factor_full_period_build.py
 """
 import io, sys
+from fileio import read_pickle
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 import pandas as pd
 import pickle
@@ -16,7 +17,7 @@ CLOSE = ROOT / "data/raw/drive/daily_close_none_20260630.pkl"
 DRIVE_TO = ROOT / "data/raw/drive/daily_turnover_rate_20260630.pkl"
 
 # ---- 1) 构造 2006-2013 日面板（close_raw + rraw；volume/amount 用 Drive 换手率*流通盘不可得，填空）----
-close = pickle.load(open(CLOSE, "rb"))  # index=date, columns=order_book_id '000001.SZ'
+close = read_pickle(CLOSE)  # index=date, columns=order_book_id '000001.SZ'
 rraw = close.pct_change(fill_method=None)
 start, end = "2006-01-01", "2013-12-31"
 mask = (close.index >= start) & (close.index <= end)

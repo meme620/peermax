@@ -57,10 +57,9 @@ import json
 import math
 import numpy as np
 import pandas as pd
-from pricing_lib import (  # noqa: E402
+from pricing_lib import (
     fm_regression, newey_west, param_value, rank_average_groups,
 )
-
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -2067,52 +2066,16 @@ def make_md(S: dict) -> None:
 # --- end scripts/lib bootstrap ---
 
 
-
-
 DIAG.mkdir(parents=True, exist_ok=True)
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 # ---------------------------------------------------------------- 装载
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 # ================================================================ H1
 
 
 # ================================================================ H2
-
-
 
 
 # ================================================================ H3
@@ -2127,8 +2090,6 @@ DIAG.mkdir(parents=True, exist_ok=True)
 # ================================================================ H6
 
 
-
-
 # ================================================================ H7
 
 
@@ -2136,8 +2097,6 @@ DIAG.mkdir(parents=True, exist_ok=True)
 
 
 # ================================================================ 装配
-
-
 
 
 def main() -> int:

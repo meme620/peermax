@@ -36,7 +36,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from fileio import atomic_write_text as _atomic_write_text
+from fileio import assert_path_allowed, json_default, write_csv_rows, write_json_atomic, write_parquet_atomic
 
 import argparse
 import csv
@@ -47,16 +47,13 @@ import time
 from datetime import datetime, timezone
 import numpy as np
 import pandas as pd
-from pricing_lib import (  # noqa: E402
+from pricing_lib import (
     SAMPLE_WINDOW_END, SAMPLE_WINDOW_START, assert_m1_inputs_sha, load_me, load_sw2,
     months_between, require, sha256_file,
 )
-from peermax_panel_build import (  # noqa: E402
+from peermax_panel_build import (
     NETWORK_AVAILABLE_AT_RULE, load_versions, select_version,
 )
-from fileio import json_default as _json_default
-from fileio import assert_path_allowed  # noqa: E402
-
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -174,7 +171,7 @@ def assert_output_path_guard(path) -> Path:
     """任何写出路径必须落在 shadow 允许根内，且不命中 headline/G0/configs 等禁写集合。"""
     return assert_path_allowed(path, ALLOWED_ROOTS, (*BANNED_ROOTS, SAMPLE_PARQUET, SW2_MAP))
 
-def _atomic_write_text(path, text: str) -> None:
+def atomic_write_text(path, text: str) -> None:
     p = assert_output_path_guard(path)
     p.parent.mkdir(parents=True, exist_ok=True)
     tmp = p.with_name(p.name + '.tmp')
@@ -182,25 +179,14 @@ def _atomic_write_text(path, text: str) -> None:
     os.replace(tmp, p)
 
 def write_json(path, obj) -> None:
-    _atomic_write_text(path, json.dumps(obj, ensure_ascii=False, indent=1, default=_json_default))
+    write_json_atomic(obj, assert_output_path_guard(path), indent=1, default=json_default,
+                      trailing_newline=False)
 
 def write_csv(path, rows, header) -> None:
-    p = assert_output_path_guard(path)
-    p.parent.mkdir(parents=True, exist_ok=True)
-    tmp = p.with_name(p.name + '.tmp')
-    with open(tmp, 'w', newline='', encoding='utf-8') as fh:
-        w = csv.writer(fh)
-        w.writerow(header)
-        for r in rows:
-            w.writerow(r)
-    os.replace(tmp, p)
+    write_csv_rows(assert_output_path_guard(path), rows, header)
 
 def write_parquet(path, df: pd.DataFrame) -> None:
-    p = assert_output_path_guard(path)
-    p.parent.mkdir(parents=True, exist_ok=True)
-    tmp = p.with_name(p.name + '.tmp.parquet')
-    df.to_parquet(tmp, index=False)
-    os.replace(tmp, p)
+    write_parquet_atomic(df, assert_output_path_guard(path))
 
 def log(msg: str) -> None:
     print(f'[{time.strftime("%H:%M:%S")}] {msg}', flush=True)
@@ -963,10 +949,6 @@ def step_accept(m: pd.DataFrame, years) -> tuple:
 # --- end scripts/lib bootstrap ---
 
 
-
-
-
-
 # ---------------------------------------------------------------- 路径与常量
 
 
@@ -979,85 +961,25 @@ def step_accept(m: pd.DataFrame, years) -> tuple:
 # ---------------------------------------------------------------- 输出路径守卫
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 # ---------------------------------------------------------------- 锚台账
-
-
-
-
 
 
 # ---------------------------------------------------------------- as-of 映射
 
 
-
-
-
-
-
-
-
-
 # ---------------------------------------------------------------- 行业基线（LOO）
-
-
 
 
 # ---------------------------------------------------------------- K 目标
 
 
-
-
 # ---------------------------------------------------------------- 网络构建（复用现脚本）
-
-
-
-
-
-
 
 
 # ---------------------------------------------------------------- 网络读数 / 对比
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 # ---------------------------------------------------------------- steps
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 # ---------------------------------------------------------------- main

@@ -53,14 +53,15 @@ import sys
 from pathlib import Path
 import numpy as np
 import pandas as pd
-from build_monthly_returns_status import trade_days_long  # noqa: E402
+from build_monthly_returns_status import trade_days_long
 
 
-from build_monthly_returns_status import trade_days_long  # noqa: E402
+from build_monthly_returns_status import trade_days_long
 from pathlib import Path
 import numpy as np
 import os
 import pandas as pd
+from fileio import write_json_atomic
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -765,53 +766,25 @@ import pandas as pd
 from build_monthly_returns_status import trade_days_long  # noqa: E402
 
 
-
 # sh601313（江南嘉捷）在 daily_panel 中无行；日频/成交在 sh601360（三六零）。
 # 月频 2012-02..2018-02 重叠 73 个月，72 个月 R 相同；firm_id_map 只有 sh601360。
 
 # 追加列（旧 10 列顺序不变，新列只追加在末尾）。
 
 
-
 # --------------------------------------------------------------------------- IO
-
-
 
 
 # ---------------------------------------------------------------- headline 锚
 
 
-
-
-
-
-
-
 # ---------------------------------------------------------------- 日频辅助
-
-
 
 
 # ---------------------------------------------------------------- 构造
 
 
-
-
 # ---------------------------------------------------------------- 计数
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 # ---------------------------------------------------------------- main

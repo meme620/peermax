@@ -23,7 +23,6 @@
 import csv
 import gzip
 import json
-import ssl
 import sys
 import urllib.parse
 import urllib.request
@@ -31,6 +30,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
+from fileio import read_csv_dicts
 
 ROOT = Path(__file__).resolve().parents[1]
 REPD = ROOT / 'reports/data_gates/G0'
@@ -38,17 +38,12 @@ raw = ROOT / 'data/raw/lexicon/sogou'
 em_raw = ROOT / 'data/raw/eastmoney/f10_business'
 
 
-def ctx():
-    c = ssl.create_default_context()
-    c.check_hostname = False
-    c.verify_mode = ssl.CERT_NONE
-    return c
 
 
 # ---------------- A. 搜狗 ----------------
 def audit_sogou():
     from fetch_sogou_lexicon import parse_scel
-    cat = list(csv.DictReader(open(raw / '_catalog.csv', encoding='utf-8')))
+    cat = read_csv_dicts(raw / '_catalog.csv', encoding='utf-8')
     files = {int(p.stem): p for p in raw.glob('*.scel')}
     out = {'catalog_entries': len(cat), 'files_on_disk': len(files)}
     missing = [r['dict_id'] for r in cat if int(r['dict_id']) not in files]
@@ -157,7 +152,8 @@ def probe_em_api():
     for tag, extra in [('baseline', ''), ('page2', '&page=2'), ('pagesize500', '&pageSize=500'),
                        ('limit500', '&limit=500'), ('type_zygcfx', '&type=zygcfx')]:
         try:
-            b = urllib.request.urlopen(urllib.request.Request(base + extra, headers=UA), timeout=30, context=ctx()).read()
+            with urllib.request.urlopen(urllib.request.Request(base + extra, headers=UA), timeout=30) as resp:
+                b = resp.read()
             if b[:2] == b'\x1f\x8b':
                 b = gzip.decompress(b)
             d = json.loads(b)

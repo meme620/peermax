@@ -46,7 +46,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from fileio import atomic_write_text as _atomic_write_text
+from fileio import assert_path_allowed, json_default, write_csv_rows, write_json_atomic
 
 import argparse
 import csv
@@ -58,12 +58,9 @@ from datetime import datetime, timezone
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import normalize
-from pricing_lib import assert_m1_inputs_sha, require, sha256_file  # noqa: E402
-from network_business_lexicon import build_automaton, load_lexicon  # noqa: E402
-from network_business_cluster_grid import build_vectors, load_refs  # noqa: E402
-from fileio import json_default as _json_default
-from fileio import assert_path_allowed  # noqa: E402
-
+from pricing_lib import assert_m1_inputs_sha, require, sha256_file
+from network_business_lexicon import build_automaton, load_lexicon
+from network_business_cluster_grid import build_vectors, load_refs
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -186,7 +183,7 @@ def assert_output_path_guard(path) -> Path:
     extra = [x for x in READONLY_INPUTS if Path(x).exists()]
     return assert_path_allowed(path, ALLOWED_ROOTS, (*BANNED_ROOTS, *extra))
 
-def _atomic_write_text(path, text: str) -> None:
+def atomic_write_text(path, text: str) -> None:
     p = assert_output_path_guard(path)
     p.parent.mkdir(parents=True, exist_ok=True)
     tmp = p.with_name(p.name + '.tmp')
@@ -194,18 +191,11 @@ def _atomic_write_text(path, text: str) -> None:
     os.replace(tmp, p)
 
 def write_json(path, obj) -> None:
-    _atomic_write_text(path, json.dumps(obj, ensure_ascii=False, indent=1, default=_json_default))
+    write_json_atomic(obj, assert_output_path_guard(path), indent=1, default=json_default,
+                      trailing_newline=False)
 
 def write_csv(path, rows, header) -> None:
-    p = assert_output_path_guard(path)
-    p.parent.mkdir(parents=True, exist_ok=True)
-    tmp = p.with_name(p.name + '.tmp')
-    with open(tmp, 'w', newline='', encoding='utf-8') as fh:
-        w = csv.writer(fh)
-        w.writerow(header)
-        for r in rows:
-            w.writerow(r)
-    os.replace(tmp, p)
+    write_csv_rows(assert_output_path_guard(path), rows, header)
 
 def log(msg: str) -> None:
     print(f'[{time.strftime("%H:%M:%S")}] {msg}', flush=True)
@@ -782,10 +772,7 @@ def vocab_sensitivity(probe: bool) -> dict:
 # --- end scripts/lib bootstrap ---
 
 
-
-
 # ---------------------------------------------------------------- 路径与常量
-
 
 
 # headline 登记读数（只读对账；`3.0_plan.md` §1.1）
@@ -796,54 +783,16 @@ def vocab_sensitivity(probe: bool) -> dict:
 # ---------------------------------------------------------------- 输出路径守卫（同 3.1/3.2 型）
 
 
-
-
-
-
-
-
-
-
-
-
 # ---------------------------------------------------------------- 纯函数（合成可测）
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 # ---------------------------------------------------------------- 只读装载
 
 
-
-
-
-
-
-
-
-
 # ---------------------------------------------------------------- 逐年读数
 
 
-
-
 # ---------------------------------------------------------------- 锚台账
-
-
-
-
-
-
 
 
 # ---------------------------------------------------------------- vocab 敏感度

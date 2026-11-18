@@ -28,7 +28,7 @@ def audit(name, df):
         try:
             v = pd.to_numeric(df.astype(str), errors='coerce')
             r['value_sample'] = [str(x) for x in df[:3]]
-        except Exception:
+        except (TypeError, ValueError, AttributeError):
             pass
         return r
     if idx.nlevels == 1:
@@ -48,7 +48,7 @@ def audit(name, df):
             if valid.sum() > len(dates) * 0.5 and len(dates):
                 r['date_range'] = [str(dates[valid].min().date()), str(dates[valid].max().date())]
                 break
-        except Exception:
+        except (TypeError, ValueError, AttributeError):
             continue
     # 缺失率（数值列）
     num = df.select_dtypes('number') if hasattr(df, 'select_dtypes') else df.iloc[:0]

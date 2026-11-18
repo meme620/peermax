@@ -5,8 +5,10 @@
 import pickle, sys, warnings
 import pandas as pd, numpy as np
 from pathlib import Path
+from fileio import read_pickle
 warnings.filterwarnings('ignore')
-from analyst_cf_mom_replication import _next_month, EDGES, RET, MEQ, NET_VER
+from dates import next_month as _next_month
+from analyst_cf_mom_replication import EDGES, RET, MEQ, NET_VER
 from analyst_meta import attach_meta
 
 d = Path('data/raw/drive')
@@ -16,10 +18,10 @@ def month_end(df):
     m.index = [c.strftime('%Y-%m') for c in m.index]
     m.columns = [c.split('.')[0] for c in m.columns]
     return m
-mv = month_end(pickle.load(open(d/'daily_a_share_market_val_3_20260630.pkl','rb')))
-bm = month_end(pickle.load(open(d/'daily_book_to_market_ratio_ttm_20260630.pkl','rb')))
-tr = month_end(pickle.load(open(d/'daily_turnover_rate_20260630.pkl','rb')))/100.0
-am = month_end(pickle.load(open(d/'daily_total_amount_20260630.pkl','rb')))
+mv = month_end(read_pickle(d/'daily_a_share_market_val_3_20260630.pkl'))
+bm = month_end(read_pickle(d/'daily_book_to_market_ratio_ttm_20260630.pkl'))
+tr = month_end(read_pickle(d/'daily_turnover_rate_20260630.pkl'))/100.0
+am = month_end(read_pickle(d/'daily_total_amount_20260630.pkl'))
 print("Drive 控制变量月末表就绪", flush=True)
 
 ret = pd.read_csv(RET, dtype=str, keep_default_na=False)

@@ -15,8 +15,11 @@ import numpy as np
 import pandas as pd
 import pickle
 
-from analyst_cf_mom_replication import nw_t, _next_month, EDGES, RET, NET_VER
+from dates import next_month as _next_month
+from analyst_cf_mom_replication import EDGES, RET, NET_VER
+from statsutil import nw_t
 from analyst_meta import attach_meta
+from fileio import read_pickle
 
 DRIVE = Path('data/raw/drive')
 OUT = Path('reports/data_gates/G0/s3a_9j_extra.json')
@@ -30,10 +33,10 @@ def month_end(df):
 
 
 def load_controls():
-    mv = month_end(pickle.load(open(DRIVE / 'daily_a_share_market_val_3_20260630.pkl', 'rb')))
-    bm = month_end(pickle.load(open(DRIVE / 'daily_book_to_market_ratio_ttm_20260630.pkl', 'rb')))
-    tr = month_end(pickle.load(open(DRIVE / 'daily_turnover_rate_20260630.pkl', 'rb'))) / 100.0
-    am = month_end(pickle.load(open(DRIVE / 'daily_total_amount_20260630.pkl', 'rb')))
+    mv = month_end(read_pickle(DRIVE / 'daily_a_share_market_val_3_20260630.pkl'))
+    bm = month_end(read_pickle(DRIVE / 'daily_book_to_market_ratio_ttm_20260630.pkl'))
+    tr = month_end(read_pickle(DRIVE / 'daily_turnover_rate_20260630.pkl')) / 100.0
+    am = month_end(read_pickle(DRIVE / 'daily_total_amount_20260630.pkl'))
 
     def stack_drive(s, name):
         st = s.stack().rename(name).reset_index()
@@ -64,7 +67,7 @@ def main():
     _ipo = pd.read_csv('data/processed/firm_id_map.csv', dtype=str)
     _ipo_map = dict(zip(_ipo['code6'].str.strip(), _ipo['ipo_date'].str.strip()))
 
-    ind = pickle.load(open(DRIVE / 'ind_code.pkl', 'rb'))
+    ind = read_pickle(DRIVE / 'ind_code.pkl')
     ind.index = ind.index.astype(str).str.split('.').str.get(0)
     ind = ind[~ind.index.duplicated(keep='first')]
     ind = ind.rename('ind')
@@ -80,7 +83,7 @@ def main():
     files = sorted(EDGES.glob(f'edges_{NET_VER}_*.csv'))
     rows_a, rows_b, rows_c, rows_d = [], [], [], []
     share_unknown_mean = []
-    c300 = pickle.load(open(DRIVE / 'daily_csi300_components.pkl', 'rb'))
+    c300 = read_pickle(DRIVE / 'daily_csi300_components.pkl')
     c300.columns = [c.split('.')[0] for c in c300.columns]
     c300m = c300.resample('ME').last().stack().reset_index()
     c300m.columns = ['date', 'firm_id', 'in300']

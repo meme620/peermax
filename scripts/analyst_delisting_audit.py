@@ -12,7 +12,8 @@ import sys, json, warnings
 from pathlib import Path
 import numpy as np, pandas as pd
 warnings.filterwarnings('ignore')
-from analyst_cf_mom_replication import _next_month, EDGES, RET, NET_VER
+from dates import next_month as _next_month
+from analyst_cf_mom_replication import EDGES, RET, NET_VER
 
 d = Path('data/raw/drive')
 mv = pd.read_pickle(d / 'daily_a_share_market_val_3_20260630.pkl')

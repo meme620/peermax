@@ -2,13 +2,14 @@
 import pickle, warnings, json
 import pandas as pd, numpy as np
 from pathlib import Path
+from fileio import read_pickle
 warnings.filterwarnings('ignore')
 d = Path('data/raw/drive'); out = {}
 
 def w(cols): return [c.split('.')[0] for c in cols]
 
 # ===== A. 市值 vs 自算（market_equity_panel，2018 抽样） =====
-mv = pickle.load(open(d/'daily_a_share_market_val_3_20260630.pkl','rb'))
+mv = read_pickle(d/'daily_a_share_market_val_3_20260630.pkl')
 mv.columns = w(mv.columns)
 meq = pd.read_csv('data/processed/market_equity_panel.csv', dtype=str, usecols=['firm_id','date','market_equity'])
 meq['market_equity'] = pd.to_numeric(meq['market_equity'], errors='coerce')
@@ -26,7 +27,7 @@ out['market_val_vs_calc'] = {'n': n, 'corr': round(float(corr), 5), 'mean_abs_re
 print(f"A. 市值 vs 自算: n={n} corr={corr:.4f} 均相对差={diff:.4f}", flush=True)
 
 # ===== B. BM TTM vs 自算（firm_chars_clean bm，2018-01 月） =====
-bm = pickle.load(open(d/'daily_book_to_market_ratio_ttm_20260630.pkl','rb'))
+bm = read_pickle(d/'daily_book_to_market_ratio_ttm_20260630.pkl')
 bm.columns = w(bm.columns)
 fc = pd.read_csv('data/processed/firm_chars_clean.csv', dtype=str, usecols=['firm_id','month','bm'])
 fc['bm'] = pd.to_numeric(fc['bm'], errors='coerce')
@@ -39,7 +40,7 @@ out['bm_ttm_vs_calc'] = {'n': len(m), 'corr': round(float(m['bm'].corr(m['bm_dri
 print(f"B. BM TTM vs 自算(2018-06): n={len(m)} corr={m['bm'].corr(m['bm_drive']):.4f} 均差={out['bm_ttm_vs_calc']['mean_abs_diff']}", flush=True)
 
 # ===== C. 换手率 vs 自算（firm_chars turnover） =====
-tr = pickle.load(open(d/'daily_turnover_rate_20260630.pkl','rb'))
+tr = read_pickle(d/'daily_turnover_rate_20260630.pkl')
 tr.columns = w(tr.columns)
 fc_t = pd.read_csv('data/processed/firm_chars_clean.csv', dtype=str, usecols=['firm_id','month','turnover'])
 fc_t['turnover'] = pd.to_numeric(fc_t['turnover'], errors='coerce')
@@ -51,7 +52,7 @@ out['turnover_vs_calc'] = {'n': len(mt), 'corr': round(float(mt['turnover'].corr
 print(f"C. 换手率 vs 自算(2018-06): n={len(mt)} corr={mt['turnover'].corr(mt['turn_drive']):.4f}", flush=True)
 
 # ===== D. suspend_flag vs 停牌推断（daily_panel 缺失） =====
-sf = pickle.load(open(d/'stock_suspend_flag_20260630.pkl','rb'))
+sf = read_pickle(d/'stock_suspend_flag_20260630.pkl')
 sf.columns = w(sf.columns)
 dp = pd.read_csv('data/processed/daily_panel/2018.csv', dtype=str, usecols=['code','date'])
 dp['firm_id'] = dp['code'].str.replace(r'^(sz|sh|bj)','',regex=True)
@@ -69,7 +70,7 @@ out['suspend_vs_missing'] = {'n': n, 'agreement': round(agree/n, 4)}
 print(f"D. suspend flag vs 面板缺失(2018, 800 股): n={n} 一致率={agree/n:.4f}", flush=True)
 
 # ===== E. new_stock_flag vs ipo+6月规则 =====
-nf = pickle.load(open(d/'new_stock_flag_20260630.pkl','rb'))
+nf = read_pickle(d/'new_stock_flag_20260630.pkl')
 nf.columns = w(nf.columns)
 ipo_map = dict(zip(pd.read_csv('data/processed/firm_id_map.csv', dtype=str)['code6'],
                    pd.read_csv('data/processed/firm_id_map.csv', dtype=str)['ipo_date']))
@@ -81,7 +82,7 @@ out['new_stock_vs_ipo6m'] = {'flag_new': len(ex), 'within_6m': len(exp_rule), 'o
 print(f"E. new_stock flag(2020-06-30): flag={len(ex)} 家, 其中上市<6月={len(exp_rule)}, >6月={len(ex)-len(exp_rule)}", flush=True)
 
 # ===== F. shibor vs 现有 rf（一年期存款阶梯，2006-10 起） =====
-sh = pickle.load(open(d/'shibor_rates.pkl','rb'))
+sh = read_pickle(d/'shibor_rates.pkl')
 out['shibor'] = {'shape': list(sh.shape), 'columns': list(sh.columns), 'period': f"{sh.index[0].date()}~{sh.index[-1].date()}"}
 print(f"F. shibor: {sh.shape} cols={list(sh.columns)[:5]}... 期间 {out['shibor']['period']}", flush=True)
 

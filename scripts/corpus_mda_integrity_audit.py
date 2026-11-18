@@ -229,7 +229,7 @@ def main():
     h2 = collections.defaultdict(list)
     for i, (code6, year) in enumerate(files):
         p = os.path.join(TXT, code6, year + ".txt")
-        b = open(p, "rb").read()
+        b = Path(p).read_bytes()
         h2[hashlib.md5(b).hexdigest()].append((code6, year))
         t = b.decode("utf-8", "replace")
         content, method, ident = check_identity(t, code6, code6, name_map)

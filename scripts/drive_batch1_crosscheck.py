@@ -2,6 +2,7 @@
 import pickle, warnings, json
 import pandas as pd
 from pathlib import Path
+from fileio import read_pickle
 warnings.filterwarnings('ignore')
 d = Path('data/raw/drive')
 out = {}
@@ -10,7 +11,7 @@ out = {}
 tc = pd.read_csv('data/processed/daily_panel/2018.csv', dtype=str, keep_default_na=False,
                  usecols=['code','date','close_raw'])
 tc['close_raw'] = pd.to_numeric(tc['close_raw'], errors='coerce')
-cn = pickle.load(open(d/'daily_close_none_20260630.pkl','rb'))
+cn = read_pickle(d/'daily_close_none_20260630.pkl')
 cn18 = cn.loc['2018-01-01':'2018-12-31']
 cn6 = cn18.copy(); cn6.columns = [c.split('.')[0] for c in cn6.columns]
 tc18 = tc[tc['close_raw'].notna()].copy()
@@ -30,7 +31,7 @@ out['close_none_vs_tencent'] = {'matched': matched, 'exact_diff': diff_cnt,
 print(f"A. close_none vs 腾讯: 比 {matched} 行, 不等 {diff_cnt}, >1% {diff_gt1pct}", flush=True)
 
 # ============ B. st_flag vs 名称推断 ============
-st = pickle.load(open(d/'stock_st_flag_20260630.pkl','rb'))
+st = read_pickle(d/'stock_st_flag_20260630.pkl')
 st_last = st.iloc[-1]  # 最后一日状态
 st_last.index = [c.split('.')[0] for c in st_last.index]
 fm = pd.read_csv('data/processed/firm_id_map.csv', dtype=str)
@@ -44,8 +45,8 @@ out['st_flag_vs_name'] = {'firms': len(common), 'agreement': round(float(agree),
 print(f"B. ST flag vs 名称: 一致率 {agree:.2%}, 冲突 {len(conflict)}", flush=True)
 
 # ============ C. limit flag vs 自算（2024-06 抽样） ============
-lu = pickle.load(open(d/'daily_limit_up_flag_20260630.pkl','rb'))
-ld = pickle.load(open(d/'daily_limit_down_flag_20260630.pkl','rb'))
+lu = read_pickle(d/'daily_limit_up_flag_20260630.pkl')
+ld = read_pickle(d/'daily_limit_down_flag_20260630.pkl')
 lu6, ld6 = lu.loc['2024-06-03':'2024-06-28'], ld.loc['2024-06-03':'2024-06-28']
 lu6.columns = [c.split('.')[0] for c in lu6.columns]
 ld6.columns = [c.split('.')[0] for c in ld6.columns]
@@ -79,7 +80,7 @@ out['limit_up_vs_calc'] = {'rows': len(upm), 'agreement': round(float(agree_up),
 print(f"C. limit up flag vs 自算: 一致率 {agree_up:.2%}（{len(upm)} 行, 2024-06 抽样 1500 股）", flush=True)
 
 # ============ D. ind_code 体系判定结论 ============
-out['ind_code'] = {'n_firms': int(ind_n if (ind_n:=len(pickle.load(open(d/'ind_code.pkl','rb')))) else 0),
+out['ind_code'] = {'n_firms': int(ind_n if (ind_n:=len(read_pickle(d/'ind_code.pkl'))) else 0),
     'classes': 30, 'system': '非申万二级（30 类两位数；40=银行/41=证券/36≈食品饮料/33≈家电/10≈能源/20≈公用）；体系名待确认',
     'usable_for': '行业固定效应、S11 industry alternative link', 'mb_calibration': '仍缺申万二级'}
 

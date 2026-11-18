@@ -17,6 +17,7 @@ import csv
 import json
 from collections import defaultdict
 from pathlib import Path
+from fileio import read_pickle
 
 ROOT = Path(__file__).resolve().parents[1]
 PANEL = ROOT / "data/processed/daily_panel"
@@ -57,8 +58,7 @@ def load_shares():
 def load_bm():
     """2026-08-29 全期化：改用 Drive 官方 TTM BM（2001 起，batch2 决定 TTM 口径）；
     原东财 TOTAL_EQUITY_PK 2011 前覆盖不足（<30 家/月）。返回 {code: [(date, bm_ratio)]}（月末值）。"""
-    import pickle as _pk
-    bm_df = _pk.load(open(ROOT / "data/raw/drive/daily_book_to_market_ratio_ttm_20260630.pkl", "rb"))
+    bm_df = read_pickle(ROOT / "data/raw/drive/daily_book_to_market_ratio_ttm_20260630.pkl")
     bm_df.columns = [c.split(".")[0] for c in bm_df.columns]
     bm_m = bm_df.resample("ME").last()
     bm = defaultdict(list)

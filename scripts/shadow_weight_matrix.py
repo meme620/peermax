@@ -40,7 +40,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from pricing_lib import (  # noqa: E402
+from pricing_lib import (
     ROOT, assert_m1_contract, assert_m1_inputs_sha, fm_regression, param_value,
     require, sha256_file, winsorize_bounds_by_month, write_json,
 )

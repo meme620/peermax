@@ -3,10 +3,11 @@
 """
 import json, subprocess, time
 from pathlib import Path
+from fileio import read_json
 
 OUT = Path('data/raw/drive')
 OUT.mkdir(parents=True, exist_ok=True)
-IDS = json.load(open('artifacts/review/drive_file_ids.json', encoding='utf-8'))
+IDS = read_json('artifacts/review/drive_file_ids.json')
 PROXY = 'socks5h://127.0.0.1:7993'
 
 BATCH1 = ['daily_limit_up_flag_20260630.pkl', 'daily_limit_down_flag_20260630.pkl',

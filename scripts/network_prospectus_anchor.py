@@ -43,6 +43,7 @@ import pymupdf
 
 import os
 import re
+from fileio import read_csv_dicts, read_json
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 
@@ -534,8 +535,8 @@ def cid_recover_text(code, pdf_path):
     cache = os.path.join(_CID_CACHE, f"{code}.txt")
     key = os.path.join(_CID_CACHE, f"{code}.key")
     size = str(os.path.getsize(pdf_path))
-    if os.path.exists(cache) and os.path.exists(key) and open(key, encoding="utf-8").read().strip() == size:
-        return open(cache, encoding="utf-8").read(), "pdfminer+cid_gid（缓存命中）"
+    if os.path.exists(cache) and os.path.exists(key) and Path(key).read_text(encoding="utf-8").strip() == size:
+        return Path(cache).read_text(encoding="utf-8"), "pdfminer+cid_gid（缓存命中）"
     import pdfminer.high_level
     rev = _gid2uni()
     raw = pdfminer.high_level.extract_text(pdf_path)
@@ -580,8 +581,8 @@ def ocr_recover_text(code, pdf_path):
     cache = os.path.join(cache_dir, f"{code}.txt")
     keyf = os.path.join(cache_dir, f"{code}.key")
     size = str(os.path.getsize(pdf_path))
-    if os.path.exists(cache) and os.path.exists(keyf) and open(keyf, encoding="utf-8").read().strip() == size:
-        return open(cache, encoding="utf-8").read(), "ocr_tesseract_chi_sim（缓存命中）"
+    if os.path.exists(cache) and os.path.exists(keyf) and Path(keyf).read_text(encoding="utf-8").strip() == size:
+        return Path(cache).read_text(encoding="utf-8"), "ocr_tesseract_chi_sim（缓存命中）"
     tmpd = os.path.join(ROOT, "artifacts", "tmp", "tier2_full", "ocr_render", code)
     shutil.rmtree(tmpd, ignore_errors=True)
     os.makedirs(tmpd, exist_ok=True)
@@ -623,7 +624,7 @@ def ocr_recover_text(code, pdf_path):
         for i in range(n_pages):
             tp = os.path.join(tmpd, f"p{i:05d}.txt")
             if os.path.exists(tp):
-                parts.append(open(tp, encoding="utf-8", errors="replace").read())
+                parts.append(Path(tp).read_text(encoding="utf-8", errors="replace"))
             else:
                 missing += 1
                 parts.append("")
@@ -1045,7 +1046,7 @@ def build_full_name_map(firm, use_cache=True):
             if d.get("info", {}).get("cache_version") == 4 and d["info"].get("n_codes", 0) >= 4000:
                 return ({k: set(v) for k, v in d["full"].items()},
                         {k: set(v) for k, v in d.get("short_hist", {}).items()}, d["info"])
-        except Exception:
+        except (OSError, ValueError, KeyError, pickle.UnpicklingError):
             pass
     full, short_hist, n_codes, n_files, n_short = {}, {}, 0, 0, 0
     n_change, n_defn = 0, 0
@@ -1087,9 +1088,8 @@ def build_full_name_map(firm, use_cache=True):
         for fn in years:
             n_files += 1
             try:
-                head = re.sub(_WS, "", open(os.path.join(d, fn), encoding="utf-8",
-                                            errors="replace").read(24000))
-            except Exception:
+                head = re.sub(_WS, "", Path(os.path.join(d, fn)).read_text(encoding='utf-8', errors='replace')[:24000])
+            except (OSError,):
                 continue
             for m in P_SHORT_FWD.finditer(head):
                 nm, cd = norm(cut_label_tail(m.group(1))), m.group(2)   # 修 5：标签边界切分
@@ -1134,7 +1134,7 @@ def build_full_name_map(firm, use_cache=True):
                   f"{time.time() - t0:.0f}s）", flush=True)
     if os.path.exists(EM_NAMES):
         try:
-            em = json.load(open(EM_NAMES, encoding="utf-8"))
+            em = read_json(EM_NAMES)
             for c, names in em.items():
                 c6 = str(c).zfill(6)
                 if c6 not in firm:
@@ -1145,7 +1145,7 @@ def build_full_name_map(firm, use_cache=True):
                         full.setdefault(nn, set()).add(c6)
                     elif 2 <= len(nn) <= 10:
                         reg_short(nn, c6)
-        except Exception:
+        except (ValueError, KeyError, TypeError):
             pass
     # 注册名统一去 ST 前缀建键（修 2）：头部简称可能带 ST（如 ST信通），招股书用无前缀历史名
     for nm in list(short_hist):
@@ -2350,7 +2350,7 @@ def measure_main(args):
     cross = {"ingest_detail": "", "n_compared": 0, "status_mismatch": [], "channel_mismatch": []}
     if args.ingest_detail and os.path.exists(args.ingest_detail):
         cross["ingest_detail"] = rel(args.ingest_detail)
-        ing = {r["code"]: r for r in csv.DictReader(open(args.ingest_detail, encoding="utf-8"))}
+        ing = {r["code"]: r for r in read_csv_dicts(args.ingest_detail)}
         for r in recs:
             g = ing.get(r["code"])
             if not g:
@@ -2373,7 +2373,7 @@ def measure_main(args):
         if not os.path.exists(lp):
             continue
         last = {}
-        for row in csv.DictReader(open(lp, encoding="utf-8")):
+        for row in read_csv_dicts(lp):
             last[row.get("code", "")] = row
         for r in recs:
             if r["ipo_year"] != y or r["status"] != "no_file":
@@ -2521,7 +2521,7 @@ def measure_main(args):
     pilot_cmp = None
     ppath = os.path.join(ROOT, "reports", "data_gates", "G0", "s3_network_prospectus_pilot_2018.json")
     if os.path.exists(ppath):
-        pj = json.load(open(ppath, encoding="utf-8"))
+        pj = read_json(ppath)
         py = per_year_lift["2018"]
         pfd = (pj["rates"].get("failure_decomposition") or {})
         pilot_cmp = {
@@ -2622,7 +2622,7 @@ def measure_main(args):
     ppre = args.pre_fix_report
     if ppre and os.path.exists(ppre):
         try:
-            p = json.load(open(ppre, encoding="utf-8"))
+            p = read_json(ppre)
             pfd = p["rates"]["failure_decomposition_pooled"]
             plp = p["anchor_readout"]["pooled_main_years_2015_2020"]
             pre = {
@@ -2657,7 +2657,7 @@ def measure_main(args):
     pre2, repair2 = None, None
     if args.pre_fix_report2 and os.path.exists(args.pre_fix_report2):
         try:
-            q = json.load(open(args.pre_fix_report2, encoding="utf-8"))
+            q = read_json(args.pre_fix_report2)
             qfd = q["rates"]["failure_decomposition_pooled"]
             qlp = q["anchor_readout"]["pooled_main_years_2015_2020"]
             qres = [k for k in qfd.keys() if k.startswith("残差桶") or k == "非 A 股实体"]
@@ -2845,7 +2845,7 @@ def measure_main(args):
         os.replace(tmp, path)
 
     _atomic_write(out, lambda f: json.dump(result, f, ensure_ascii=False, indent=1))
-    json.load(open(out, encoding="utf-8"))      # 写后回读校验（防半写/编码损坏）
+    read_json(out)      # 写后回读校验（防半写/编码损坏）
     with open(detail_csv, "w", encoding="utf-8", newline="") as f:
         w = csv.writer(f)
         w.writerow(["code", "ipo_year", "status", "channel", "located", "page_count", "char_count",
@@ -2893,7 +2893,7 @@ import time
 from datetime import datetime, timezone
 
 import pymupdf
-
+from pathlib import Path
 
 
 # 修 5（registry 1.5.15）：R2 标签集补「证券代码 / 公司代码」（原仅「股票代码」）——
@@ -2914,10 +2914,6 @@ import pymupdf
 # 再升科技 / 同花顺 / 大族激光 / 多氟多 / 中科三环 …）——只留纯虚词，避免误伤真名。
 
 
-
-
-
-
 # 抽取层精度过滤：财务科目/表格通用词的**子串**黑名单（命中即弃；公司名不含这些子串）
 # 弱证据规则（R4 列举 / R5 表格行，无代码锚定）的加严词表：科目/资产/费用/客户分部件类
 # 连接词/句式子串：出现即说明该 token 是句子片段而非公司名（公司名不含这些连接成分）
@@ -2933,28 +2929,7 @@ import pymupdf
 # 修 3（registry 1.5.17）：GEN_SUB 判据 = **整名 ≈ 通用词**（+ 公司后缀豁免）。
 
 
-
-
 # 修 2（registry 1.5.17）：unmapped 兜底类**改名**——原「非 A 股实体」是断言而非判据证据。
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 # ---- 修 1（2026-10-13 修正轮）：R3「代码+短名」名称形态约束 ----
@@ -2964,29 +2939,10 @@ import pymupdf
 # ④ 与 R1/R2 交叉校验（不得是本文档 R1/R2 候选名的真片段）。
 
 
-
-
-
-
-
-
-
-
-
-
-
 # ---------------------------------------------------------------- dictionaries
 
 
-
-
-
-
 # ---------------------------------------------------------------- P2 locate
-
-
-
-
 
 
 # ------------------------------------------------- OCR 回退通道（全量轮新增；registry 1.5.13 预登记）
@@ -2996,22 +2952,10 @@ import pymupdf
                            # 见 ocr_tesseract_chunk.sh 的 OMP_THREAD_LIMIT=2）
 
 
-
-
-
-
-
-
-
-
 # ---------------------------------------------------------------- P3 extract
 
 
-
-
 # ---------------------------------------------------------------- P4 map
-
-
 
 
 # ---------------------------------------------------------------- P5 classify
@@ -3022,41 +2966,13 @@ import pymupdf
 # 地名/区域前缀（2 字判据排除项：地名同头不是改名证据）与非实体后缀词（子公司/设施/项目实体）
 
 
-
-
-
-
-
-
 # ---------------------------------------------------------------- 全量轮 ingest（registry 1.5.13）
-
-
-
-
 
 
 # ---------------------------------------------------------------- 全量测量（registry 1.5.13 汇总轮）
 # 口径（逐字沿用试点，判据零改动）：四项定义 / 停机线 / 匹配口径（精确 + 后缀归一化 + 代码锚定）、
 # 覆盖率分母 = 2015–2023 cohort 全量（2,656）；逐 IPO 年 Y 用其 network_version_used（min(Y+2,2023)
 # + fallback v1_2022）；边界年子集 {2021,2022,2023} 单列、不混入主读数。
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 def main():

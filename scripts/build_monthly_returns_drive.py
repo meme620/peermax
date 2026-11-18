@@ -25,6 +25,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from fileio import read_pickle
 
 ROOT = Path(__file__).resolve().parents[1]
 DRIVE_PX = ROOT / "data/raw/drive/daily_close_none_20260630.pkl"
@@ -33,7 +34,7 @@ OUT = ROOT / "artifacts/monthly_returns_drive_rebuild.csv"
 
 
 def build(with_status: bool) -> pd.DataFrame:
-    px = pickle.load(open(DRIVE_PX, "rb"))
+    px = read_pickle(DRIVE_PX)
     me = px.resample("ME").last()
     cnt = px.notna().resample("ME").sum()
     ret = me / me.shift(1) - 1.0

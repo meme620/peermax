@@ -18,6 +18,7 @@ import pickle
 import os
 import sys
 from collections import defaultdict
+from fileio import read_pickle
 
 PROC = os.path.join(os.path.dirname(__file__), "..", "data", "processed")
 RAW_TENCENT = os.path.join(os.path.dirname(__file__), "..", "data", "raw", "tencent", "daily_raw")
@@ -44,7 +45,7 @@ def main():
 
     # 1.5 Drive 官方换手率（全期 2000 起；batch2 决定替换自算口径）
     drive_to = {}
-    _dt = pickle.load(open(os.path.join(PROC, "..", "raw", "drive", "daily_turnover_rate_20260630.pkl"), "rb"))
+    _dt = read_pickle(os.path.join(PROC, "..", "raw", "drive", "daily_turnover_rate_20260630.pkl"))
     _dtm = _dt.resample("ME").mean()
     for _d, _row in _dtm.iterrows():
         _m = _d.strftime("%Y-%m")

@@ -25,6 +25,7 @@ import pandas as pd
 import numpy as np
 
 from analyst_meta import attach_meta
+from fileio import read_pickle
 
 FIN = 'data/raw/eastmoney/finance/*.csv'
 EDGES = Path('data/processed/analyst/edges')
@@ -68,7 +69,7 @@ def load_financials():
         try:
             df = pd.read_csv(f, usecols=['SECURITY_CODE', 'REPORT_DATE', 'NOTICE_DATE',
                                          'TOTALOPERATEREVETZ', 'PARENTNETPROFITTZ'])
-        except Exception:
+        except (OSError, ValueError, pd.errors.ParserError, pd.errors.EmptyDataError):
             continue
         frames.append(df)
     fin = pd.concat(frames, ignore_index=True)
@@ -93,7 +94,7 @@ def main():
     fin = load_financials()
     # 2026-08-29：控制变量改用 Drive 全期市值/BM（原 firm_chars_clean 仅 2018 起，限制 9A 到短样本）
     def _drive_chars(fname, col):
-        d = pickle.load(open(Path('data/raw/drive') / fname, 'rb')).resample('ME').last()
+        d = read_pickle(Path('data/raw/drive') / fname).resample('ME').last()
         s = d.stack().reset_index()
         s.columns = ['month', 'firm_id', col]
         s['firm_id'] = s['firm_id'].astype(str).str.split('.').str.get(0)

@@ -512,7 +512,7 @@ def _f(x, nd=5):
     try:
         if isinstance(x, float) and not np.isfinite(x):
             return 'NA'
-    except Exception:
+    except (TypeError, ValueError):
         pass
     return f'{x:.{nd}f}' if isinstance(x, (int, float)) else str(x)
 

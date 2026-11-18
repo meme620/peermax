@@ -126,6 +126,30 @@ ALLOWED_ROLES = {'library', 'stage', 'analysis', 'support', 'oneoff', 'deliverab
 TEXT_SUFFIXES = {'.py', '.md', '.csv', '.yaml', '.yml', '.sh'}
 
 
+def check_hygiene(root: pathlib.Path) -> list:
+    """禁止回流的三种坏味道：脚本里 sys.path.insert、裸 except 吞异常、except Exception: pass。"""
+    import ast
+
+    problems = []
+    # runpy 不会把脚本目录放进 sys.path[0]，bootstrap 必须自己插；其余脚本禁插。
+    PATH_INSERT_EXEMPT = {'peerlab/bootstrap.py'}
+    for base in ('scripts', 'peerlab'):
+        for path in sorted((root / base).glob('*.py')):
+            rel = path.relative_to(root).as_posix()
+            tree = ast.parse(path.read_text(encoding='utf-8'))
+            for node in ast.walk(tree):
+                if (rel not in PATH_INSERT_EXEMPT and isinstance(node, ast.Call)
+                        and ast.unparse(node.func) in {'sys.path.insert', '_sys.path.insert'}):
+                    problems.append(f'{rel}:{node.lineno}: sys.path.insert（脚本目录已在 sys.path[0]）')
+                if isinstance(node, ast.ExceptHandler):
+                    if node.type is None:
+                        problems.append(f'{rel}:{node.lineno}: 裸 except')
+                    elif isinstance(node.type, ast.Name) and node.type.id == 'Exception':
+                        if len(node.body) == 1 and isinstance(node.body[0], (ast.Pass, ast.Continue)):
+                            problems.append(f'{rel}:{node.lineno}: except Exception 后直接 pass/continue（收窄异常类型）')
+    return problems
+
+
 def check_script_literals(root: pathlib.Path, paths=None) -> list:
     """代码、文档、清单里出现的 scripts/<name>.py 必须真的存在。
 
@@ -271,6 +295,7 @@ def run(root: pathlib.Path = ROOT, experiments=None) -> tuple:
                 + check_local_imports(root)
                 + check_script_sources(root)
                 + check_text_io_encoding(root)
+                + check_hygiene(root)
                 + check_script_literals(root)
                 + check_inventory(root)
                 + check_oneoff_imports(root))

@@ -30,6 +30,7 @@ import pandas as pd
 
 from pathlib import Path
 import re
+from fileio import read_pickle
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -268,7 +269,7 @@ def load_st() -> pd.DataFrame:
     import pickle
     import warnings
     warnings.filterwarnings('ignore')
-    d = pickle.load(open(ST_PKL, 'rb'))
+    d = read_pickle(ST_PKL)
     d.index = pd.to_datetime(d.index)
     d = d.loc['2014-01-01':'2024-01-31']
     me = d.resample('ME').max()          # 当月是否曾 ST（保守：曾 ST 即标 1）
@@ -306,7 +307,7 @@ def _drive_monthly_wide(pkl, how: str) -> pd.DataFrame:
     import pickle
     import warnings
     warnings.filterwarnings('ignore')
-    d = pickle.load(open(pkl, 'rb'))
+    d = read_pickle(pkl)
     d.index = pd.to_datetime(d.index)
     d = d.loc['2014-06-01':'2024-01-31']
     if how == 'sum':
@@ -1439,18 +1440,6 @@ import pandas as pd
 # registry_path 仅作测试注入；生产调用一律用 configs/parameter_registry.yaml。
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 # sample 窗口（registry sample_start/sample_end，事件月口径；当前 2015-01 / 2023-12）
 SAMPLE_WINDOW_START, SAMPLE_WINDOW_END = sample_window_bounds()
 
@@ -1460,24 +1449,7 @@ SAMPLE_WINDOW_START, SAMPLE_WINDOW_END = sample_window_bounds()
 # 并在报告中登记来源，不猜参数名。outcome-blind 事前冻结，不按 v1/v2 结果调整。
 
 
-
-
-
-
-
-
-
 # ---------------------------------------------------------------- 基础工具
-
-
-
-
-
-
-
-
-
-
 
 
 # ---------------------------------------------------------------- M1 主输入锚（Phase 1 I-3）
@@ -1488,40 +1460,10 @@ SAMPLE_WINDOW_START, SAMPLE_WINDOW_END = sample_window_bounds()
 # sha 不匹配一律 SystemExit(2)，禁止回退实测值或自动刷新 manifest。
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 # ---------------------------------------------------------------- 输入契约硬门（Phase 1 I-2）
 # 四条硬门（字段名 == s3_m1_sample_report.json:contracts.<column> 的实际键名）：
 #   rows_match_registered / pit_violations_strict_lt /
 #   duplicate_focal_month_keys / missing_filled_with_zero
-
-
-
-
-
-
-
-
-
-
 
 
 def months_between(start: str, end: str) -> list:
@@ -1537,88 +1479,12 @@ def ym_add(month: str, k: int) -> str:
 # ---------------------------------------------------------------- 统计工具
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 # ---------------------------------------------------------------- FM 回归
-
-
-
-
-
-
-
-
 
 
 # ---------------------------------------------------------------- 装载
 
 # W1 bundle（P1.2-01 A1 + D-08 B）v4 面板列集（43 + PeerMAXraw_renorm/formula_id_max_renorm）
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 # ---------------------------------------------------------------- 边表与权重变体

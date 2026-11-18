@@ -21,7 +21,6 @@ import argparse
 import csv
 import json
 import re
-import ssl
 import time
 import urllib.request
 from collections import Counter, defaultdict
@@ -40,18 +39,13 @@ UA = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.3
 DELAY = 0.6
 
 
-def _ctx():
-    c = ssl.create_default_context()
-    c.check_hostname = False
-    c.verify_mode = ssl.CERT_NONE
-    return c
 
 
 def fetch_sw_industry(code6: str):
     """返回 (l1_name, l2_name) 或 None。"""
     url = f'https://basic.10jqka.com.cn/{code6}/company.html'
     req = urllib.request.Request(url, headers=UA)
-    with urllib.request.urlopen(req, timeout=40, context=_ctx()) as r:
+    with urllib.request.urlopen(req, timeout=40) as r:
         html = r.read().decode('gbk', 'ignore')
     m = re.search(r'所属申万行业[：:]\s*</strong>\s*<span>([^<]{1,60})</span>', html)
     if not m:

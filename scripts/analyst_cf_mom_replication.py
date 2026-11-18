@@ -42,7 +42,6 @@ _SPEC_HASH = hashlib.sha256(SPEC.read_bytes()).hexdigest()
 _INPUT_HASHES = _SPEC['provenance']['input_hashes']
 
 
-
 def main():
     global NET_VER, RET
     weight_mode = sys.argv[1] if len(sys.argv) > 1 else 'count'

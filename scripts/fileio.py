@@ -8,6 +8,7 @@ import datetime
 import hashlib
 import json
 import os
+import pickle
 from datetime import datetime
 from pathlib import Path
 
@@ -22,12 +23,31 @@ def atomic_write_text(path: Path, text: str) -> None:
     os.replace(tmp, path)
 
 
-def write_json_atomic(obj: dict, path: Path) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(path.name + ".tmp")
-    tmp.write_text(json.dumps(obj, ensure_ascii=False, indent=2) + "\n",
-                   encoding="utf-8")
-    os.replace(tmp, path)
+def read_json(path):
+    with open(path, encoding='utf-8') as f:
+        return json.load(f)
+
+
+def read_pickle(path):
+    with open(path, 'rb') as f:
+        return pickle.load(f)
+
+
+def write_json_atomic(obj: dict, path: Path, *, indent: int = 2, default=None,
+                      trailing_newline: bool = True) -> None:
+    """JSON 原子写。indent / trailing_newline 保留既有两种产物的字节形态，勿随手统一。"""
+    text = json.dumps(obj, ensure_ascii=False, indent=indent, default=default)
+    if trailing_newline:
+        text += "\n"
+    atomic_write_text(Path(path), text)
+
+
+def write_parquet_atomic(df, path) -> None:
+    p = Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    tmp = p.with_name(p.name + ".tmp.parquet")
+    df.to_parquet(tmp, index=False)
+    os.replace(tmp, p)
 
 
 def sha256_file(path: Path) -> str:
@@ -68,6 +88,16 @@ def assert_path_allowed(path, allowed_roots=(), banned_roots=()) -> Path:
               file=sys.stderr, flush=True)
         raise SystemExit(2)
     return p
+
+
+def read_csv_dicts(path, encoding: str = 'utf-8') -> list:
+    with open(path, encoding=encoding, newline='') as f:
+        return list(csv.DictReader(f))
+
+
+def read_csv_rows(path, encoding: str = 'utf-8') -> list:
+    with open(path, encoding=encoding, newline='') as f:
+        return list(csv.reader(f))
 
 
 def write_csv_rows(path, rows, header) -> None:

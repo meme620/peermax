@@ -4,6 +4,7 @@ import pandas as pd, numpy as np
 from pathlib import Path
 import yaml
 from analyst_meta import attach_meta
+from fileio import read_pickle
 
 warnings.filterwarnings('ignore')
 
@@ -12,7 +13,7 @@ _SPEC = yaml.safe_load(SPEC.read_text(encoding='utf-8'))
 RET = Path(_SPEC['inputs']['returns'])
 EDGE_DIR = Path('data/processed/analyst/edges')
 
-ind = pickle.load(open('data/raw/drive/ind_code.pkl','rb'))
+ind = read_pickle('data/raw/drive/ind_code.pkl')
 ind.index = [c.split('.')[0] for c in ind.index]
 ind = ind.dropna()
 print(f"行业分类: {len(ind)} 家, {ind.nunique()} 类", flush=True)

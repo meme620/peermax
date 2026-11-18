@@ -17,7 +17,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from analyst_cf_mom_replication import nw_t, EDGES, NET_VER
+from analyst_cf_mom_replication import EDGES, NET_VER
+from statsutil import nw_t
 from analyst_meta import attach_meta
 
 SRC = 'data/processed/analyst/s3a_step3_clean.csv'

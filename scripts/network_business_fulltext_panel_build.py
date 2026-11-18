@@ -41,6 +41,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from fileio import read_csv_rows
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -94,7 +95,7 @@ def load_meta() -> tuple[dict, dict]:
             ident[(r['code6'], int(r['year']))] = r
     fmap = {}
     if IDMAP.exists():
-        for r in csv.reader(open(IDMAP, encoding='utf-8')):
+        for r in read_csv_rows(IDMAP, encoding='utf-8'):
             if r and r[0] != 'firm_id':
                 fmap[r[1]] = r[0]
     return ident, fmap

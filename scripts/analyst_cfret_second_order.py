@@ -12,8 +12,11 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from analyst_cf_mom_replication import nw_t, _next_month, EDGES, RET, MEQ, NET_VER
+from dates import next_month as _next_month
+from analyst_cf_mom_replication import EDGES, RET, MEQ, NET_VER
+from statsutil import nw_t
 from analyst_meta import attach_meta
+from fileio import read_pickle
 
 # 与主复刻一致：网络版本和输入由统一 spec 决定
 DRIVE = Path('data/raw/drive')
@@ -44,9 +47,9 @@ def main():
     meq = meq[['firm_id', 'month', 'me']].dropna()
     _ipo = pd.read_csv('data/processed/firm_id_map.csv', dtype=str)
     _ipo_map = dict(zip(_ipo['code6'].str.strip(), _ipo['ipo_date'].str.strip()))
-    mv = stack(month_end(pickle.load(open(DRIVE / 'daily_a_share_market_val_3_20260630.pkl', 'rb'))), 'mv')
-    bm = stack(month_end(pickle.load(open(DRIVE / 'daily_book_to_market_ratio_ttm_20260630.pkl', 'rb'))), 'bm')
-    tr = stack(month_end(pickle.load(open(DRIVE / 'daily_turnover_rate_20260630.pkl', 'rb'))), 'turn')
+    mv = stack(month_end(read_pickle(DRIVE / 'daily_a_share_market_val_3_20260630.pkl')), 'mv')
+    bm = stack(month_end(read_pickle(DRIVE / 'daily_book_to_market_ratio_ttm_20260630.pkl')), 'bm')
+    tr = stack(month_end(read_pickle(DRIVE / 'daily_turnover_rate_20260630.pkl')), 'turn')
     # 2026-09-10 Gate 4.14：完整形成月市场横截面 q10（与主复刻同口径）
     q10_full = meq.groupby('month')['me'].quantile(0.10)
     rows = []

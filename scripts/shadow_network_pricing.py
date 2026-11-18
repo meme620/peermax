@@ -25,14 +25,13 @@ import time
 from datetime import datetime, timezone
 import numpy as np
 import pandas as pd
-from pricing_lib import (  # noqa: E402
+from pricing_lib import (
     assert_m1_inputs_sha, fm_regression, param_value, require, sha256_file,
     winsor_bounds, winsorize_by_month,
 )
-from peermax_panel_build import (  # noqa: E402
+from peermax_panel_build import (
     NETWORK_AVAILABLE_AT_RULE, load_versions, select_version,
 )
-
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -688,16 +687,6 @@ def evaluate_q_status(rows: pd.DataFrame, coverage: dict, net_metrics: dict,
 # --- end scripts/lib bootstrap ---
 
 
-
-
-
-
-
-
-
-
-
-
 # ------------------------------------------------------------------ 输出路径守卫
 
 
@@ -716,53 +705,19 @@ class _Tee:
         self.fh.flush()
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 # ------------------------------------------------------------------ 锚 / sha 台账
-
-
-
-
-
-
 
 
 # ------------------------------------------------------------------ 网络装载 / 月份映射
 
 
-
-
-
-
 # ------------------------------------------------------------------ 聚合
-
-
-
-
-
-
 
 
 # ------------------------------------------------------------------ 固定样本 treatment
 
 
-
-
 # ------------------------------------------------------------------ FM
-
-
-
-
 
 
 # ------------------------------------------------------------------ 相关矩阵

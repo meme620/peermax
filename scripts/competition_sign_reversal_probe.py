@@ -50,7 +50,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from pricing_lib import (  # noqa: E402
+from pricing_lib import (
     OUT_DIR, ROOT, fm_regression, newey_west, param_value, rank_average_groups, write_json,
 )
 

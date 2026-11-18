@@ -11,6 +11,7 @@
 import csv
 from collections import Counter
 from pathlib import Path
+from fileio import read_csv_dicts
 
 ROOT = Path(__file__).resolve().parents[1]
 TXT = ROOT / "data/raw/cninfo/annual_txt"
@@ -20,7 +21,7 @@ MIN_BYTES = 8000
 
 
 def main():
-    rows = list(csv.DictReader(open(IDENT, encoding="utf-8")))
+    rows = read_csv_dicts(IDENT, encoding="utf-8")
     queue = []
     reason_c = Counter()
     for r in rows:

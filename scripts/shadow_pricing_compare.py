@@ -25,7 +25,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from fileio import json_default as _json_default
+from fileio import assert_path_allowed, atomic_write_text, json_default, write_csv_rows, write_json_atomic
 
 import argparse
 import csv as _csv
@@ -34,14 +34,11 @@ import os
 from datetime import datetime, timezone
 import numpy as np
 import pandas as pd
-from fileio import atomic_write_text as _atomic_write_text  # noqa: E402
-from pricing_lib import (  # noqa: E402
+from pricing_lib import (
     RETURNS_V2, ROOT, assert_m1_inputs_sha, fm_regression, load_amount_100m, load_edges,
     param_value, require, sha256_file, winsor_bounds, ym_add,
 )
-from peermax_panel_build import load_versions, select_version  # noqa: E402
-from fileio import assert_path_allowed  # noqa: E402
-
+from peermax_panel_build import load_versions, select_version
 
 
 SHADOW_DIR = ROOT / 'data/processed/phase2_shadow'
@@ -145,7 +142,7 @@ def assert_output_path_guard(path) -> None:
         *HEADLINE_GUARD_FILES.values(), ROOT / 'data', ROOT / 'reports',
         ROOT / 'configs', ROOT / 'scripts', ROOT / 'tests'))
 
-def _json_default(o):
+def json_default(o):
     """numpy 标量/bool_ -> 原生类型（确保 counts JSON 可序列化且可复算）。"""
     if isinstance(o, (np.integer,)):
         return int(o)
@@ -163,23 +160,13 @@ def _rel_or_abs(p) -> str:
         return Path(p).resolve().as_posix()
 
 def write_json(path, obj) -> None:
-    assert_output_path_guard(path)
-    _atomic_write_text(Path(path), json.dumps(obj, ensure_ascii=False, indent=1,
-                                               default=_json_default))
+    write_json_atomic(obj, assert_output_path_guard(path), indent=1, default=json_default,
+                      trailing_newline=False)
     print(f'  -> {_rel_or_abs(path)}', flush=True)
 
 def write_csv(path, rows, columns) -> None:
-    assert_output_path_guard(path)
-    p = Path(path)
-    p.parent.mkdir(parents=True, exist_ok=True)
-    tmp = p.with_name(p.name + '.tmp')
-    with open(tmp, 'w', encoding='utf-8', newline='') as f:
-        w = _csv.DictWriter(f, fieldnames=list(columns), extrasaction='ignore')
-        w.writeheader()
-        for r in rows:
-            w.writerow(r)
-    os.replace(tmp, p)
-    print(f'  -> {_rel_or_abs(p)}', flush=True)
+    write_csv_rows(assert_output_path_guard(path),
+                   [[r.get(c, '') for c in columns] for r in rows], columns)
 
 def _num(v):
     if v is None:

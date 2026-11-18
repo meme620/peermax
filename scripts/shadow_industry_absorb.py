@@ -55,13 +55,11 @@ import time
 from datetime import datetime, timezone
 import numpy as np
 import pandas as pd
-from pricing_lib import (  # noqa: E402
+from pricing_lib import (
     assert_m1_inputs_sha, fm_regression, newey_west, param_value,
     require, sha256_file, vif_table,
 )
-from fileio import json_default as _json_default
-from fileio import assert_path_allowed  # noqa: E402
-
+from fileio import assert_path_allowed, json_default, write_csv_rows, write_json_atomic, write_parquet_atomic
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -202,7 +200,8 @@ def _atomic_text(path, text: str) -> None:
     os.replace(tmp, p)
 
 def write_json(path, obj) -> None:
-    _atomic_text(path, json.dumps(obj, ensure_ascii=False, indent=1, default=_json_default))
+    write_json_atomic(obj, assert_output_path_guard(path), indent=1, default=json_default,
+                      trailing_newline=False)
 
 def fmt(v) -> str:
     if v is None:
@@ -219,22 +218,11 @@ def fmt(v) -> str:
     return str(v)
 
 def write_csv(path, header, rows) -> None:
-    p = assert_output_path_guard(path)
-    p.parent.mkdir(parents=True, exist_ok=True)
-    tmp = p.with_name(p.name + '.tmp')
-    with open(tmp, 'w', newline='', encoding='utf-8') as fh:
-        w = csv.writer(fh)
-        w.writerow(header)
-        for r in rows:
-            w.writerow([fmt(r.get(k)) for k in header])
-    os.replace(tmp, p)
+    write_csv_rows(assert_output_path_guard(path),
+                   [[fmt(r.get(k)) for k in header] for r in rows], header)
 
 def write_parquet(path, df: pd.DataFrame) -> None:
-    p = assert_output_path_guard(path)
-    p.parent.mkdir(parents=True, exist_ok=True)
-    tmp = p.with_name(p.name + '.tmp.parquet')
-    df.to_parquet(tmp, index=False)
-    os.replace(tmp, p)
+    write_parquet_atomic(df, assert_output_path_guard(path))
 
 def log(msg: str) -> None:
     print(f'[{time.strftime("%H:%M:%S")}] {msg}', flush=True)
@@ -597,18 +585,12 @@ def cluster_industry_cross() -> tuple:
 # --- end scripts/lib bootstrap ---
 
 
-
-
-
-
 # ---------------------------------------------------------------- 路径与常量
-
 
 
 # plan §1.2 E7–E9 / §2.5 R1 预登记值
 # plan E9 预跑用的是 headline **latest** `ind_l2_max_ew`（见 §11 E7/E9 命令），不是 as-of；
 # as-of 主口径的残差化 β 由本脚本现算，单独报（见 `asof_vs_latest`）。
-
 
 
 # 输出路径守卫：只允许 phase3 shadow 与 artifacts/phase3
@@ -617,46 +599,16 @@ def cluster_industry_cross() -> tuple:
 # ---------------------------------------------------------------- 输出守卫与原子写
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 # ---------------------------------------------------------------- 锚台账
-
-
-
-
 
 
 # ---------------------------------------------------------------- 第一阶段：month FE 残差化
 
 
-
-
 # ---------------------------------------------------------------- 规格定义与执行
 
 
-
-
-
-
-
-
-
-
-
-
 # ---------------------------------------------------------------- 团-行业交叉
-
-
 
 
     # note: 仅在 2019 网络年（text_year=2018）核对审计读数，不做事先硬门

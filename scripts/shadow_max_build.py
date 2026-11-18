@@ -55,6 +55,7 @@ import math
 import numpy as np
 import os
 import pandas as pd
+from fileio import write_json_atomic
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -901,8 +902,6 @@ import pandas as pd
 from peermax_max_build import LIMIT_CHINEXT_STAR, LIMIT_MAIN, LIMIT_MAIN_ST, board_of, load_st_flags, resolve_tie_rule
 
 
-
-
 # 追加列（旧列顺序不变，新列只追加在末尾）。
 # 每列的输出格式：int / float / str / raw（原样字符串）。
 
@@ -910,59 +909,19 @@ from peermax_max_build import LIMIT_CHINEXT_STAR, LIMIT_MAIN, LIMIT_MAIN_ST, boa
 # --------------------------------------------------------------------------- IO
 
 
-
-
 # ---------------------------------------------------------------- headline 锚
-
-
-
-
-
-
 
 
 # ---------------------------------------------------------------- 日历/复牌
 
 
-
-
-
-
-
-
-
-
 # ---------------------------------------------------------------- official flags
-
-
-
-
-
-
-
-
 
 
 # ---------------------------------------------------------------- 构造 shadow
 
 
 # ---------------------------------------------------------------- 计数
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 # ---------------------------------------------------------------- main

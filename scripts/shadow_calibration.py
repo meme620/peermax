@@ -58,7 +58,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from fileio import atomic_write_text as _atomic_write_text
+from fileio import assert_path_allowed, atomic_write_text, json_default, write_csv_rows, write_json_atomic
 
 import argparse
 import csv
@@ -70,13 +70,10 @@ from datetime import datetime, timezone
 import numpy as np
 import pandas as pd
 import shadow_asof_industry as p31  # noqa: E402  （as-of 映射 / lift / 锚台账：3.1 交接件，只读复用）
-from pricing_lib import assert_m1_inputs_sha, require, sha256_file  # noqa: E402
-from peermax_panel_build import (  # noqa: E402
+from pricing_lib import assert_m1_inputs_sha, require, sha256_file
+from peermax_panel_build import (
     NETWORK_AVAILABLE_AT_RULE, load_versions, select_version,
 )
-from fileio import json_default as _json_default
-from fileio import assert_path_allowed  # noqa: E402
-
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -247,7 +244,7 @@ def assert_output_path_guard(path) -> Path:
         raise SystemExit(2)
     return p
 
-def _atomic_write_text(path, text: str) -> None:
+def atomic_write_text(path, text: str) -> None:
     p = assert_output_path_guard(path)
     p.parent.mkdir(parents=True, exist_ok=True)
     tmp = p.with_name(p.name + '.tmp')
@@ -255,21 +252,14 @@ def _atomic_write_text(path, text: str) -> None:
     os.replace(tmp, p)
 
 def write_json(path, obj) -> None:
-    _atomic_write_text(path, json.dumps(obj, ensure_ascii=False, indent=1, default=_json_default))
+    write_json_atomic(obj, assert_output_path_guard(path), indent=1, default=json_default,
+                      trailing_newline=False)
 
 def write_csv(path, rows, header) -> None:
-    p = assert_output_path_guard(path)
-    p.parent.mkdir(parents=True, exist_ok=True)
-    tmp = p.with_name(p.name + '.tmp')
-    with open(tmp, 'w', newline='', encoding='utf-8') as fh:
-        w = csv.writer(fh)
-        w.writerow(header)
-        for r in rows:
-            w.writerow(r)
-    os.replace(tmp, p)
+    write_csv_rows(assert_output_path_guard(path), rows, header)
 
 def write_text(path, text: str) -> None:
-    _atomic_write_text(path, text)
+    atomic_write_text(assert_output_path_guard(path), text)
 
 def log(msg: str) -> None:
     print(f'[{time.strftime("%H:%M:%S")}] {msg}', flush=True)
@@ -1302,10 +1292,6 @@ def step_postflight(counts) -> dict:
 # --- end scripts/lib bootstrap ---
 
 
-
-
-
-
 # ---------------------------------------------------------------- 路径与常量
 
 
@@ -1323,30 +1309,10 @@ def step_postflight(counts) -> dict:
 # ---------------------------------------------------------------- 输出路径守卫
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 # ---------------------------------------------------------------- 锚台账（复用 3.1 语义）
 
 
 # ---------------------------------------------------------------- 变体登记 / 目标
-
-
-
-
-
-
-
-
 
 
 # ---------------------------------------------------------------- 逐年词表（L-6）
@@ -1355,79 +1321,13 @@ def step_postflight(counts) -> dict:
 # ---------------------------------------------------------------- 网络构建（复用现脚本）
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 # ---------------------------------------------------------------- 扩展 K 阶梯（目标可达性 + 二级 K 选择）
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 # ---------------------------------------------------------------- 读数 / 对比 / 验收
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 # ---------------------------------------------------------------- steps 入口
-
-
 
 
 def main():

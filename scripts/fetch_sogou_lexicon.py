@@ -27,7 +27,6 @@ import argparse
 import csv
 import json
 import re
-import ssl
 import struct
 import time
 import urllib.parse
@@ -57,11 +56,6 @@ UA = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.3
 DELAY = 0.25
 
 
-def _ctx():
-    c = ssl.create_default_context()
-    c.check_hostname = False
-    c.verify_mode = ssl.CERT_NONE
-    return c
 
 
 def fetch(url, timeout=45) -> bytes:
@@ -69,7 +63,7 @@ def fetch(url, timeout=45) -> bytes:
     hdrs = dict(UA)
     hdrs['Referer'] = 'https://pinyin.sogou.com/dict/'
     req = urllib.request.Request(url, headers=hdrs)
-    with urllib.request.urlopen(req, timeout=timeout, context=_ctx()) as r:
+    with urllib.request.urlopen(req, timeout=timeout) as r:
         return r.read()
 
 

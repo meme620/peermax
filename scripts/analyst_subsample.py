@@ -4,14 +4,16 @@
 import pickle, sys, warnings
 import pandas as pd, numpy as np
 from pathlib import Path
+from fileio import read_pickle
 warnings.filterwarnings('ignore')
-from analyst_cf_mom_replication import _next_month, EDGES, RET, MEQ, NET_VER
+from dates import next_month as _next_month
+from analyst_cf_mom_replication import EDGES, RET, MEQ, NET_VER
 from analyst_meta import attach_meta
 
 d = Path('data/raw/drive')
-c300 = pickle.load(open(d/'daily_csi300_components.pkl','rb')); c300.columns=[c.split('.')[0] for c in c300.columns]
-c500 = pickle.load(open(d/'daily_csi500_components.pkl','rb')); c500.columns=[c.split('.')[0] for c in c500.columns]
-mv = pickle.load(open(d/'daily_a_share_market_val_3_20260630.pkl','rb')); mv.columns=[c.split('.')[0] for c in mv.columns]
+c300 = read_pickle(d/'daily_csi300_components.pkl'); c300.columns=[c.split('.')[0] for c in c300.columns]
+c500 = read_pickle(d/'daily_csi500_components.pkl'); c500.columns=[c.split('.')[0] for c in c500.columns]
+mv = read_pickle(d/'daily_a_share_market_val_3_20260630.pkl'); mv.columns=[c.split('.')[0] for c in mv.columns]
 def month_end(df):
     m = df.resample('ME').last(); m.index=[c.strftime('%Y-%m') for c in m.index]
     return m

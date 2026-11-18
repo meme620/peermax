@@ -95,6 +95,26 @@ def test_text_io_without_encoding_reported(tmp_path: Path) -> None:
     assert len(problems) == 2
 
 
+def test_hygiene_flags_blanket_except(tmp_path: Path) -> None:
+    (tmp_path / 'scripts').mkdir()
+    (tmp_path / 'scripts' / 'bad.py').write_text(
+        "try:\n    pass\nexcept Exception:\n    pass\n", encoding='utf-8')
+    problems = lint.check_hygiene(tmp_path)
+    assert any('pass/continue' in p for p in problems)
+
+
+def test_hygiene_flags_path_insert_but_exempts_bootstrap(tmp_path: Path) -> None:
+    (tmp_path / 'scripts').mkdir()
+    (tmp_path / 'scripts' / 'bad.py').write_text(
+        "import sys\nsys.path.insert(0, 'x')\n", encoding='utf-8')
+    (tmp_path / 'peerlab').mkdir()
+    (tmp_path / 'peerlab' / 'bootstrap.py').write_text(
+        "import sys\nsys.path.insert(0, 'x')\n", encoding='utf-8')
+    problems = lint.check_hygiene(tmp_path)
+    assert any('scripts/bad.py' in p for p in problems)
+    assert not any('bootstrap' in p for p in problems)
+
+
 def test_binary_open_needs_no_encoding(tmp_path: Path) -> None:
     (tmp_path / 'scripts').mkdir()
     (tmp_path / 'scripts' / 'ok.py').write_text("open('x', 'rb')\n", encoding='utf-8')

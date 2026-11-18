@@ -13,6 +13,7 @@ import csv
 import collections
 import re
 from pathlib import Path
+from fileio import read_csv_dicts
 
 ROOT = Path(__file__).resolve().parents[1]
 TXT = ROOT / "data/raw/cninfo/annual_txt"
@@ -57,7 +58,7 @@ def load_names():
 
 def main():
     name2codes, name_pat = load_names()
-    rows = list(csv.DictReader(open(IDENT, encoding="utf-8")))
+    rows = read_csv_dicts(IDENT, encoding="utf-8")
     updated = 0
     method2 = collections.Counter()
     for row in rows:

@@ -22,11 +22,11 @@ import argparse
 import csv
 import gzip
 import json
-import ssl
 import time
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
+from fileio import read_csv_dicts
 
 ROOT = Path(__file__).resolve().parents[1]
 IDMAP = ROOT / 'data/processed/firm_id_map.csv'
@@ -39,11 +39,6 @@ UA = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.3
 DELAY = 0.25
 
 
-def _ctx():
-    c = ssl.create_default_context()
-    c.check_hostname = False
-    c.verify_mode = ssl.CERT_NONE
-    return c
 
 
 def em_code(firm_id: str) -> str:
@@ -53,7 +48,7 @@ def em_code(firm_id: str) -> str:
 
 def fetch_one(code: str, timeout=45):
     req = urllib.request.Request(URL.format(code=code), headers=UA)
-    with urllib.request.urlopen(req, timeout=timeout, context=_ctx()) as r:
+    with urllib.request.urlopen(req, timeout=timeout) as r:
         raw = r.read()
     # 服务端偶发返回 gzip 体（urllib 不自动解压）→ 按 magic 判断
     if raw[:2] == b'\x1f\x8b':
@@ -72,7 +67,7 @@ def main():
     ap.add_argument('--limit', type=int, default=0)
     args = ap.parse_args()
 
-    idmap = list(csv.DictReader(open(IDMAP, encoding='utf-8')))
+    idmap = read_csv_dicts(IDMAP, encoding='utf-8')
     RAWD.mkdir(parents=True, exist_ok=True)
     failures = []
 
@@ -126,7 +121,7 @@ def main():
             continue
         try:
             d = load_json_gz(fp)
-        except Exception:
+        except (OSError, ValueError):
             continue
         zg = d.get('zygcfx') or []
         if zg:

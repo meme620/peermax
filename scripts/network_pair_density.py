@@ -643,7 +643,6 @@ def gate_block(col: dict) -> dict:
             'crop_density_deviation_check': crop_check}
 
 
-
 def load_stored_ref(chapter_json: Path, weight_json: Path, label: str) -> dict:
     """既有 JSON 的存储值（5 位小数）：teacher 优先取 weighting（9 年）、self 取 chapter（6 年）。"""
     out: dict[int, dict] = {}
@@ -956,7 +955,6 @@ def main() -> None:
         p = outdir / f's3_lift_pair_density_{label}{args.tag}.json'
         p.write_text(json.dumps(results[label], ensure_ascii=False, indent=2), encoding='utf-8')
         print(f'[T1-①②] {label}: 产物写入 -> {p}', flush=True)
-
 
 
 if __name__ == '__main__':

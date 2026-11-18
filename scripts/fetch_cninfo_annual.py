@@ -32,6 +32,7 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import pymupdf
+from pathlib import Path
 
 BASE = os.path.join(os.path.dirname(__file__), "..", "data", "raw", "cninfo")
 CODES = os.path.join(os.path.dirname(__file__), "..", "data", "raw", "baostock", "stock_basic", "a_stocks.csv")
@@ -64,7 +65,7 @@ def load_org_ids(refresh: bool = False):
                 _ORG_IDS = {str(x["code"]): x.get("orgId") for x in json.load(f)}
             if _ORG_IDS:
                 return _ORG_IDS
-        except Exception:
+        except (OSError, ValueError, KeyError):
             pass
     try:
         req = urllib.request.Request("http://www.cninfo.com.cn/new/data/szse_stock.json",
@@ -141,14 +142,14 @@ def em_former_names(code6: str):
         org = re.sub(r"[ \u3000]", "", jb.get("ORG_NAME") or "")
         if len(org) >= 4:
             names.append(org)
-    except Exception:
+    except (KeyError, TypeError, ValueError, AttributeError):
         pass
     cache[code6] = names
     try:
         os.makedirs(BASE, exist_ok=True)
         with open(EM_NAMES_JSON, "w", encoding="utf-8") as f:
             json.dump(cache, f, ensure_ascii=False)
-    except Exception:
+    except (OSError,):
         pass
     return names
 
@@ -175,8 +176,8 @@ def load_names(code6: str):
                 continue
             try:
                 head = re.sub(r"[ \u3000\t]", "",
-                              open(os.path.join(d, fn), encoding="utf-8", errors="replace").read(3000))
-            except Exception:
+                              Path(os.path.join(d, fn)).read_text(encoding='utf-8', errors='replace')[:3000])
+            except (OSError,):
                 continue
             names += re.findall(r"(?:证券简称|股票简称|公司简称)[：:]([\u4e00-\u9fa5A-Za-z0-9]{2,12})", head)
     names += em_former_names(code6)

@@ -41,13 +41,11 @@ import warnings
 from datetime import datetime, timezone
 import numpy as np
 import pandas as pd
-from pricing_lib import (  # noqa: E402
+from pricing_lib import (
     ROOT, TURNOVER_PKL, assert_m1_inputs_sha, drive_code_to_firm_id, fm_regression,
     param_value, require, sha256_file, winsor_bounds,
 )
-from fileio import atomic_write_text as _atomic_write_text
-from fileio import assert_path_allowed  # noqa: E402
-
+from fileio import assert_path_allowed, read_pickle
 
 
 SHADOW_DIR = ROOT / 'data/processed/phase2_shadow'
@@ -125,7 +123,7 @@ def load_turnover_wide(path=TURNOVER_PKL) -> pd.DataFrame:
     """只读 Drive 日换手率宽表（index=交易日，columns=Drive code）。"""
     with warnings.catch_warnings():
         warnings.simplefilter('ignore')
-        d = pickle.load(open(path, 'rb'))
+        d = read_pickle(path)
     d.index = pd.to_datetime(d.index)
     require(isinstance(d, pd.DataFrame) and len(d) > 0, f'turnover pkl 非法: {path}')
     return d
@@ -513,33 +511,16 @@ def plan_replication(stats_plan_window: dict, matrix: dict, diag_matrix: dict,
 # --- end scripts/lib bootstrap ---
 
 
-
-
-
-
-
 # headline 关键文件（本脚本必须不写、且 sha 前后不变）
 
 # shadow turnover CSV 窗口：2014-01..2024-01（与 2.0_plan §2.4 R1 的「匹配 446,301 行」窗口一致；
 # 覆盖 M1 事件月 2015-01..2023-12 与 outcome 月 2015-05..2023-12）
 
 
-
-
 # ---------------------------------------------------------------- 基础 IO
 
 
-
-
-
-
-
-
-
-
 # ---------------------------------------------------------------- 差异统计
-
-
 
 
 # ---------------------------------------------------------------- 控制集（样本只读）
@@ -548,19 +529,7 @@ def plan_replication(stats_plan_window: dict, matrix: dict, diag_matrix: dict,
 # ---------------------------------------------------------------- FM 矩阵
 
 
-
-
-
-
 # ---------------------------------------------------------------- 产物写出
-
-
-
-
-
-
-
-
 
 
 # ---------------------------------------------------------------- 主流程
@@ -742,12 +711,6 @@ def main(argv=None):
     print(f'[2.4] DONE：shadow CSV {out_info["rows"]:,} 行 sha={sha[:12]}…；'
           f'counts/diff/matrix 已落盘', flush=True)
     return 0
-
-
-
-
-
-
 
 
 if __name__ == '__main__':

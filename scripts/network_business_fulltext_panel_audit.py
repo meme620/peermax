@@ -75,7 +75,7 @@ def main() -> int:
     t_all = time.time()
     pan = pd.read_parquet(args.panel, columns=SMALL_COLS)
     lex_sha = sha256(Path(args.lexicon))
-    lex_rows = sum(1 for _ in open(args.lexicon, encoding='utf-8')) - 1
+    lex_rows = len(Path(args.lexicon).read_text(encoding='utf-8').splitlines()) - 1
     psay(f'状态 = 开始；面板 = {Path(args.panel).name}（{len(pan):,} 行）；'
          f'词表 = {Path(args.lexicon).name}（{lex_rows:,} 行，sha256 {lex_sha[:12]}…）')
 

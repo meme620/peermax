@@ -14,7 +14,9 @@ import hashlib
 import pandas as pd
 import numpy as np
 
-from analyst_cf_mom_replication import nw_t, _next_month, EDGES, RET, MEQ, NET_VER, SPEC, _SPEC
+from dates import next_month as _next_month
+from analyst_cf_mom_replication import EDGES, RET, MEQ, NET_VER, SPEC, _SPEC
+from statsutil import nw_t
 from analyst_meta import attach_meta
 
 OUT = Path('data/processed/analyst/npm_replication.json')

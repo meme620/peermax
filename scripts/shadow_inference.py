@@ -64,7 +64,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from fileio import json_default as _json_default
+from fileio import assert_path_allowed, json_default, write_csv_rows, write_json_atomic
 
 import argparse
 import csv
@@ -75,15 +75,13 @@ import time
 from datetime import datetime, timezone
 import numpy as np
 import pandas as pd
-from pricing_lib import (  # noqa: E402
+from pricing_lib import (
     assert_m1_inputs_sha, fm_regression, newey_west, param_value, require, sha256_file,
     two_sided_p, winsor_bounds, _ols,
 )
-from peermax_panel_build import (  # noqa: E402
+from peermax_panel_build import (
     ARGMAX, EXCLUDE_QUAL, RETURNS, load_versions, select_version,
 )
-from fileio import assert_path_allowed  # noqa: E402
-
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -224,7 +222,7 @@ def log(msg: str) -> None:
     else:
         print(line, flush=True)
 
-def _json_default(o):
+def json_default(o):
     if isinstance(o, (np.integer,)):
         return int(o)
     if isinstance(o, (np.floating,)):
@@ -238,22 +236,11 @@ def _json_default(o):
     return str(o)
 
 def write_json(path, obj) -> None:
-    p = assert_output_path_guard(path)
-    tmp = p.with_name(p.name + '.tmp')
-    tmp.write_text(json.dumps(obj, ensure_ascii=False, indent=1, default=_json_default),
-                   encoding='utf-8')
-    os.replace(tmp, p)
+    write_json_atomic(obj, assert_output_path_guard(path), indent=1, default=json_default,
+                      trailing_newline=False)
 
 def write_csv(path, rows, header) -> None:
-    p = assert_output_path_guard(path)
-    p.parent.mkdir(parents=True, exist_ok=True)
-    tmp = p.with_name(p.name + '.tmp')
-    with open(tmp, 'w', newline='', encoding='utf-8') as fh:
-        w = csv.writer(fh)
-        w.writerow(header)
-        for r in rows:
-            w.writerow(r)
-    os.replace(tmp, p)
+    write_csv_rows(assert_output_path_guard(path), rows, header)
 
 def read_csv_rows(path, header):
     p = Path(path)
@@ -876,14 +863,14 @@ def step_n1(inp: Inputs, counts: dict) -> dict:
     for d in eff_year:
         rows.append({'block': 'eff_opponents_by_year', 'item': f'text_year_{d["text_year"]}',
                      'value': d['eff_p50'], 'reference': None, 'n_rows': d['n_focal_with_edges'],
-                     'n_groups': None, 'note': json.dumps(d, ensure_ascii=False, default=_json_default)})
+                     'n_groups': None, 'note': json.dumps(d, ensure_ascii=False, default=json_default)})
     rows += n1['rows']
     inf_rows = []
     for weight in ('EW', 'VW'):
         v = n1['res']['inference'][weight]
         inf_rows.append({'block': 'n1_inference', 'item': f'PeerMAX_{weight}', 'value': v['beta'],
                          'reference': None, 'n_rows': v['T'], 'n_groups': v['n_clusters_total'],
-                         'note': json.dumps(v, ensure_ascii=False, default=_json_default)})
+                         'note': json.dumps(v, ensure_ascii=False, default=json_default)})
     res = {'eff_by_year': eff_year, 'eff_check_2019': eff_check,
            'variance_rows': var_rows, 'variance': var_res,
            'n1_rows': rows, 'inference_rows': inf_rows,
@@ -929,14 +916,14 @@ def step_n8(inp: Inputs, counts: dict, reps: int, seed: int, industry: str,
                 continue
     rows = [dict(zip(NULL_COLS, r)) for r in done.values()]
     if -1 not in done:                                  # identity rep 一并留档（不参与零分布）
-        rows.append({c: (json.dumps(ident[c], ensure_ascii=False, default=_json_default)
+        rows.append({c: (json.dumps(ident[c], ensure_ascii=False, default=json_default)
                          if isinstance(ident.get(c), dict) else ident.get(c)) for c in NULL_COLS})
     todo = [r for r in range(reps) if r not in done]
     log(f'N-8：目标 R={reps}（已存在 {len(done)} 个 rep，本次补跑 {len(todo)} 个；'
         f'seed={seed}；swaps/edge={spe}；industry={industry}；weight={weight_mode}）')
     for k, r in enumerate(todo, 1):
         rec = eng.run_rep(r, seed)
-        row = {c: (json.dumps(rec[c], ensure_ascii=False, default=_json_default)
+        row = {c: (json.dumps(rec[c], ensure_ascii=False, default=json_default)
                    if isinstance(rec.get(c), dict) else rec.get(c)) for c in NULL_COLS}
         rows.append(row)
         write_csv(NULL_CSV, [[r.get(c) for c in NULL_COLS] for r in sorted(
@@ -1007,13 +994,13 @@ def step_n8perm(inp: Inputs, counts: dict, reps: int, seed: int, industry: str,
                 continue
     rows = [dict(zip(PERM_COLS, r)) for r in done.values()]
     if -1 not in done:                                  # identity rep 留档（全样本保真门，不入零分布）
-        rows.append({c: (json.dumps(ident[c], ensure_ascii=False, default=_json_default)
+        rows.append({c: (json.dumps(ident[c], ensure_ascii=False, default=json_default)
                          if isinstance(ident.get(c), dict) else ident.get(c)) for c in PERM_COLS})
     todo = [r for r in range(reps) if r not in done]
     log(f'N-1 (c′) 年块置换：目标 R={reps}（已存在 {len(done)}，本次 {len(todo)}）')
     for k, r in enumerate(todo, 1):
         rec = eng.run_perm_rep(r, seed)
-        row = {c: (json.dumps(rec[c], ensure_ascii=False, default=_json_default)
+        row = {c: (json.dumps(rec[c], ensure_ascii=False, default=json_default)
                    if isinstance(rec.get(c), dict) else rec.get(c)) for c in PERM_COLS}
         rows.append(row)
         write_csv(BLOCKPERM_CSV, [[r.get(c) for c in PERM_COLS] for r in sorted(
@@ -1180,19 +1167,10 @@ def write_long_tables(counts: dict) -> None:
 # --- end scripts/lib bootstrap ---
 
 
-
-
-
-
 # ---------------------------------------------------------------- 路径与常量
 
 
-
-
 # headline 登记读数（只读对账；`3.0_plan.md` §1.1 / 审计）
-
-
-
 
 
 class _Tee:
@@ -1213,25 +1191,7 @@ class _Tee:
         self.fh.flush()
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 # ---------------------------------------------------------------- 锚台账（9 锚 + headline 45 文件）
-
-
-
-
 
 
 # ---------------------------------------------------------------- 只读输入装载
@@ -1365,27 +1325,13 @@ class Inputs:
 # ---------------------------------------------------------------- FM 推断机器
 
 
-
-
-
-
 # ---------------------------------------------------------------- N-1 结构读数
-
-
-
-
-
-
 
 
 # ---------------------------------------------------------------- N-1 推断
 
 
 # ---------------------------------------------------------------- N-11 PC
-
-
-
-
 
 
 # ---------------------------------------------------------------- N-8 双保持 swap-MCMC
@@ -1616,19 +1562,7 @@ class RewireEngine:
         return rec
 
 
-
-
-
-
 # ---------------------------------------------------------------- steps
-
-
-
-
-
-
-
-
 
 
 def main():
@@ -1718,10 +1652,6 @@ def main():
     counts['elapsed_sec_total'] = r6(time.time() - t_all)
     write_json(COUNTS_JSON, counts)
     log(f'=== 完成：总耗时 {counts["elapsed_sec_total"]}s → {COUNTS_JSON.name} ===')
-
-
-
-
 
 
 if __name__ == '__main__':

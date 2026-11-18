@@ -65,7 +65,7 @@ def main():
             n_files += 1
             try:
                 t = f.read_text(encoding="utf-8", errors="ignore")
-            except Exception:
+            except (OSError,):
                 continue
             if len(t) < 500:
                 continue

@@ -26,7 +26,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from analyst_cf_mom_alpha import nw_ols
+from statsutil import nw_ols
 
 SELF_REV = 'data/processed/rev_factor_monthly.csv'
 CF = 'data/processed/analyst/cf_mom_replication_ln_h1.json'

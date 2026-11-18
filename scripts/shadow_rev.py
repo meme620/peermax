@@ -44,13 +44,11 @@ import os
 from datetime import datetime, timezone
 import numpy as np
 import pandas as pd
-from pricing_lib import (  # noqa: E402
+from pricing_lib import (
     RETURNS_V2, ROOT, assert_m1_inputs_sha, fm_regression, param_value, require,
     sha256_file, winsor_bounds, winsorize_by_month,
 )
-from fileio import atomic_write_text as _atomic_write_text
-from fileio import assert_path_allowed  # noqa: E402
-
+from fileio import assert_path_allowed
 
 
 SAMPLE_PARQUET = ROOT / 'data/processed/m1_common_sample_ma_teacher_v2.parquet'
@@ -703,65 +701,22 @@ def absorption_block(matrix: dict) -> dict:
 # --- end scripts/lib bootstrap ---
 
 
-
-
-
-
-
 # headline 关键文件（本脚本必须不写、且 sha 前后不变）
-
-
-
 
 
 # ---------------------------------------------------------------- 基础 IO / 月键
 
 
-
-
-
-
-
-
-
-
-
-
 # ---------------------------------------------------------------- 相关 / VIF
-
-
 
 
 # ---------------------------------------------------------------- 规格矩阵
 
 
-
 # 前视诊断规格（provenance，只为复现 2.0_plan 引用数字；不写矩阵 CSV、不得被引用为结论）
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 # ---------------------------------------------------------------- 输出
-
-
-
-
 
 
 def main(argv=None) -> int:
@@ -989,8 +944,6 @@ def main(argv=None) -> int:
           f'sha={out_info["sha256"][:12]}…；锚点 all_match={anchors["all_items_match"]}；'
           f'plan 前视复现 all_match={fwd_diag["all_items_match"]}', flush=True)
     return 0
-
-
 
 
 if __name__ == '__main__':

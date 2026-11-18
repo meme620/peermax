@@ -13,7 +13,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from analyst_cf_mom_replication import _next_month, EDGES, RET, NET_VER
+from dates import next_month as _next_month
+from analyst_cf_mom_replication import EDGES, RET, NET_VER
 from analyst_meta import attach_meta
 
 OUT = Path('reports/data_gates/G0/s3a_9i_bivariate_decile_cumret.json')

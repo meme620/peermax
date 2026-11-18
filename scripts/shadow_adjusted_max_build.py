@@ -54,7 +54,7 @@ import shutil
 from pathlib import Path
 import numpy as np
 import pandas as pd
-from peermax_max_build import resolve_tie_rule  # noqa: E402
+from peermax_max_build import resolve_tie_rule
 
 
 from pathlib import Path
@@ -63,6 +63,7 @@ import math
 import numpy as np
 import os
 import pandas as pd
+from fileio import write_json_atomic
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -853,75 +854,25 @@ import pandas as pd
 from peermax_max_build import resolve_tie_rule  # noqa: E402
 
 
-
-
 # 追加列（旧列顺序不变，新列只追加在末尾）。
 
 
 # --------------------------------------------------------------------------- IO
 
 
-
-
-
-
 # ---------------------------------------------------------------- headline 锚
-
-
-
-
-
-
 
 
 # ---------------------------------------------------------------- 代码/事件
 
 
-
-
-
-
-
-
-
-
-
-
 # ---------------------------------------------------------------- 复权收益
-
-
-
-
-
-
-
-
-
-
 
 
 # ---------------------------------------------------------------- shadow 面板
 
 
-
-
-
-
-
-
-
-
 # ---------------------------------------------------------------- 统计/审计
-
-
-
-
-
-
-
-
-
-
 
 
 # ---------------------------------------------------------------- main

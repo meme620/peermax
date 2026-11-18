@@ -19,7 +19,6 @@
 import argparse
 import hashlib
 import json
-import ssl
 import sys
 import time
 import urllib.request
@@ -33,11 +32,6 @@ META = OUTD / 'fetch_meta.json'
 URL = 'https://www.swsresearch.com/swindex/pdf/SwClass2021/StockClassifyUse_stock.xls'
 
 
-def _ctx():
-    c = ssl.create_default_context()
-    c.check_hostname = False
-    c.verify_mode = ssl.CERT_NONE
-    return c
 
 
 def download() -> dict:
@@ -47,7 +41,7 @@ def download() -> dict:
         'Referer': 'https://www.swsresearch.com/',
     })
     t0 = time.time()
-    with urllib.request.urlopen(req, timeout=120, context=_ctx()) as r:
+    with urllib.request.urlopen(req, timeout=120) as r:
         status = r.status
         ctype = r.headers.get('Content-Type')
         blob = r.read()

@@ -236,7 +236,7 @@ def main():
             begin, end = sample_days[0][0].replace("-", ""), sample_days[-1][0].replace("-", "")
             try:
                 em = eastmoney_returns(code, begin, end)
-            except Exception:
+            except (OSError, ValueError, KeyError, TypeError):
                 continue
             for d, pct_tencent in sample_days:
                 if d in em:
