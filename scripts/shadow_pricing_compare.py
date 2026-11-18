@@ -40,6 +40,7 @@ from pricing_lib import (  # noqa: E402
     param_value, require, sha256_file, winsor_bounds, ym_add,
 )
 from peermax_panel_build import load_versions, select_version  # noqa: E402
+from fileio import assert_path_allowed  # noqa: E402
 
 
 
@@ -140,14 +141,9 @@ COMPARISON_COLUMNS = ['variant', 'variant_label', 'teacher', 'spec_id', 'spec_la
                       'source', 'note']
 
 def assert_output_path_guard(path) -> None:
-    p = Path(path).resolve()
-    banned = set(HEADLINE_GUARD_FILES.values()) | {
-        ROOT / 'data', ROOT / 'reports', ROOT / 'configs', ROOT / 'scripts', ROOT / 'tests',
-    }
-    for b in banned:
-        b = Path(b).resolve()
-        if p == b or b in p.parents:
-            raise SystemExit(f'[HARD-GATE] 输出路径命中禁写集合: {p}')
+    assert_path_allowed(path, banned_roots=(
+        *HEADLINE_GUARD_FILES.values(), ROOT / 'data', ROOT / 'reports',
+        ROOT / 'configs', ROOT / 'scripts', ROOT / 'tests'))
 
 def _json_default(o):
     """numpy 标量/bool_ -> 原生类型（确保 counts JSON 可序列化且可复算）。"""

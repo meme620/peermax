@@ -46,7 +46,6 @@ import numpy as np
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / 'scripts'))
 import network_business_chapter_cross_audit as CA  # noqa: E402
 import network_pair_density as PD  # noqa: E402  （同一口径：pair_density / same_sw2_share / lift）
 

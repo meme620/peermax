@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 import csv
 import datetime
 import hashlib
@@ -47,6 +48,26 @@ def json_default(o):
     if isinstance(o, (pd.Timestamp, datetime)):
         return o.isoformat()
     return str(o)
+
+
+def assert_path_allowed(path, allowed_roots=(), banned_roots=()) -> Path:
+    """写出路径必须在 allowed_roots 内（给定时），且不命中 banned_roots（含其后代）。
+
+    违反 → stderr 打印命中集合并 SystemExit(2)。返回 resolve 后的路径。
+    各 shadow 脚本只保留自己的 allow/banned 常量，谓词只此一份。
+    """
+    p = Path(path).resolve()
+    allowed = True
+    if allowed_roots:
+        allowed = any(p == Path(a).resolve() or Path(a).resolve() in p.parents
+                      for a in allowed_roots)
+    banned = [Path(b).resolve() for b in banned_roots]
+    hit = [b for b in banned if p == b or b in p.parents]
+    if not allowed or hit:
+        print(f'[HARD-GATE] 输出路径命中禁写集合: {p}（allowed={allowed} banned={hit}）',
+              file=sys.stderr, flush=True)
+        raise SystemExit(2)
+    return p
 
 
 def write_csv_rows(path, rows, header) -> None:

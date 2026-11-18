@@ -15,7 +15,6 @@ import numpy as np
 import pandas as pd
 import pickle
 
-sys.path.insert(0, str(Path(__file__).parent))
 from analyst_cf_mom_replication import nw_t, _next_month, EDGES, RET, NET_VER
 from analyst_meta import attach_meta
 

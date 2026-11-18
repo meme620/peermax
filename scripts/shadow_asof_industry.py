@@ -55,6 +55,7 @@ from peermax_panel_build import (  # noqa: E402
     NETWORK_AVAILABLE_AT_RULE, load_versions, select_version,
 )
 from fileio import json_default as _json_default
+from fileio import assert_path_allowed  # noqa: E402
 
 
 
@@ -171,17 +172,7 @@ ASOF_RULE = ('effective_from <= key，取 max(effective_from)（分类生效日�
 
 def assert_output_path_guard(path) -> Path:
     """任何写出路径必须落在 shadow 允许根内，且不命中 headline/G0/configs 等禁写集合。"""
-    p = Path(path).resolve()
-    allowed = any(p == Path(a).resolve() or Path(a).resolve() in p.parents
-                  for a in ALLOWED_ROOTS)
-    banned = [Path(b).resolve() for b in BANNED_ROOTS]
-    banned += [Path(SAMPLE_PARQUET).resolve(), Path(SW2_MAP).resolve()]
-    hit = [b for b in banned if p == b or b in p.parents]
-    if not allowed or hit:
-        print(f'[HARD-GATE] 输出路径命中禁写集合: {p}（allowed={allowed} banned={hit}）',
-              file=sys.stderr, flush=True)
-        raise SystemExit(2)
-    return p
+    return assert_path_allowed(path, ALLOWED_ROOTS, (*BANNED_ROOTS, SAMPLE_PARQUET, SW2_MAP))
 
 def _atomic_write_text(path, text: str) -> None:
     p = assert_output_path_guard(path)

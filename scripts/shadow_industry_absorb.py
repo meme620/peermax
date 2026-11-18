@@ -60,6 +60,7 @@ from pricing_lib import (  # noqa: E402
     require, sha256_file, vif_table,
 )
 from fileio import json_default as _json_default
+from fileio import assert_path_allowed  # noqa: E402
 
 
 
@@ -189,21 +190,9 @@ EXTRA_INPUTS = {
 }
 
 def assert_output_path_guard(path) -> Path:
-    p = Path(path).resolve()
-    allowed = any(p == Path(a).resolve() or Path(a).resolve() in p.parents
-                  for a in ALLOWED_ROOTS)
-    banned = [Path(b).resolve() for b in BANNED_ROOTS]
-    banned += [Path(SAMPLE).resolve(), Path(HEADLINE_PANEL).resolve(),
-               Path(FIRM_CHARS).resolve(), Path(G0_A12).resolve(),
-               Path(ASOF_MAP).resolve(), Path(ASOF_BASELINES).resolve(),
-               Path(SAMPLE_ASOF).resolve(), Path(SW2_MAP).resolve(),
-               Path(SW2_LATEST).resolve()]
-    hit = [b for b in banned if p == b or b in p.parents]
-    if not allowed or hit:
-        print(f'[HARD-GATE] 输出路径命中禁写集合: {p}（allowed={allowed} banned={hit}）',
-              file=sys.stderr, flush=True)
-        raise SystemExit(2)
-    return p
+    return assert_path_allowed(path, ALLOWED_ROOTS, (
+        *BANNED_ROOTS, SAMPLE, HEADLINE_PANEL, FIRM_CHARS, G0_A12,
+        ASOF_MAP, ASOF_BASELINES, SAMPLE_ASOF, SW2_MAP, SW2_LATEST))
 
 def _atomic_text(path, text: str) -> None:
     p = assert_output_path_guard(path)

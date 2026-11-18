@@ -46,6 +46,7 @@ from pricing_lib import (  # noqa: E402
     param_value, require, sha256_file, winsor_bounds,
 )
 from fileio import atomic_write_text as _atomic_write_text
+from fileio import assert_path_allowed  # noqa: E402
 
 
 
@@ -374,16 +375,10 @@ def write_matrix_csv(matrix: dict, path: Path = MATRIX_CSV) -> dict:
             'sha256': sha256_file(path)}
 
 def assert_output_path_guard(path: Path) -> None:
-    p = Path(path).resolve()
-    banned = set(HEADLINE_GUARD_FILES.values()) | {
+    assert_path_allowed(path, banned_roots=(
+        *HEADLINE_GUARD_FILES.values(),
         ROOT / 'data/processed/monthly_pricing_panel_ma_teacher.csv',
-        ROOT / 'reports/data_gates/G0',
-        ROOT / 'configs',
-    }
-    for b in banned:
-        b = Path(b).resolve()
-        if p == b or b in p.parents:
-            raise SystemExit(f'[HARD-GATE] 输出路径命中 headline 禁写集合: {p}')
+        ROOT / 'reports/data_gates/G0', ROOT / 'configs'))
 
 def parse_args(argv=None):
     ap = argparse.ArgumentParser(description='Phase 2.4 shadow：turnover last vs mean + 四规格 FM')

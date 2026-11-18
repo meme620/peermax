@@ -65,7 +65,6 @@ from scipy.spatial.distance import squareform
 from sklearn.preprocessing import normalize
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / 'scripts'))
 from network_business_lexicon import DF_MAX_DEFAULT, build_automaton, load_lexicon, normalize as norm_text  # noqa: E402
 
 REPD = ROOT / 'reports/data_gates/G0'

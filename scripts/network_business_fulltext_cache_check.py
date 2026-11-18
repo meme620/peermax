@@ -47,7 +47,6 @@ import numpy as np
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / 'scripts'))
 
 import network_business_fulltext_panel_build as PB  # noqa: E402
 from network_business_cluster_grid import CORPORA, build_vectors_from_hits, load_refs  # noqa: E402

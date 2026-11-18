@@ -33,7 +33,6 @@ from pathlib import Path
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / 'scripts'))
 REPD = ROOT / 'reports/data_gates/G0'
 raw = ROOT / 'data/raw/lexicon/sogou'
 em_raw = ROOT / 'data/raw/eastmoney/f10_business'

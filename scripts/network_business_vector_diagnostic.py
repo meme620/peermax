@@ -16,7 +16,6 @@ import scipy.sparse as sp
 from sklearn.preprocessing import normalize
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / 'scripts'))
 from network_business_lexicon import build_automaton, load_lexicon, normalize as norm_text  # noqa: E402
 
 REPD = ROOT / 'reports/data_gates/G0'

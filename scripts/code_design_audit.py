@@ -21,7 +21,6 @@ import numpy as np
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / 'scripts'))
 REPD = ROOT / 'reports/data_gates/G0'
 MA, MB = ROOT / 'data/processed/network_ma', ROOT / 'data/processed/network_mb'
 YEAR = 2021

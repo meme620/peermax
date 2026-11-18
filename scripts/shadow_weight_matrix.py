@@ -40,7 +40,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-sys.path.insert(0, str(Path(__file__).parent))
 from pricing_lib import (  # noqa: E402
     ROOT, assert_m1_contract, assert_m1_inputs_sha, fm_regression, param_value,
     require, sha256_file, winsorize_bounds_by_month, write_json,

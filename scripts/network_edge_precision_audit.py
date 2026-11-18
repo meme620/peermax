@@ -39,8 +39,6 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 HERE = Path(__file__).resolve().parent
-if str(HERE) not in sys.path:
-    sys.path.insert(0, str(HERE))
 
 SEED = 20260915                 # 沿用 2026-09-15 旧审计的种子：新旧 flag 可在**同一批边**上逐条对比
 N_PER_STRATUM = 60

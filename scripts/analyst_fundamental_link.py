@@ -24,7 +24,6 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 
-sys.path.insert(0, str(Path(__file__).parent))
 from analyst_meta import attach_meta
 
 FIN = 'data/raw/eastmoney/finance/*.csv'

@@ -82,6 +82,7 @@ from pricing_lib import (  # noqa: E402
 from peermax_panel_build import (  # noqa: E402
     ARGMAX, EXCLUDE_QUAL, RETURNS, load_versions, select_version,
 )
+from fileio import assert_path_allowed  # noqa: E402
 
 
 
@@ -213,16 +214,8 @@ PERM_COLS = ['rep', 'seed', 'is_identity_perm', 'beta_EW', 'se_EW', 't_EW', 'n_r
              'beta_VW', 'se_VW', 't_VW', 'n_rows_VW', 'elapsed_sec', 'perm']
 
 def assert_output_path_guard(path) -> Path:
-    """任何写出路径必须落在 `artifacts/phase3/`，且不命中 headline/G0/configs/data 等禁写集合。"""
-    p = Path(path).resolve()
-    allowed = any(p == Path(a).resolve() or Path(a).resolve() in p.parents for a in ALLOWED_ROOTS)
-    banned = [Path(b).resolve() for b in BANNED_ROOTS]
-    hit = [b for b in banned if p == b or b in p.parents]
-    if not allowed or hit:
-        print(f'[HARD-GATE] 输出路径命中禁写集合: {p}（allowed={allowed} banned={hit}）',
-              file=sys.stderr, flush=True)
-        raise SystemExit(2)
-    return p
+    """任何写出路径必须落在 artifacts/phase3/，且不命中 headline/G0/configs/data 等禁写集合。"""
+    return assert_path_allowed(path, ALLOWED_ROOTS, BANNED_ROOTS)
 
 def log(msg: str) -> None:
     line = f'[{time.strftime("%H:%M:%S")}] {msg}'

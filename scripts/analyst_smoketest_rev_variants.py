@@ -13,12 +13,7 @@
 用法: python scripts/analyst_smoketest_rev_variants.py
 输出: data/processed/analyst/smoketest_rev_variants.json
 """
-# --- scripts/lib bootstrap ---
-import sys as _sys
-from pathlib import Path as _Path
-_sys.path.insert(0, str(_Path(__file__).resolve().parent))
 from statsutil import nw_ols
-# --- end scripts/lib bootstrap ---
 
 import json
 from pathlib import Path

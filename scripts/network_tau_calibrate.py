@@ -26,7 +26,6 @@ from pathlib import Path
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / 'scripts'))
 from network_mda_edges_build import build_similarity
 
 V2 = ROOT / 'data/processed/mda_texts.csv'

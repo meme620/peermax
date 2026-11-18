@@ -66,7 +66,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-sys.path.insert(0, str(Path(__file__).parent))
 from pricing_lib import (  # noqa: E402
     OUT_DIR, ROOT, ROWS_NOT_APPLICABLE, assert_m1_contract, contract_from_frame, fm_regression,
     manifest_anchor_sha, manifest_input_key, newey_west, param_value, rank_average_groups,

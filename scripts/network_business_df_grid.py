@@ -37,7 +37,6 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / 'scripts'))
 import network_business_chapter_cross_audit as CA  # noqa: E402  （统一口径：peer_stats / sw2_lift / isolation）
 
 REPD = ROOT / 'reports/data_gates/G0'

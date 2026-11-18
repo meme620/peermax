@@ -13,7 +13,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-sys.path.insert(0, str(Path(__file__).parent))
 from analyst_cf_mom_replication import _next_month, EDGES, RET, NET_VER
 from analyst_meta import attach_meta
 

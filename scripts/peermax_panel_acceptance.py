@@ -36,7 +36,6 @@ import numpy as np
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(Path(__file__).parent))
 from pricing_lib import assert_m1_inputs_sha, sha256_file  # noqa: E402
 
 REPD = ROOT / 'reports/data_gates/G0'

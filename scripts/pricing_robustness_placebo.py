@@ -27,7 +27,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-sys.path.insert(0, str(Path(__file__).parent))
 from pricing_lib import IQR_POOL_REGISTERED, M1_SAMPLE_VERSION_V1, M1_SAMPLE_VERSION_V2, M1_SAMPLE_VERSION_V3, M1_SAMPLE_VERSION_V4, NET_DIRS, OUT_DIR, ROOT, SAMPLE_DIR, aggregate_edges, clip_by_month, fm_regression, load_edges, load_returns_raw, load_src_month, load_support, param_value, progress, rank_average_groups, sample_path, write_json
 
 P = param_value('m1_sample_and_spec_registry')

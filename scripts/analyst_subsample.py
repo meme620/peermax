@@ -5,7 +5,6 @@ import pickle, sys, warnings
 import pandas as pd, numpy as np
 from pathlib import Path
 warnings.filterwarnings('ignore')
-sys.path.insert(0, str(Path(__file__).parent))
 from analyst_cf_mom_replication import _next_month, EDGES, RET, MEQ, NET_VER
 from analyst_meta import attach_meta
 

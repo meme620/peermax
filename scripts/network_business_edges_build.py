@@ -73,7 +73,6 @@ import pandas as pd
 from sklearn.preprocessing import normalize
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / 'scripts'))
 from network_business_lexicon import build_automaton, load_lexicon  # noqa: E402
 from network_business_cluster_grid import build_vectors, load_refs, row_median_excl_self, SIM_ADJUST_CHOICES  # noqa: E402
 

@@ -75,6 +75,7 @@ from peermax_panel_build import (  # noqa: E402
     NETWORK_AVAILABLE_AT_RULE, load_versions, select_version,
 )
 from fileio import json_default as _json_default
+from fileio import assert_path_allowed  # noqa: E402
 
 
 
@@ -240,16 +241,9 @@ __all__ = ['main', 'VARIANTS', 'VARIANT_ORDER', 'target_for', 'lexicon_for', 'ne
 
 def assert_output_path_guard(path) -> Path:
     """写出路径必须落在 shadow 允许根内；命中 headline/G0/configs/3.1 产物 → SystemExit(2)。"""
-    p = Path(path).resolve()
-    allowed = any(p == Path(a).resolve() or Path(a).resolve() in p.parents for a in ALLOWED_ROOTS)
-    banned = [Path(b).resolve() for b in BANNED_ROOTS] + [Path(x).resolve() for x in READONLY_INPUTS]
-    hit = [b for b in banned if p == b or b in p.parents]
-    # 3.1 产物与 3.0 方案只读：`artifacts/phase3/3.1_*` / `3.0_plan.md`
+    p = assert_path_allowed(path, ALLOWED_ROOTS, (*BANNED_ROOTS, *READONLY_INPUTS))
     if p.parent == ART.resolve() and (p.name.startswith('3.1_') or p.name.startswith('3.0')):
-        hit.append(p)
-    if not allowed or hit:
-        print(f'[HARD-GATE] 输出路径命中禁写集合: {p}（allowed={allowed} banned={hit}）',
-              file=sys.stderr, flush=True)
+        print(f'[HARD-GATE] 3.1 产物与 3.0 方案只读: {p}', file=sys.stderr, flush=True)
         raise SystemExit(2)
     return p
 

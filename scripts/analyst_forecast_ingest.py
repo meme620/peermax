@@ -9,7 +9,6 @@
 import sys, zipfile, io, json, csv
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent))
 from analyst_xlsx_read import load_shared_strings, iter_rows
 
 OUT = Path('data/raw/analyst')

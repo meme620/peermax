@@ -49,6 +49,7 @@ from pricing_lib import (  # noqa: E402
     sha256_file, winsor_bounds, winsorize_by_month,
 )
 from fileio import atomic_write_text as _atomic_write_text
+from fileio import assert_path_allowed  # noqa: E402
 
 
 
@@ -659,17 +660,9 @@ def plan_lookahead_diagnostic(fm: pd.DataFrame, fwd_matrix: dict, corr_fwd_own: 
     }
 
 def assert_output_path_guard(path: Path) -> None:
-    p = Path(path).resolve()
-    banned = set(HEADLINE_GUARD_FILES.values()) | {
-        ROOT / 'data',
-        ROOT / 'reports/data_gates/G0',
-        ROOT / 'configs',
-        RETURNS_V1,
-    }
-    for b in banned:
-        b = Path(b).resolve()
-        if p == b or b in p.parents:
-            raise SystemExit(f'[HARD-GATE] 输出路径命中禁写集合: {p}')
+    assert_path_allowed(path, banned_roots=(
+        *HEADLINE_GUARD_FILES.values(), ROOT / 'data',
+        ROOT / 'reports/data_gates/G0', ROOT / 'configs', RETURNS_V1))
 
 def write_matrix_csv(matrix: dict, path: Path = MATRIX_CSV) -> dict:
     assert_output_path_guard(path)

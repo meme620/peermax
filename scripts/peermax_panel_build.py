@@ -46,7 +46,6 @@ import pandas as pd
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(Path(__file__).parent))
 from pricing_lib import aggregate_stat, assert_m1_inputs_sha, assert_named_m1_input_sha, param_value, sha256_file
 
 ARGMAX = ROOT / 'data/processed/source_month_argmax_panel.csv'

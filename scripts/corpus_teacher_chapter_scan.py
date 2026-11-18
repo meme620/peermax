@@ -179,8 +179,6 @@ def lexicon_compare(years=("2017", "2018", "2019", "2020")) -> dict:
     （network_business_lexicon：product_lexicon_v2.csv keep_df25 + Aho-Corasick 全子串、集合语义）。
     """
     import statistics as _st
-    import sys as _sys
-    _sys.path.insert(0, str(Path(__file__).resolve().parent))
     from network_business_lexicon import load_lexicon, build_automaton, match_terms_normalized, normalize
 
     terms, meta = load_lexicon()

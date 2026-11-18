@@ -31,7 +31,6 @@ from pathlib import Path
 
 import numpy as np
 
-sys.path.insert(0, str(Path(__file__).parent))
 from pricing_lib import IQR_POOL_REGISTERED, M1_SAMPLE_VERSION_V1, M1_SAMPLE_VERSION_V2, M1_SAMPLE_VERSION_V3, OUT_DIR, ROOT, assert_m1_contract, norm_cdf, param_value, params, progress, require, tost_equivalence, write_json
 
 # 2026-10-27 Phase 0.1（S-1/S-4）：MDE/功效与 TOST 尺度说明只做解释，不参与任何 pass 判定；

@@ -67,7 +67,6 @@ from scipy.cluster.hierarchy import fcluster
 from scipy.spatial.distance import squareform
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / 'scripts'))
 from network_business_cluster_grid import (CORPORA, SIM_ADJUST_CHOICES, adjust_stats,  # noqa: E402
                                    build_vectors, load_refs, median_adjust)
 from network_business_lexicon import build_automaton, load_lexicon  # noqa: E402

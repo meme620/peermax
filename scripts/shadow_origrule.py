@@ -62,6 +62,7 @@ from pricing_lib import assert_m1_inputs_sha, require, sha256_file  # noqa: E402
 from network_business_lexicon import build_automaton, load_lexicon  # noqa: E402
 from network_business_cluster_grid import build_vectors, load_refs  # noqa: E402
 from fileio import json_default as _json_default
+from fileio import assert_path_allowed  # noqa: E402
 
 
 
@@ -182,16 +183,8 @@ READONLY_INPUTS = (TEACHER_LEXICON, REVENUE_PKL, SW2_LATEST, ASOF_MAP_PARQUET)
 
 def assert_output_path_guard(path) -> Path:
     """任何写出路径必须落在 shadow 允许根内，且不命中 headline/G0/configs/只读输入等禁写集合。"""
-    p = Path(path).resolve()
-    allowed = any(p == Path(a).resolve() or Path(a).resolve() in p.parents for a in ALLOWED_ROOTS)
-    banned = [Path(b).resolve() for b in BANNED_ROOTS]
-    banned += [Path(x).resolve() for x in READONLY_INPUTS if Path(x).exists()]
-    hit = [b for b in banned if p == b or b in p.parents]
-    if not allowed or hit:
-        print(f'[HARD-GATE] 输出路径命中禁写集合: {p}（allowed={allowed} banned={hit}）',
-              file=sys.stderr, flush=True)
-        raise SystemExit(2)
-    return p
+    extra = [x for x in READONLY_INPUTS if Path(x).exists()]
+    return assert_path_allowed(path, ALLOWED_ROOTS, (*BANNED_ROOTS, *extra))
 
 def _atomic_write_text(path, text: str) -> None:
     p = assert_output_path_guard(path)

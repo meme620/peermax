@@ -5,7 +5,6 @@ import pickle, sys, warnings
 import pandas as pd, numpy as np
 from pathlib import Path
 warnings.filterwarnings('ignore')
-sys.path.insert(0, str(Path(__file__).parent))
 from analyst_npm_replication import nw_t, _next_month, EDGES, RET, MEQ, NET_VER
 
 ST = pickle.load(open('data/raw/drive/stock_st_flag_20260630.pkl','rb'))

@@ -18,13 +18,8 @@
 
 输出: data/processed/analyst/cf_mom_replication[_{weight}][_h{horizon}].json
 """
-# --- scripts/lib bootstrap ---
-import sys as _sys
-from pathlib import Path as _Path
-_sys.path.insert(0, str(_Path(__file__).resolve().parent))
 from dates import next_month as _next_month
 from statsutil import nw_t
-# --- end scripts/lib bootstrap ---
 
 import json, sys
 from pathlib import Path
@@ -33,7 +28,6 @@ import pandas as pd
 import numpy as np
 import yaml
 
-sys.path.insert(0, str(Path(__file__).parent))
 from analyst_meta import attach_meta
 
 EDGES = Path('data/processed/analyst/edges')

@@ -5,12 +5,7 @@
 回归: 多空月收益 ~ alpha + MKT + SMB + HML + MOM（FF4）
 输出: 月度 alpha（%）、Newey-West L=1 t 统计、因子暴露、年化 alpha
 """
-# --- scripts/lib bootstrap ---
-import sys as _sys
-from pathlib import Path as _Path
-_sys.path.insert(0, str(_Path(__file__).resolve().parent))
 from statsutil import nw_ols
-# --- end scripts/lib bootstrap ---
 
 import json
 import sys

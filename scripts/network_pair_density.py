@@ -50,7 +50,6 @@ import numpy as np
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / 'scripts'))
 import network_business_chapter_cross_audit as CA  # noqa: E402  （复用其纯函数与统一口径常量）
 
 REPD = ROOT / 'reports/data_gates/G0'

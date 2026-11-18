@@ -48,7 +48,6 @@ import numpy as np
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / 'scripts'))
 
 from pricing_lib import (  # noqa: E402
     assert_m1_inputs_sha, fm_regression, param_value, require, sha256_file,

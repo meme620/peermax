@@ -6,13 +6,8 @@
 用法: python scripts/analyst_smoketest_weight_coverage.py
 输出: data/processed/analyst/smoketest_c3_weight_coverage.json
 """
-# --- scripts/lib bootstrap ---
-import sys as _sys
-from pathlib import Path as _Path
-_sys.path.insert(0, str(_Path(__file__).resolve().parent))
 from dates import next_month as _next_month
 from statsutil import nw_t
-# --- end scripts/lib bootstrap ---
 
 import json
 from pathlib import Path

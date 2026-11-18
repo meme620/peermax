@@ -41,8 +41,6 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 HERE = Path(__file__).resolve().parent
-if str(HERE) not in sys.path:
-    sys.path.insert(0, str(HERE))
 
 from network_edge_precision_audit import (          # noqa: E402  (同目录 v2 模块，复用同口径实现)
     build_ma_automaton, load_corpus, load_industry, load_lexicon_terms, load_names,
