@@ -64,7 +64,7 @@ class Experiment:
 
 EXPERIMENTS: tuple[Experiment, ...] = (
     Experiment(
-        id='prepare-sample',
+        id='estimation-sample',
         title='M1 样本构建（run-all 只跑一次）',
         steps=(Step('scripts/data_audit/s3_m1_1_build_sample.py'),),
         requires=(REGISTRY_CONFIG, 'data/processed'),
@@ -76,7 +76,7 @@ EXPERIMENTS: tuple[Experiment, ...] = (
         runtime_hint='分钟级到小时级',
     ),
     Experiment(
-        id='net-ma',
+        id='network-business-text',
         title='M-A 产品市场竞争网络构边（老师 MD&A 语料）',
         steps=(Step('scripts/data_audit/s3_ma_build_edges.py', ('--corpus', 'teacher')),),
         requires=('configs/version_manifest.yaml', 'data/processed'),
@@ -84,7 +84,7 @@ EXPERIMENTS: tuple[Experiment, ...] = (
         runtime_hint='分钟级',
     ),
     Experiment(
-        id='net-mb',
+        id='network-mda-text',
         title='M-B 文本竞争网络：全期矩阵 → τ 校准 → 构边',
         steps=(
             Step('scripts/data_audit/s3_mb_full_matrix.py', ('--years', '2017-2025')),
@@ -100,7 +100,7 @@ EXPERIMENTS: tuple[Experiment, ...] = (
         runtime_hint='分钟级',
     ),
     Experiment(
-        id='peermax',
+        id='peermax-panel',
         title='S4：MAX/PeerMAX 面板（主口径 ma_teacher）',
         steps=(
             Step('scripts/data_audit/s4_step1_max.py'),
@@ -121,7 +121,7 @@ EXPERIMENTS: tuple[Experiment, ...] = (
         runtime_hint='分钟级',
     ),
     Experiment(
-        id='m1-main',
+        id='fm-main-table',
         title='M1 主表：Fama-MacBeth + horse race',
         steps=(Step('scripts/data_audit/s3_m1_2_fm_main.py', ('--sample-version', 'v3')),),
         requires=(REGISTRY_CONFIG, 'data/processed'),
@@ -140,7 +140,7 @@ EXPERIMENTS: tuple[Experiment, ...] = (
         runtime_hint='分钟级',
     ),
     Experiment(
-        id='m1-shape',
+        id='portfolio-sorts',
         title='M1 组合表：五分位/十分位 spread',
         steps=(Step('scripts/data_audit/s3_m1_3_portfolio_shape.py', ('--sample-version', 'v2')),),
         requires=(REGISTRY_CONFIG, 'data/processed'),
@@ -152,7 +152,7 @@ EXPERIMENTS: tuple[Experiment, ...] = (
         runtime_hint='分钟级',
     ),
     Experiment(
-        id='m1-robust',
+        id='robustness-checks',
         title='M1 稳健性：placebo 与长度/行业控制',
         steps=(
             Step('scripts/data_audit/s3_m1_4_robustness_placebo.py'),
@@ -167,7 +167,7 @@ EXPERIMENTS: tuple[Experiment, ...] = (
         runtime_hint='分钟级',
     ),
     Experiment(
-        id='m1-gate',
+        id='gate-report',
         title='M1 数据门报告',
         steps=(Step('scripts/data_audit/s3_m1_6_gate_report.py'),),
         requires=(REGISTRY_CONFIG, 'data/processed'),
@@ -179,7 +179,7 @@ EXPERIMENTS: tuple[Experiment, ...] = (
         runtime_hint='秒级到分钟级',
     ),
     Experiment(
-        id='inference-shadow',
+        id='shadow-inference',
         title='Phase3 shadow 推断层（bootstrap，随 seed 变化）',
         steps=(Step('scripts/data_audit/p3_4_inference_shadow.py'),),
         requires=(REGISTRY_CONFIG, 'artifacts/phase3'),

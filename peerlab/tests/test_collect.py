@@ -27,19 +27,19 @@ def _fake_run(result_dir: Path, exp_id: str, seed: int, value: float) -> None:
 
 
 def test_extract_metrics_uses_suffix_glob(tmp_path: Path):
-    exp = registry.get('m1-main')
-    _fake_run(tmp_path, 'm1-main', 2, 0.131)
-    values = collect.extract_metrics(tmp_path / 'runs/m1-main--s2--20260101T000000Z', exp, 2)
+    exp = registry.get('fm-main-table')
+    _fake_run(tmp_path, 'fm-main-table', 2, 0.131)
+    values = collect.extract_metrics(tmp_path / 'runs/fm-main-table--s2--20260101T000000Z', exp, 2)
     assert values['beta_peer'] == 0.131
     assert values['t_peer'] == 6.0
 
 
 def test_build_tables_marks_identical_across_seeds(tmp_path: Path):
-    exp = registry.get('m1-main')
+    exp = registry.get('fm-main-table')
     for seed in registry.SEEDS:
-        _fake_run(tmp_path, 'm1-main', seed, 0.131)
+        _fake_run(tmp_path, 'fm-main-table', seed, 0.131)
     written = collect.build_tables(tmp_path, (exp,))
-    table = (tmp_path / 'tables/m1-main.csv').read_text(encoding='utf-8').strip().splitlines()
+    table = (tmp_path / 'tables/fm-main-table.csv').read_text(encoding='utf-8').strip().splitlines()
     assert table[0].startswith('metric,s0,s1,s2,s3,s4,mean,sd,identical')
     beta_row = [line for line in table if line.startswith('beta_peer')][0]
     assert beta_row.endswith('True')
@@ -51,4 +51,4 @@ def test_summary_without_runs(tmp_path: Path):
     path = collect.write_summary(tmp_path, registry.EXPERIMENTS)
     text = path.read_text(encoding='utf-8')
     assert '当前没有有效运行' in text
-    assert '## m1-main' in text
+    assert '## fm-main-table' in text
