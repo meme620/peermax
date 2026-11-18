@@ -1,6 +1,6 @@
 # PeerMAX 计算链（2026-11-17 代码快照）
 
-本文件说明代码快照。快照的 `scripts/`、`tests/` 铺在仓库根——与主仓库层级一致，`Path(__file__).resolve().parents[2]` 据此指向仓库根；外部输入材料在 `materials/`；清单与校验和是仓库根的 `code_MANIFEST.csv`、`code_SHA256SUMS.txt`。下文命令一律在仓库根执行。
+本文件说明代码快照。快照的 `scripts/`、`tests/` 铺在仓库根——与主仓库层级一致，`Path(__file__).resolve().parents[2]` 据此指向仓库根；外部输入文档在 `ref/`，教师数据在 `data/`，来源说明见 `docs/materials.md`。下文命令一律在仓库根执行。
 
 ## 1. 本快照是什么
 
@@ -10,7 +10,7 @@ PeerMAX 项目的**计算链代码只读快照**：原始数据抓取 → 清洗
 
 **其中 2 个是 SUPERSEDED pilot 脚本**——`scripts/data_audit/s3_build_network.py`、`scripts/data_audit/s4_step2_peermax.py`，仅为 pilot 链完整性与历史留档而纳入，docstring 均明令「请勿使用」，**不得作为分析输入**；正式结果一律来自 `s4_step2_peermax_formal.py` 等 active 脚本（见 §10）。
 
-规模：**233 个代码文件**（232 `.py` + 1 `.sh`）、**3,845,923 字节**、**72,444 行**；清单 `code_MANIFEST.csv` 233 条、`code_SHA256SUMS.txt` 233 行。
+规模：**233 个代码文件**（232 `.py` + 1 `.sh`）、**3,845,923 字节**、**72,444 行**。
 
 | 目录（相对仓库根） | 文件数 | 字节 | 行数 | 职责 |
 |---|---|---|---|---|
@@ -20,17 +20,16 @@ PeerMAX 项目的**计算链代码只读快照**：原始数据抓取 → 清洗
 | `scripts/deliverables/` | 1 | 23,016 | 420 | 仅 `make_s3a_brief_pptx.py`（被 Gate5 读源码，见 §8） |
 | `tests/` | 33 | 446,620 | 9,722 | 契约测试（33 模块；主仓库当前收集 568 个 test） |
 
-与仓库其它部分的分工：`materials/01_proposal/` 是立项/研究计划文档（PDF、TeX），本快照不含叙述性文档；`materials/04_teacher_data/` 是老师提供的原始数据包（分析师预测、CFND、WSVI、老师 MD&A、申万分类、Google Drive 共享），该目录已随仓库归档，代码按主仓库路径读取；`materials/README.md` 记录老师原始数据的落盘位置与快照日期，数据来源问题读那份。
+与仓库其它部分的分工：`ref/01_proposal/` 是立项/研究计划文档（PDF、TeX），本快照不含叙述性文档；老师提供的原始数据包（分析师预测、CFND、WSVI、老师 MD&A、申万分类、Google Drive 共享）在 `data/raw/{analyst,cfnd,wsvi,teacher,drive}` 与 `data/external/`，代码读的正是这些路径；落盘位置与快照日期见 `docs/materials.md`。
 
 ## 2. 目录结构
 
 ```text
 仓库根/
-├── code_MANIFEST.csv            234 行（1 表头 + 233 条）；列：dir_group,rel_path,source_path,
-│                                bytes,lines,sha256,sha256_verified,mtime；UTF-8 BOM；sha256_verified 全 YES
-├── code_SHA256SUMS.txt          233 行，sha256sum 原生格式（可直接 -c）
 ├── docs/pipeline.md             本文件
-├── materials/                   外部输入材料（`materials/README.md`）
+├── ref/                         外部输入文档：立项文档、老师材料、组内论文
+├── data/                        教师数据（raw/）与派生产物（processed/）
+├── configs/                     冻结参数与版本锚（待主仓库提供）
 ├── scripts/
 │   ├── data/                    抓数与基础 builder（35 .py）
 │   ├── data_audit/              阶段管线、网络、面板、回归、审计（162 .py + 1 .sh）
@@ -319,7 +318,7 @@ M1 样本命名注意：**v1 文件没有 `_v1` 后缀**（实际为 `m1_common_
 
 数据门与阶段审计的登记证据（主仓库当前 154 个 `.json` + 37 个 `.md`）。脚本直接读写该目录，`s3_m1_lib.OUT_DIR` 即指向此处；这些 JSON/MD 属 registry/manifest 登记产物，不得手改。
 
-老师原始数据的落盘位置与快照日期（analyst_forecast 2026-05-27 打包、cfnd/wsvi 年度分片、mda `mda_data_2023.csv` 1005.5 MiB / UTF-8 / 2014-2022、`all_stkcds.xlsx` 2026-09-15、drive 36 文件快照 20260630）记录在 `materials/README.md` 与 `materials/04_teacher_data/`，本快照不重复。
+老师原始数据的落盘位置与快照日期（analyst_forecast 2026-05-27 打包、cfnd/wsvi 年度分片、mda `mda_data_2023.csv` 1005.5 MiB / UTF-8 / 2014-2022、`all_stkcds.xlsx` 2026-09-15、drive 36 文件快照 20260630）记录在 `docs/materials.md`，文件在 `data/raw/` 与 `data/external/`，本快照不重复。
 
 ## 8. 共享模块最小闭包
 
@@ -343,7 +342,7 @@ M1 样本命名注意：**v1 文件没有 `_v1` 后缀**（实际为 `m1_common_
 
 ## 9. 未纳入文件与原因
 
-主仓库同目录下另有 **12 个 `.py`** 未纳入（`code_MANIFEST.csv` 无其条目，`sha256sum -c` 也不校验）。三类，逐条一行证据：
+主仓库同目录下另有 **12 个 `.py`** 未纳入本快照。三类，逐条一行证据：
 
 | 类 | 文件（主仓库路径） | 证据 |
 |---|---|---|
@@ -398,20 +397,13 @@ M1 样本命名注意：**v1 文件没有 `_v1` 后缀**（实际为 `m1_common_
 ## 11. 校验与重建
 
 ```bash
-shasum -a 256 -c code_SHA256SUMS.txt      # 预期 233 行全 OK、0 FAILED；Linux 用 sha256sum -c
-```
-
-任一 `FAILED` 说明副本被改动或传输损坏，回主仓库重取。其它校验：
-
-```bash
 find scripts tests -name '*.py' | xargs python -m py_compile   # 全部 .py 语法通过
 bash -n scripts/data_audit/ocr_tesseract_chunk.sh              # shell 语法通过
-wc -l code_MANIFEST.csv code_SHA256SUMS.txt                    # 234 / 233
 ```
 
-**源文件仍在主仓库原路径**：`code_MANIFEST.csv` 的 `source_path` 与 `rel_path` 233/233 逐行相同。本快照是只读副本，可随时删除重建；不要在此编辑脚本后当主线用。
+本仓库不保存逐文件清单与校验和。快照的源文件仍在主仓库原路径，本仓库是只读副本，可随时删除重建；不要在此编辑脚本后当主线用。
 
-行数口径差异：`code_MANIFEST.csv` 合计 72,444 行，`wc -l` 合计 72,439 行，差 5 行来自 5 个文件末尾无换行符（`s3_ma_weighting_cross_audit.py`、`s3_pc_sign_diag_h1h8.py`、`s3a_identity_conflict_sensitivity.py`、`s3a_smoketest_c4_min_months.py`、`s3a_smoketest_no_top1_variants.py`），两个数都对，只是计数方式不同。
+行数口径差异：本文的 72,444 行按每个文件的行数分项相加，`wc -l` 合计 72,439 行，差 5 行来自 5 个文件末尾无换行符（`s3_ma_weighting_cross_audit.py`、`s3_pc_sign_diag_h1h8.py`、`s3a_identity_conflict_sensitivity.py`、`s3a_smoketest_c4_min_months.py`、`s3a_smoketest_no_top1_variants.py`），两个数都对，只是计数方式不同。
 
 **关于复现能力**：本快照**不保证**能复现任何结果。能否跑起来、能否得到相同数字，取决于三件事同时成立：
 
@@ -425,7 +417,7 @@ wc -l code_MANIFEST.csv code_SHA256SUMS.txt                    # 234 / 233
 
 快照日期是 **2026-11-17**。主仓库之后每次变更（新增脚本、修 bug、改路径、改参数实现）都会让它滞后。引用前做两件事：
 
-1. 比对 `code_MANIFEST.csv` 的 `sha256` 列与主仓库当前文件 sha256；不一致即本快照对应文件已过期。
+1. 用 `shasum -a 256` 比对快照文件与主仓库当前文件的哈希；不一致即本快照对应文件已过期。
 2. 若引用脚本涉及冻结参数或样本版本，重读主仓库 `configs/parameter_registry.yaml` 的 `registry_version` 与 `configs/version_manifest.yaml` 的 `manifest_version`，确认与 §7.1 记录的版本号是否仍一致。
 
-刷新方式：回主仓库原路径重新生成副本与 `code_MANIFEST.csv` / `code_SHA256SUMS.txt`，不要在副本上打补丁。归档的生命周期是「快照 + 校验和」，不是「工作副本」。
+刷新方式：回主仓库原路径重新生成副本，不要在副本上打补丁。归档的生命周期是「快照」，不是「工作副本」。

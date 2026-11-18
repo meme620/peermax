@@ -4,5 +4,6 @@ __pycache__/
 .pytest_cache/
 .venv/
 
-# 老师原始数据 4.11 GiB：只按 SHA256SUMS 校验，不入库
-materials/04_teacher_data/
+# 数据载荷与临时产物：不入库
+data/
+artifacts/
