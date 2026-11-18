@@ -65,7 +65,8 @@ def check_path_names(paths) -> list:
                 problems.append(f'{rel}: 目录名含阶段代号 {part!r}')
             if NUMBER_PREFIX.match(part):
                 problems.append(f'{rel}: 目录名带数字前缀 {part!r}')
-        if STAGE_CODE.search(pure.stem):
+        config_exception = pure.parts[0] == 'configs' and pure.suffix in {'.yaml', '.yml'}
+        if STAGE_CODE.search(pure.stem) and not config_exception:
             problems.append(f'{rel}: 文件名含阶段代号')
         if NUMBER_PREFIX.match(pure.stem):
             problems.append(f'{rel}: 文件名带数字前缀')

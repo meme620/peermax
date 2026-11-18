@@ -64,3 +64,7 @@ def test_deep_and_single_file_dirs_rejected() -> None:
 def test_data_dir_with_single_file_allowed() -> None:
     problems = lint.check_path_names(['data/external/reference.xlsx'])
     assert not any('只装一个文件' in p for p in problems)
+
+def test_config_yaml_stage_code_allowed() -> None:
+    problems = lint.check_path_names(['configs/m1_contracts.yaml'])
+    assert not any('阶段代号' in p for p in problems)
