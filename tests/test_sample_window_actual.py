@@ -14,9 +14,9 @@ import pandas as pd
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / 'scripts' / 'data_audit'))
+sys.path.insert(0, str(ROOT / 'scripts'))
 
-import s3_m1_1_build_sample as build  # noqa: E402
+import pricing_sample_build as build  # noqa: E402
 
 PANEL_KEYS = ['ma_teacher', 'mb_teacher', 'ma', 'mb']
 LEGACY_WINDOW = '2015-01..2023-12'

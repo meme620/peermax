@@ -2,25 +2,25 @@
 
 ## 从脚本到 result/
 
-1. 脚本把产物写到三个固定位置：`reports/data_gates/G0/`（结果与审计 JSON/MD，`s3_m1_lib.OUT_DIR` 指向这里）、`data/processed/`（面板、网络、样本）、`artifacts/`（shadow 工作记录）。
+1. 脚本把产物写到三个固定位置：`reports/data_gates/G0/`（结果与审计 JSON/MD，`pricing_lib.OUT_DIR` 指向这里）、`data/processed/`（面板、网络、样本）、`artifacts/`（shadow 工作记录）。
 2. `python -m peerlab run --exp X --seed N` 在子进程前后对这三个目录做 (路径, 大小, mtime) 快照，把差异里命中注册表 glob 的文件复制到 `result/runs/<run_id>/outputs/`，保留原相对路径。
 3. `python -m peerlab report` 从各 run 的产物里按 dotted path 抽指标，写 `result/metrics.csv`、`result/tables/<exp>.csv`、`result/summary.md`。
-4. 结果文件本身不被改名、不被搬动；`result/` 只是按运行归拢 + 跨种子聚合。产物名被 `s3_m1_6_gate_report.py` 与契约测试硬编码引用，改名会让门禁失效。
+4. 结果文件本身不被改名、不被搬动；`result/` 只是按运行归拢 + 跨种子聚合。产物名被 `pricing_gate_report.py` 与契约测试硬编码引用，改名会让门禁失效。
 
 ## 实验与产物
 
 | id | 入口 | 关键产物 | 随机性 |
 |---|---|---|---|
-| `estimation-sample` | `s3_m1_1_build_sample.py` | `G0/s3_m1_sample_report*.json`、`data/processed/m1_common_sample_*.parquet` | 无 |
-| `network-business-text` | `s3_ma_build_edges.py --corpus teacher` | `data/processed/network_ma_teacher/**` | 无 |
-| `network-mda-text` | `s3_mb_full_matrix.py` → `s3_b1_calibrate_tau.py` → `s3_mb_build_edges.py` | `network_mb_teacher/**`、`G0/s3_b1_tau_calibration*.json` | 无 |
-| `peermax-panel` | `s4_step1_max.py` → `s4_step2_peermax_formal.py --use-case ma` | `data/processed/monthly_pricing_panel_*_v4.csv` | 无 |
-| `fm-main-table` | `s3_m1_2_fm_main.py --sample-version v3 --out-suffix _s{seed}` | `G0/s3_m1_pricing_table*`、`G0/s3_m1_horse_race*` | 无 |
-| `portfolio-sorts` | `s3_m1_3_portfolio_shape.py --sample-version v2 --out-suffix _s{seed}` | `G0/s3_m1_portfolio_deciles*`、`G0/s3_m1_diagnostics*` | 无 |
-| `robustness-checks` | `s3_m1_4_robustness_placebo.py` + `s3_m1_5_length_industry.py` | `G0/s3_m1_robustness_placebo.json`、`s3_m1_length_control.json`、`s3_m1_industry_absorb.json` | 无 |
-| `gate-report` | `s3_m1_6_gate_report.py --out-suffix _s{seed}` | `G0/s3_m1_gate_report*` | 无 |
-| `shadow-inference` | `p3_4_inference_shadow.py --seed {seed}` | `artifacts/phase3/3.4_*.csv` | 是（bootstrap） |
-| `density-null` | `s3_network_density_null.py --seed {seed}` | `G0/s3_network_density_null.json` | 是（随机重连） |
+| `estimation-sample` | `pricing_sample_build.py` | `G0/s3_m1_sample_report*.json`、`data/processed/m1_common_sample_*.parquet` | 无 |
+| `network-business-text` | `network_business_edges_build.py --corpus teacher` | `data/processed/network_ma_teacher/**` | 无 |
+| `network-mda-text` | `network_mda_full_matrix.py` → `network_tau_calibrate.py` → `network_mda_edges_build.py` | `network_mb_teacher/**`、`G0/s3_b1_tau_calibration*.json` | 无 |
+| `peermax-panel` | `peermax_max_build.py` → `peermax_panel_build.py --use-case ma` | `data/processed/monthly_pricing_panel_*_v4.csv` | 无 |
+| `fm-main-table` | `pricing_fm_main.py --sample-version v3 --out-suffix _s{seed}` | `G0/s3_m1_pricing_table*`、`G0/s3_m1_horse_race*` | 无 |
+| `portfolio-sorts` | `pricing_portfolio_sorts.py --sample-version v2 --out-suffix _s{seed}` | `G0/s3_m1_portfolio_deciles*`、`G0/s3_m1_diagnostics*` | 无 |
+| `robustness-checks` | `pricing_robustness_placebo.py` + `pricing_length_industry_control.py` | `G0/s3_m1_robustness_placebo.json`、`s3_m1_length_control.json`、`s3_m1_industry_absorb.json` | 无 |
+| `gate-report` | `pricing_gate_report.py --out-suffix _s{seed}` | `G0/s3_m1_gate_report*` | 无 |
+| `shadow-inference` | `shadow_inference.py --seed {seed}` | `artifacts/phase3/3.4_*.csv` | 是（bootstrap） |
+| `density-null` | `network_density_null.py --seed {seed}` | `G0/s3_network_density_null.json` | 是（随机重连） |
 
 样本版本不一致是既有口径：`s3_m1_2` 缺省 v3，`s3_m1_3/4/5` 缺省 v2。注册表按脚本缺省值固定，改版本属于口径变更，需要单独登记。
 

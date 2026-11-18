@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPT = ROOT / 'scripts/data_audit/s4_step2_peermax_formal.py'
+SCRIPT = ROOT / 'scripts/peermax_panel_build.py'
 NET_ROOT = ROOT / 'data/processed'
 MAIN_DIRS = ('network_ma', 'network_mb',
              'network_ma_teacher', 'network_mb_teacher')
@@ -33,7 +33,7 @@ SHADOW_VERSION_PREFIX = SHADOW_VERSION_PREFIX_BY_DIR['network_ma_teacher_p3asof'
 
 
 def _load():
-    spec = importlib.util.spec_from_file_location('s4_step2_peermax_formal',
+    spec = importlib.util.spec_from_file_location('peermax_panel_build',
                                                   SCRIPT)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)

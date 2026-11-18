@@ -18,12 +18,12 @@ import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / 'scripts' / 'data_audit'))
+sys.path.insert(0, str(ROOT / 'scripts'))
 
-import s3_m1_lib as lib  # noqa: E402
-import s3_m1_1_build_sample as build  # noqa: E402
+import pricing_lib as lib  # noqa: E402
+import pricing_sample_build as build  # noqa: E402
 
-SCRIPT = ROOT / 'scripts' / 'data_audit' / 's3_m1_1_build_sample.py'
+SCRIPT = ROOT / 'scripts' / 'pricing_sample_build.py'
 REGISTRY = ROOT / 'configs' / 'parameter_registry.yaml'
 
 DEFAULTS = {

@@ -19,7 +19,7 @@ lint:
 	$(PY) -m peerlab lint
 
 selftest:
-	$(PY) -m pytest peerlab/tests tests_lib -q
+	$(PY) -m pytest tests/test_peerlab_*.py tests/test_script_utils.py -q
 
 status:
 	$(PY) -m peerlab status

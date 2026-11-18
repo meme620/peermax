@@ -50,7 +50,7 @@ def run_one(path: pathlib.Path, root: pathlib.Path, timeout: int = 180):
 
 
 def targets(root: pathlib.Path) -> list[pathlib.Path]:
-    return sorted(p for p in (root / 'scripts').rglob('*.py') if '__pycache__' not in p.parts)
+    return sorted(p for p in (root / 'scripts').glob('*.py'))
 
 
 WATCH_DIRS = ('reports/data_gates/G0', 'data/processed', 'artifacts')

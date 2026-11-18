@@ -3,7 +3,7 @@
 用法：python -m peerlab.bootstrap <script> [args...]
 环境变量：PEERLAB_SEED（种子），PYTHONHASHSEED（由 runner 设置）。
 
-快照脚本用 Path(__file__).resolve().parents[2] 定位仓库根，runpy 保留 __file__，
+脚本用 Path(__file__).resolve().parents[1] 定位仓库根，runpy 保留 __file__，
 因此层级不变；同级 import 依赖脚本目录在 sys.path[0]，这里补上。
 """
 

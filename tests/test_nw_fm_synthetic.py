@@ -1,8 +1,8 @@
 """Phase 1.12 / C-7：NW / FM 分析模块合成对拍（独立参考实现）。
 
 覆盖：
-- `s3_m1_lib.newey_west` vs 手写 Bartlett Newey-West（均值 / se_nw / t_nw / se_iid / t_iid）。
-- `s3_m1_lib.fm_regression` vs 独立逐月 OLS（numpy lstsq）+ 手写 NW（beta 序列均值 / SE / T）。
+- `pricing_lib.newey_west` vs 手写 Bartlett Newey-West（均值 / se_nw / t_nw / se_iid / t_iid）。
+- `pricing_lib.fm_regression` vs 独立逐月 OLS（numpy lstsq）+ 手写 NW（beta 序列均值 / SE / T）。
 - VW：`weight_col` 走 sqrt(w) WLS，与独立参考一致，且与 EW 结果不同（证明权重生效）。
 - 退化输入：T<2、全 NaN/全缺失、n<min_n、秩亏——返回值/per_month reason 明确。
 
@@ -17,9 +17,9 @@ import pandas as pd
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / 'scripts' / 'data_audit'))
+sys.path.insert(0, str(ROOT / 'scripts'))
 
-from s3_m1_lib import fm_regression, newey_west  # noqa: E402
+from pricing_lib import fm_regression, newey_west  # noqa: E402
 
 
 # ---------------------------------------------------------------- 独立参考实现

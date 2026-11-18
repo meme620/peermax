@@ -66,7 +66,7 @@ EXPERIMENTS: tuple[Experiment, ...] = (
     Experiment(
         id='estimation-sample',
         title='M1 样本构建（run-all 只跑一次）',
-        steps=(Step('scripts/data_audit/s3_m1_1_build_sample.py'),),
+        steps=(Step('scripts/pricing_sample_build.py'),),
         requires=(REGISTRY_CONFIG, 'data/processed'),
         outputs=(
             'reports/data_gates/G0/s3_m1_sample_report*.json',
@@ -78,7 +78,7 @@ EXPERIMENTS: tuple[Experiment, ...] = (
     Experiment(
         id='network-business-text',
         title='M-A 产品市场竞争网络构边（老师 MD&A 语料）',
-        steps=(Step('scripts/data_audit/s3_ma_build_edges.py', ('--corpus', 'teacher')),),
+        steps=(Step('scripts/network_business_edges_build.py', ('--corpus', 'teacher')),),
         requires=('configs/version_manifest.yaml', 'data/processed'),
         outputs=('data/processed/network_ma_teacher/**',),
         runtime_hint='分钟级',
@@ -87,9 +87,9 @@ EXPERIMENTS: tuple[Experiment, ...] = (
         id='network-mda-text',
         title='M-B 文本竞争网络：全期矩阵 → τ 校准 → 构边',
         steps=(
-            Step('scripts/data_audit/s3_mb_full_matrix.py', ('--years', '2017-2025')),
-            Step('scripts/data_audit/s3_b1_calibrate_tau.py'),
-            Step('scripts/data_audit/s3_mb_build_edges.py', ('--year', '2021')),
+            Step('scripts/network_mda_full_matrix.py', ('--years', '2017-2025')),
+            Step('scripts/network_tau_calibrate.py'),
+            Step('scripts/network_mda_edges_build.py', ('--year', '2021')),
         ),
         requires=(REGISTRY_CONFIG, 'data/raw/teacher/mda_data_2023.csv'),
         outputs=(
@@ -103,9 +103,9 @@ EXPERIMENTS: tuple[Experiment, ...] = (
         id='peermax-panel',
         title='S4：MAX/PeerMAX 面板（主口径 ma_teacher）',
         steps=(
-            Step('scripts/data_audit/s4_step1_max.py'),
+            Step('scripts/peermax_max_build.py'),
             Step(
-                'scripts/data_audit/s4_step2_peermax_formal.py',
+                'scripts/peermax_panel_build.py',
                 (
                     '--use-case', 'ma',
                     '--net-dir', 'data/processed/network_ma_teacher',
@@ -123,7 +123,7 @@ EXPERIMENTS: tuple[Experiment, ...] = (
     Experiment(
         id='fm-main-table',
         title='M1 主表：Fama-MacBeth + horse race',
-        steps=(Step('scripts/data_audit/s3_m1_2_fm_main.py', ('--sample-version', 'v3')),),
+        steps=(Step('scripts/pricing_fm_main.py', ('--sample-version', 'v3')),),
         requires=(REGISTRY_CONFIG, 'data/processed'),
         outputs=(
             'reports/data_gates/G0/s3_m1_pricing_table*.json',
@@ -142,7 +142,7 @@ EXPERIMENTS: tuple[Experiment, ...] = (
     Experiment(
         id='portfolio-sorts',
         title='M1 组合表：五分位/十分位 spread',
-        steps=(Step('scripts/data_audit/s3_m1_3_portfolio_shape.py', ('--sample-version', 'v2')),),
+        steps=(Step('scripts/pricing_portfolio_sorts.py', ('--sample-version', 'v2')),),
         requires=(REGISTRY_CONFIG, 'data/processed'),
         outputs=(
             'reports/data_gates/G0/s3_m1_portfolio_deciles*.json',
@@ -155,8 +155,8 @@ EXPERIMENTS: tuple[Experiment, ...] = (
         id='robustness-checks',
         title='M1 稳健性：placebo 与长度/行业控制',
         steps=(
-            Step('scripts/data_audit/s3_m1_4_robustness_placebo.py'),
-            Step('scripts/data_audit/s3_m1_5_length_industry.py'),
+            Step('scripts/pricing_robustness_placebo.py'),
+            Step('scripts/pricing_length_industry_control.py'),
         ),
         requires=(REGISTRY_CONFIG, 'data/processed'),
         outputs=(
@@ -169,7 +169,7 @@ EXPERIMENTS: tuple[Experiment, ...] = (
     Experiment(
         id='gate-report',
         title='M1 数据门报告',
-        steps=(Step('scripts/data_audit/s3_m1_6_gate_report.py'),),
+        steps=(Step('scripts/pricing_gate_report.py'),),
         requires=(REGISTRY_CONFIG, 'data/processed'),
         outputs=(
             'reports/data_gates/G0/s3_m1_gate_report*.json',
@@ -181,7 +181,7 @@ EXPERIMENTS: tuple[Experiment, ...] = (
     Experiment(
         id='shadow-inference',
         title='Phase3 shadow 推断层（bootstrap，随 seed 变化）',
-        steps=(Step('scripts/data_audit/p3_4_inference_shadow.py'),),
+        steps=(Step('scripts/shadow_inference.py'),),
         requires=(REGISTRY_CONFIG, 'artifacts/phase3'),
         outputs=('artifacts/phase3/3.4_*.csv',),
         accepts_seed=True,
@@ -190,7 +190,7 @@ EXPERIMENTS: tuple[Experiment, ...] = (
     Experiment(
         id='density-null',
         title='网络密度零模型（随机重连，随 seed 变化）',
-        steps=(Step('scripts/data_audit/s3_network_density_null.py'),),
+        steps=(Step('scripts/network_density_null.py'),),
         requires=(REGISTRY_CONFIG, 'data/processed'),
         outputs=('reports/data_gates/G0/s3_network_density_null.json',),
         accepts_seed=True,

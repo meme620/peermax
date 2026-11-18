@@ -17,7 +17,7 @@ import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPT = ROOT / 'scripts/data_audit/s4_step2_peermax_formal.py'
+SCRIPT = ROOT / 'scripts/peermax_panel_build.py'
 MANIFEST = ROOT / 'configs/version_manifest.yaml'
 NET_ROOT = ROOT / 'data/processed'
 MAIN_DIRS = ('network_ma', 'network_mb',
@@ -31,7 +31,7 @@ RULE = '(y+1)-04-30'
 
 
 def _load():
-    spec = importlib.util.spec_from_file_location('s4_step2_peermax_formal',
+    spec = importlib.util.spec_from_file_location('peermax_panel_build',
                                                   SCRIPT)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)

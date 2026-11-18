@@ -19,9 +19,9 @@ import pandas as pd
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / 'scripts' / 'data_audit'))
+sys.path.insert(0, str(ROOT / 'scripts'))
 
-import s3_m1_lib as lib  # noqa: E402
+import pricing_lib as lib  # noqa: E402
 
 SOURCE_BYTES = b'phase1-i14-fake-daily-total-amount-source-v1'
 
@@ -99,7 +99,7 @@ def test_meta_fields_complete(tmp_path, source, frame):
     assert meta['columns'] == lib.AMOUNT_CACHE_COLUMNS
     assert meta['dtypes'] == {'firm_id': 'object', 'month': 'object', 'amount_100m': 'float64'}
     assert re.fullmatch(r'[0-9a-f]{64}', meta['script_sha256'])
-    assert Path(meta['script_path']).name == 's3_m1_lib.py'
+    assert Path(meta['script_path']).name == 'pricing_lib.py'
     assert meta['created_at_utc'].endswith('+00:00')
 
     on_disk = json.loads((tmp_path / lib.AMOUNT_CACHE_META_NAME).read_text(encoding='utf-8'))

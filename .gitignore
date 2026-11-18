@@ -4,10 +4,20 @@ __pycache__/
 .pytest_cache/
 .venv/
 
-# 数据载荷与临时产物：不入库
-data/
+# codegraph 索引：本地可重建，不入库
+.codegraph/
+
+# 数据：raw/ 是老师提供的 4.4 GB 原始包，不入库；external/ 与 processed/ 进跟踪
+data/raw/
+data/processed/*
+!data/processed/.gitkeep
+
+# 审计工作记录：不入库
 artifacts/
 
 # 运行记录与冒烟产物：不入库（index.json、tables/、summary.md 入库）
 result/runs/
 result/smoke/
+
+# 门禁与审计产物：由脚本运行时生成，不入库
+reports/

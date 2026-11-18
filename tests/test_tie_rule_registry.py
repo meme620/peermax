@@ -19,7 +19,7 @@ import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPT = ROOT / "scripts/data_audit/s4_step1_max.py"
+SCRIPT = ROOT / "scripts/peermax_max_build.py"
 REGISTRY = ROOT / "configs/parameter_registry.yaml"
 
 PANEL_HEADER = ["code", "date", "rraw"]

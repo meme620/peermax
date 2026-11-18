@@ -5,7 +5,7 @@
   complete_month/return_status 同步按有效交易日判定；旧价格观测数仅作
   n_price_obs / n_price_obs_legacy 审计列。
 - 全月 volume=0 → complete_month=0（P1-01 新增用例）。
-- s4_step1_max：默认 0 输出与旧逻辑逐字节一致；阈值 15 只标记/排除不足行。
+- peermax_max_build：默认 0 输出与旧逻辑逐字节一致；阈值 15 只标记/排除不足行。
 """
 import csv
 import importlib.util
@@ -18,8 +18,8 @@ import pandas as pd
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-MONTHLY_SCRIPT = ROOT / "scripts/data/build_monthly_returns_status.py"
-MAX_SCRIPT = ROOT / "scripts/data_audit/s4_step1_max.py"
+MONTHLY_SCRIPT = ROOT / "scripts/build_monthly_returns_status.py"
+MAX_SCRIPT = ROOT / "scripts/peermax_max_build.py"
 MONTHLY_V2 = ROOT / "data/processed/monthly_returns_clean_v2.csv"
 SOURCE_MONTH = ROOT / "data/processed/source_month_argmax_panel.csv"
 
@@ -153,7 +153,7 @@ def test_empty_panel_dir_gives_zero_trade_days(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# s4_step1_max（P1.1-01）：complete_month 边界 / D-02=A / registry fail-closed
+# peermax_max_build（P1.1-01）：complete_month 边界 / D-02=A / registry fail-closed
 # ---------------------------------------------------------------------------
 
 PANEL_HEADER = ["code", "date", "volume", "rraw"]

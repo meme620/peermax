@@ -18,7 +18,7 @@ import pandas as pd
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-LIB = ROOT / "scripts/data_audit/s3_m1_lib.py"
+LIB = ROOT / "scripts/pricing_lib.py"
 
 
 def _load(name="s3_m1_lib_agg"):

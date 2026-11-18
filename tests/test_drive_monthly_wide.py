@@ -1,6 +1,6 @@
-"""Phase 4 BL-03：`s3_m1_lib._drive_monthly_wide` how 分支显式化护栏。
+"""Phase 4 BL-03：`pricing_lib._drive_monthly_wide` how 分支显式化护栏。
 
-背景（`artifacts/phase4/4.0_backlog.md` §2.3；Phase 2.4 `p2_4_turnover_shadow.py` 已实证）：
+背景（`artifacts/phase4/4.0_backlog.md` §2.3；Phase 2.4 `shadow_turnover.py` 已实证）：
 修复前 `how != 'sum'` 全部静默落 `.last()`（含 `'mean'`）。修复后：
 
   - `'sum'`  : `resample('ME').sum(min_count=1)`（口径不变；全 NaN 月/列 = NaN，不是 0）
@@ -13,7 +13,7 @@
   1. sum / last / mean 三分支的宽表值与 NaN 位置；
   2. 全 NaN 月（2014-09）在宽表层为 NaN、因 `.stack()` 默认 dropna 不出现在长表；
   3. mean ≠ last（旧 bug 必然失败）的逐值证据；
-  4. mean 与 `p2_4_turnover_shadow.monthly_frames` 自实现月均值逐值对拍（max|Δ| = 0）；
+  4. mean 与 `shadow_turnover.monthly_frames` 自实现月均值逐值对拍（max|Δ| = 0）；
   5. 未知 how 抛 `ValueError`；`resample('ME').mean(min_count=1)` 抛
      `pandas.errors.UnsupportedFunctionCall`（禁止写法，非 TypeError）；
   6. 两个生产 loader（`load_amount_100m` = sum、`load_turnover_drive` = last）
@@ -30,11 +30,11 @@ import pandas as pd
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / 'scripts' / 'data_audit'))
+sys.path.insert(0, str(ROOT / 'scripts'))
 
-import s3_m1_lib as lib  # noqa: E402
+import pricing_lib as lib  # noqa: E402
 
-P2_4_SCRIPT = ROOT / 'scripts/data_audit/p2_4_turnover_shadow.py'
+P2_4_SCRIPT = ROOT / 'scripts/shadow_turnover.py'
 
 CODES = ['000002.SZ', '600000.SH', '000001.SZ']  # 000001.SZ 全 NaN -> 长表无行
 DAYS = ['2014-07-01', '2014-07-02', '2014-07-03', '2014-07-31',
@@ -150,8 +150,8 @@ def test_mean_is_not_last_old_bug_regression(monkeypatch, pkl):
 
 # ------------------------------------------------------- 2) 与 Phase 2.4 自实现月均值对拍
 def test_mean_matches_p2_4_self_implementation(monkeypatch, pkl):
-    """逐值对拍 `p2_4_turnover_shadow.monthly_frames` 自实现月均值（含 NaN 位置）。"""
-    spec = importlib.util.spec_from_file_location('p2_4_turnover_shadow', P2_4_SCRIPT)
+    """逐值对拍 `shadow_turnover.monthly_frames` 自实现月均值（含 NaN 位置）。"""
+    spec = importlib.util.spec_from_file_location('shadow_turnover', P2_4_SCRIPT)
     p2_4 = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(p2_4)
     ref = p2_4.monthly_frames(p2_4.load_turnover_wide(pkl))['turnover_mean']

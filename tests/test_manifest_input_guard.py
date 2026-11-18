@@ -14,9 +14,9 @@ import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / 'scripts' / 'data_audit'))
+sys.path.insert(0, str(ROOT / 'scripts'))
 
-from s3_m1_lib import (  # noqa: E402
+from pricing_lib import (  # noqa: E402
     M1_INPUTS, assert_anchored_file_sha, assert_m1_inputs_sha, manifest_input_key,
 )
 
@@ -222,7 +222,7 @@ def _s4_argv(tmp_path: Path):
 
 
 def test_s4_step2_bad_source_month_sha_exits_without_output(monkeypatch, tmp_path, capsys):
-    import s4_step2_peermax_formal as s4
+    import peermax_panel_build as s4
     bad = tmp_path / 'bad_source.csv'
     bad.write_text('not the registered source month\n', encoding='utf-8')
     monkeypatch.setattr(s4, 'ARGMAX', bad)
@@ -238,7 +238,7 @@ def test_s4_step2_bad_source_month_sha_exits_without_output(monkeypatch, tmp_pat
 
 
 def test_s4_step2_bad_returns_sha_exits_without_output(monkeypatch, tmp_path, capsys):
-    import s4_step2_peermax_formal as s4
+    import peermax_panel_build as s4
     bad = tmp_path / 'bad_returns.csv'
     bad.write_text('not the registered returns file\n', encoding='utf-8')
     monkeypatch.setattr(s4, 'RETURNS', bad)
@@ -255,7 +255,7 @@ def test_s4_step2_bad_returns_sha_exits_without_output(monkeypatch, tmp_path, ca
 
 # ---------------------------------------------------------------- 下游 s3_pc
 def test_s3_pc_bad_sample_sha_exits_without_output(monkeypatch, tmp_path, capsys):
-    import s3_pc_pricing_correspondence as pc
+    import competition_pricing_correspondence as pc
     report = {'contracts': {'ma_teacher': dict(GOOD)},
               'samples': {'ma_teacher': {'rows_total': 10}},
               'files': {'v2_samples': {'ma_teacher': {'sha256': '0' * 64}}}}
@@ -279,7 +279,7 @@ def test_s3_pc_bad_sample_sha_exits_without_output(monkeypatch, tmp_path, capsys
 
 
 def test_s3_pc_custom_panel_skips_sample_anchor(monkeypatch, tmp_path):
-    import s3_pc_pricing_correspondence as pc
+    import competition_pricing_correspondence as pc
     report = {'contracts': {'ma_teacher': dict(GOOD)},
               'samples': {'ma_teacher': {'rows_total': 10}}}
     report_path = tmp_path / 'sample_report.json'

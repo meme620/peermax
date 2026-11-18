@@ -21,7 +21,7 @@ import pandas as pd
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / 'scripts' / 'data'))
+sys.path.insert(0, str(ROOT / 'scripts'))
 
 import build_monthly_returns_status as build  # noqa: E402
 
@@ -109,7 +109,7 @@ def test_build_status_writes_computed_columns(tmp_path):
 
 
 def test_no_hardcoded_sample_version_and_no_manual_override():
-    src = (ROOT / 'scripts' / 'data' / 'build_monthly_returns_status.py').read_text(
+    src = (ROOT / 'scripts' / 'build_monthly_returns_status.py').read_text(
         encoding='utf-8')
     assert re.search(r'^\s*SAMPLE_VERSION\s*=', src, re.M) is None
     assert 'sample_version' not in inspect.signature(build.build_status).parameters

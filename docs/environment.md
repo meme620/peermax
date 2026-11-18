@@ -28,7 +28,7 @@
 | pymupdf | 1.28.2 | 年报/招股书 PDF 文本层 | 4 |
 | pdfminer-six | 20260107 | 招股书锚 CID→GID 通道 | 1 |
 | fonttools | 4.68.0 | 同上，字形映射 | 1 |
-| python-pptx | 1.0.2 | 只给 `make_s3a_brief_pptx.py` | 1 |
+| python-pptx | 1.0.2 | 只给 `make_analyst_network_brief_pptx.py` | 1 |
 | baostock | 0.9.4 | 只给 `fetch_baostock_*` | 2 |
 
 **pandas 锁 2.x**：全树没有 `applymap`/`swapaxes`/`.ix`/`DataFrame.append` 这类已删除 API（逐项检索为 0），但 `groupby(...).apply(...)` 有 25 处。pandas 3.0 把 `include_groups` 的默认值改为 False，分组列不再出现在传入的帧里，这 25 处可能静默改变数字。研究数字出自 pandas 2.x，因此锁 2.x。
@@ -46,12 +46,12 @@ make env        # uv venv --python 3.13 .venv + uv pip install -r requirements.t
 | 命令 | 做什么 | 2026-11-18 结果 |
 |---|---|---|
 | `make preflight` | 解释器 / 14 个依赖 / 6 个 configs / 数据目录，三块一次打印 | env 通过；configs 6 个缺失；raw 目录 5/14 就绪 |
-| `make imports` | 逐个导入 `scripts/` 下 199 个脚本 | 145 ok、24 config、30 missing、**0 dep、0 other** |
+| `make imports` | 逐个导入 `scripts/` 下 203 个脚本 | 150 ok、24 config、29 missing、**0 dep、0 other** |
 | `make smoke` | peerlab L0：10 个实验逐个判脚本与输入是否就绪 | 10 个全部 blocked（缺 configs），退出码 3 |
 | `make status` | 逐实验列出缺什么 | 0/10 就绪 |
 | `make lint` | 命名与实验文档规范检查 | 通过 |
-| `make selftest` | `pytest peerlab/tests` | 22 passed |
-| `make test` | 全量 `pytest`（`tests/`） | **收集阶段 INTERNALERROR**：`s3_m1_lib` 导入即校验 registry，缺 `configs/parameter_registry.yaml` → `SystemExit(2)` |
+| `make selftest` | `pytest tests/test_peerlab_*.py tests/test_script_utils.py` | 34 passed |
+| `make test` | 全量 `pytest`（`tests/`） | **收集阶段 INTERNALERROR**：`pricing_lib` 导入即校验 registry，缺 `configs/parameter_registry.yaml` → `SystemExit(2)` |
 
 `make imports`（即 `python -m peerlab smoke --imports --clean`）会执行每个脚本的模块级代码，部分脚本会在 `reports/data_gates/G0/`、`data/processed/` 下写出文件（如 `drive_batch1_schema.json`）。命令跑完会列出这些文件并删除；不加 `--clean` 时只列出，便于先看脚本写了什么。
 
@@ -72,6 +72,6 @@ make env        # uv venv --python 3.13 .venv + uv pip install -r requirements.t
 
 ## 平台边界
 
-- `scripts/data_audit/s3_network_prospectus_anchor.py` 的 OCR 回退经 `wsl.exe -u 27697 bash` 调用 `ocr_tesseract_chunk.sh`，WSL 用户 ID 写死在代码里（`:718`）。macOS 上这条通道不可用，只影响招股书锚审计；该脚本的 pdfminer + CID→GID 通道不受影响。
+- `scripts/network_prospectus_anchor.py` 的 OCR 回退经 `wsl.exe -u 27697 bash` 调用 `ocr_tesseract_chunk.sh`，WSL 用户 ID 写死在代码里（`:718`）。macOS 上这条通道不可用，只影响招股书锚审计；该脚本的 pdfminer + CID→GID 通道不受影响。
 - 抓数脚本用标准库 `urllib`，没有 `requests` 依赖。
-- 全部脚本要求 **cwd = 仓库根**：`scripts/<组>/<文件>.py` 用 `parents[2]` 定位根，`tests/` 用 `parents[1]`。
+- 全部脚本要求 **cwd = 仓库根**：`scripts/<文件>.py` 与 `tests/*.py` 都用 `parents[1]` 定位根。
