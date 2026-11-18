@@ -12,6 +12,14 @@ A&H 原文 = 前月末股价 <$5 剔除。本脚本复刻 cf_mom_replication.py 
 用法: python scripts/data_audit/s3a_smoketest_cf_filters.py <price5|market_micro|none>
 输出: data/processed/analyst/smoketest_cf_filter_<mode>.json
 """
+# --- scripts/lib bootstrap ---
+import sys as _sys
+from pathlib import Path as _Path
+_sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))
+from lib.dates import next_month as _next_month
+from lib.stats import nw_t
+# --- end scripts/lib bootstrap ---
+
 import json, sys
 from pathlib import Path
 import pandas as pd
@@ -24,28 +32,6 @@ OUT = Path('data/processed/analyst')
 NET_VER = 'coverage_win12_fy12_v2'
 
 MODE = sys.argv[1] if len(sys.argv) > 1 else 'price5'
-
-
-def nw_t(x, L=1):
-    x = np.asarray(x, dtype=float)
-    x = x[~np.isnan(x)]
-    T = len(x)
-    if T < 3:
-        return np.nan
-    mu = x.mean()
-    se2 = np.sum((x - mu) ** 2) / T / T
-    for l in range(1, min(L, T - 1) + 1):
-        gamma_l = np.sum((x[:-l] - mu) * (x[l:] - mu)) / T
-        se2 += 2 * (1 - l / (L + 1)) * gamma_l / T
-    return mu / np.sqrt(se2)
-
-
-def _next_month(ym):
-    y, m = int(ym[:4]), int(ym[5:7])
-    m += 1
-    if m == 13:
-        y, m = y + 1, 1
-    return f'{y:04d}-{m:02d}'
 
 
 def main():

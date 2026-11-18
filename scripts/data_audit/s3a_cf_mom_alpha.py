@@ -5,6 +5,13 @@
 回归: 多空月收益 ~ alpha + MKT + SMB + HML + MOM（FF4）
 输出: 月度 alpha（%）、Newey-West L=1 t 统计、因子暴露、年化 alpha
 """
+# --- scripts/lib bootstrap ---
+import sys as _sys
+from pathlib import Path as _Path
+_sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))
+from lib.stats import nw_ols
+# --- end scripts/lib bootstrap ---
+
 import json
 import sys
 from pathlib import Path
@@ -18,23 +25,6 @@ DEFAULT_CF = 'data/processed/analyst/cf_mom_replication_ln_h1.json'
 FAC = 'data/processed/factor_returns_daily.csv'
 REV_FAC = 'data/processed/rev_factor_monthly.csv'
 DEFAULT_OUT = 'data/processed/analyst/cf_mom_alpha.json'
-
-
-def nw_ols(X, y, L=1):
-    """OLS + Newey-West (L) 协方差。返回 beta, se, t。"""
-    T = len(y)
-    XpX_inv = np.linalg.inv(X.T @ X)
-    beta = XpX_inv @ (X.T @ y)
-    eps = y - X @ beta
-    S0 = sum(eps[t] ** 2 * np.outer(X[t], X[t]) for t in range(T))
-    S = S0.copy()
-    for l in range(1, min(L, T - 1) + 1):
-        Sl = sum(eps[t] * eps[t + l] * (np.outer(X[t], X[t + l]) + np.outer(X[t + l], X[t]))
-                 for t in range(T - l))
-        S += (1 - l / (L + 1)) * Sl
-    V = XpX_inv @ S @ XpX_inv
-    se = np.sqrt(np.diag(V))
-    return beta, se, beta / se
 
 
 def main():

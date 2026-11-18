@@ -6,6 +6,14 @@
 用法: python scripts/data_audit/s3a_smoketest_c3_weight_coverage.py
 输出: data/processed/analyst/smoketest_c3_weight_coverage.json
 """
+# --- scripts/lib bootstrap ---
+import sys as _sys
+from pathlib import Path as _Path
+_sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))
+from lib.dates import next_month as _next_month
+from lib.stats import nw_t
+# --- end scripts/lib bootstrap ---
+
 import json
 from pathlib import Path
 import pandas as pd
@@ -16,28 +24,6 @@ RET = 'data/processed/monthly_returns_clean.csv'
 OUT = Path('data/processed/analyst/smoketest_c3_weight_coverage.json')
 NET_VER = 'coverage_win12_fy12_v2'
 THRESHOLDS = [0.0, 0.5, 0.8, 1.0]
-
-
-def nw_t(x, L=1):
-    x = np.asarray(x, dtype=float)
-    x = x[~np.isnan(x)]
-    T = len(x)
-    if T < 3:
-        return np.nan
-    mu = x.mean()
-    se2 = np.sum((x - mu) ** 2) / T / T
-    for l in range(1, min(L, T - 1) + 1):
-        gamma_l = np.sum((x[:-l] - mu) * (x[l:] - mu)) / T
-        se2 += 2 * (1 - l / (L + 1)) * gamma_l / T
-    return mu / np.sqrt(se2)
-
-
-def _next_month(ym):
-    y, m = int(ym[:4]), int(ym[5:7])
-    m += 1
-    if m == 13:
-        y, m = y + 1, 1
-    return f'{y:04d}-{m:02d}'
 
 
 def main():

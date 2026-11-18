@@ -18,6 +18,14 @@
 
 输出: data/processed/analyst/cf_mom_replication[_{weight}][_h{horizon}].json
 """
+# --- scripts/lib bootstrap ---
+import sys as _sys
+from pathlib import Path as _Path
+_sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))
+from lib.dates import next_month as _next_month
+from lib.stats import nw_t
+# --- end scripts/lib bootstrap ---
+
 import json, sys
 from pathlib import Path
 from datetime import datetime, timezone
@@ -40,29 +48,6 @@ H12_MIN_AVAIL = int(_SPEC['horizon']['h12_min_available_months'])
 _SPEC_HASH = hashlib.sha256(SPEC.read_bytes()).hexdigest()
 _INPUT_HASHES = _SPEC['provenance']['input_hashes']
 
-
-
-def nw_t(x, L=1):
-    """Newey-West t 统计（滞后 L 期自协方差修正）。v2：自协方差分母统一为 T。"""
-    x = np.asarray(x, dtype=float)
-    x = x[~np.isnan(x)]
-    T = len(x)
-    if T < 3:
-        return np.nan
-    mu = x.mean()
-    se2 = np.sum((x - mu) ** 2) / T / T
-    for l in range(1, min(L, T - 1) + 1):
-        gamma_l = np.sum((x[:-l] - mu) * (x[l:] - mu)) / T
-        se2 += 2 * (1 - l / (L + 1)) * gamma_l / T
-    return mu / np.sqrt(se2)
-
-
-def _next_month(ym):
-    y, m = int(ym[:4]), int(ym[5:7])
-    m += 1
-    if m == 13:
-        y, m = y + 1, 1
-    return f'{y:04d}-{m:02d}'
 
 
 def main():

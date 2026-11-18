@@ -13,6 +13,13 @@
 用法: python scripts/data_audit/s3a_smoketest_rev_variants.py
 输出: data/processed/analyst/smoketest_rev_variants.json
 """
+# --- scripts/lib bootstrap ---
+import sys as _sys
+from pathlib import Path as _Path
+_sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))
+from lib.stats import nw_ols
+# --- end scripts/lib bootstrap ---
+
 import json
 from pathlib import Path
 import pandas as pd
@@ -24,22 +31,6 @@ CF = 'data/processed/analyst/cf_mom_replication_ln_h1.json'
 FAC = 'data/processed/factor_returns_daily.csv'
 REV_BASE = 'data/processed/rev_factor_monthly.csv'
 OUT = Path('data/processed/analyst/smoketest_rev_variants.json')
-
-
-def nw_ols(X, y, L=1):
-    T = len(y)
-    XpX_inv = np.linalg.inv(X.T @ X)
-    beta = XpX_inv @ (X.T @ y)
-    eps = y - X @ beta
-    S0 = sum(eps[t] ** 2 * np.outer(X[t], X[t]) for t in range(T))
-    S = S0.copy()
-    for l in range(1, min(L, T - 1) + 1):
-        Sl = sum(eps[t] * eps[t + l] * (np.outer(X[t], X[t + l]) + np.outer(X[t + l], X[t]))
-                 for t in range(T - l))
-        S += (1 - l / (L + 1)) * Sl
-    V = XpX_inv @ S @ XpX_inv
-    se = np.sqrt(np.diag(V))
-    return beta, se, beta / se
 
 
 def main():

@@ -9,6 +9,7 @@
 | `oneoff/` | 一次性检查、抽样审计、历史复核 | 43 |
 | `external/` | 外部基准（HP TNIC-3）结构统计 | 1 |
 | `deliverables/` | 汇报物料生成 | 1 |
+| `lib/` | 抽出的原子模块：`io.py` `fmt.py` `dates.py` `stats.py`，以及 `m1/` `prospectus/` `diag/` `shadow/` 四组拆分产物 | 34 |
 
 逐文件角色与理由见 `docs/script_inventory.csv`，命名规则见 `docs/script_naming.md`。
 

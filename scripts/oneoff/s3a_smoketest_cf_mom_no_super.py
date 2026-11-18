@@ -6,6 +6,15 @@
 用法: python scripts/data_audit/s3a_smoketest_cf_mom_no_super.py
 输出: data/processed/analyst/smoketest_cf_mom_no_super.json
 """
+# --- scripts/lib bootstrap ---
+import sys as _sys
+from pathlib import Path as _Path
+_sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))
+from lib.dates import next_month as _next_month
+from lib.stats import nw_t
+from lib.stats import nw_ols
+# --- end scripts/lib bootstrap ---
+
 import json
 from pathlib import Path
 from collections import defaultdict
@@ -19,44 +28,6 @@ FAC = 'data/processed/factor_returns_daily.csv'
 REV_FAC = 'data/processed/rev_factor_monthly.csv'
 OUT = Path('data/processed/analyst/smoketest_cf_mom_no_super.json')
 TOP_EXCLUDE_THRESHOLD = 300
-
-
-def nw_t(x, L=1):
-    x = np.asarray(x, dtype=float)
-    x = x[~np.isnan(x)]
-    T = len(x)
-    if T < 3:
-        return np.nan
-    mu = x.mean()
-    se2 = np.sum((x - mu) ** 2) / T / T
-    for l in range(1, min(L, T - 1) + 1):
-        gamma_l = np.sum((x[:-l] - mu) * (x[l:] - mu)) / T
-        se2 += 2 * (1 - l / (L + 1)) * gamma_l / T
-    return mu / np.sqrt(se2)
-
-
-def nw_ols(X, y, L=1):
-    T = len(y)
-    XpX_inv = np.linalg.inv(X.T @ X)
-    beta = XpX_inv @ (X.T @ y)
-    eps = y - X @ beta
-    S0 = sum(eps[t] ** 2 * np.outer(X[t], X[t]) for t in range(T))
-    S = S0.copy()
-    for l in range(1, min(L, T - 1) + 1):
-        Sl = sum(eps[t] * eps[t + l] * (np.outer(X[t], X[t + l]) + np.outer(X[t + l], X[t]))
-                 for t in range(T - l))
-        S += (1 - l / (L + 1)) * Sl
-    V = XpX_inv @ S @ XpX_inv
-    se = np.sqrt(np.diag(V))
-    return beta, se, beta / se
-
-
-def _next_month(ym):
-    y, m = int(ym[:4]), int(ym[5:7])
-    m += 1
-    if m == 13:
-        y, m = y + 1, 1
-    return f'{y:04d}-{m:02d}'
 
 
 def main():
