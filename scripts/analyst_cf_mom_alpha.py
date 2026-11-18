@@ -19,7 +19,7 @@ import pandas as pd
 import numpy as np
 import yaml
 
-SPEC = Path('configs/s3a_final_spec_v1.yaml')
+SPEC = Path('configs/s3a_final_spec.yaml')
 _SPEC = yaml.safe_load(SPEC.read_text(encoding='utf-8'))
 DEFAULT_CF = 'data/processed/analyst/cf_mom_replication_ln_h1.json'
 FAC = 'data/processed/factor_returns_daily.csv'

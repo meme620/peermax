@@ -192,13 +192,13 @@ def lexicon_compare(years=("2017", "2018", "2019", "2020")) -> dict:
             if y in years:
                 mda[y][str(r.get("f_stock_id") or "").zfill(6)] = r.get("f_chapter_content") or ""
     bus: dict[str, dict[str, str]] = defaultdict(dict)
-    with open(ROOT / "data/processed/business_texts_v7.csv", encoding="utf-8", errors="replace", newline="") as f:
+    with open(ROOT / "data/processed/business_texts.csv", encoding="utf-8", errors="replace", newline="") as f:
         for r in csv.DictReader(f):
             if r.get("status") == "ok" and (r.get("year") or "") in years:
                 code = "".join(ch for ch in str(r.get("code") or "") if ch.isdigit())[-6:].zfill(6)
                 bus[r["year"]][code] = r.get("text") or ""
     out = {"lexicon_terms": meta["terms_kept"], "lexicon_file": meta["path"],
-           "business_corpus": "data/processed/business_texts_v7.csv",
+           "business_corpus": "data/processed/business_texts.csv",
            "note": ("原始命中词数受篇幅混淆，不可直接比较；可比口径=密度(每千字命中词)+覆盖率"
                     "(|MD&A∩业务章|/|业务章|)+等长前缀对照。terms 为去重词条数（集合语义，即 M-A 0/1 向量维度）。"),
            "per_year": {}}

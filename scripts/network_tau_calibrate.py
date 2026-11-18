@@ -3,7 +3,7 @@
 Plan §8 Phase B1 的可执行实现：
   1. 目标值：申万二级同行业 peer 数（组内 N-1）在**入网公司**上的**公司层面中位数**，
      跨 9 个文本年池化 → `sw2_median_peer_target`（registry 冻结值）。
-  2. 校准：TF-IDF 余弦（df<=0.25，mda_texts_v2 ok 行）在**抽样 focal**上求 τ，
+  2. 校准：TF-IDF 余弦（df<=0.25，mda_texts ok 行）在**抽样 focal**上求 τ，
      使池化中位 peer 数 = 目标（中位 peer 数是 τ 的阶梯函数 → 二分 + 区间细扫）。
   3. 诊断：逐文本年的中位/均值 peer 数、孤立公司、质量保留比；并给出
      「组层面中位规模」目标下的备选 τ（次级口径，供稳健性）。
@@ -31,7 +31,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'scripts'))
 from network_mda_edges_build import build_similarity, load_texts  # noqa: E402  复用已冻结的实现
 
-V2 = ROOT / 'data/processed/mda_texts_v2.csv'
+V2 = ROOT / 'data/processed/mda_texts.csv'
 LAT = ROOT / 'data/processed/sw2_industry_latest.csv'
 REPD = ROOT / 'reports/data_gates/G0'
 PROBE = ROOT / 'data/processed/network_mb' / 'tau_calibration_probe.csv'

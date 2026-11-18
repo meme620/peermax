@@ -17,7 +17,7 @@ from pathlib import Path
 from collections import defaultdict
 import pandas as pd
 
-BT = 'data/processed/business_texts_v7.csv'
+BT = 'data/processed/business_texts.csv'
 OUTD = Path('reports/data_gates/G0'); OUTD.mkdir(parents=True, exist_ok=True)
 ART = Path('artifacts/review'); ART.mkdir(parents=True, exist_ok=True)
 

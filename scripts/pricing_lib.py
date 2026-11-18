@@ -17,7 +17,6 @@ m1_formula_ids）。
 from __future__ import annotations
 
 import sys as _sys
-from pathlib import Path as _Path
 import json
 import math
 import os
@@ -39,7 +38,7 @@ REGISTRY = ROOT / 'configs/parameter_registry.yaml'
 
 MANIFEST = ROOT / 'configs/version_manifest.yaml'
 
-SPEC = ROOT / 'configs/s3a_final_spec_v1.yaml'
+SPEC = ROOT / 'configs/s3a_final_spec.yaml'
 
 PANELS = {
     'ma_teacher': ROOT / 'data/processed/monthly_pricing_panel_ma_teacher.csv',

@@ -31,13 +31,13 @@ from pathlib import Path
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
-V2 = ROOT / "data/processed/mda_texts_v2.csv"                      # 自建语料（对照链）
+V2 = ROOT / "data/processed/mda_texts.csv"                      # 自建语料（对照链）
 TEACHER = ROOT / "data/processed/teacher_mda_panel.csv"            # 老师导出（M-B 主输入，2026-09-22 起）
 OUT_DIR = ROOT / "data/processed/network_mb_stub"   # 骨架目录（正式为 network_mb/）
 NET_USE_CASE = "product_market_mb"
-SRC_VERSION = "mda_texts_v2"
+SRC_VERSION = "mda_texts"
 CORPORA = {
-    "self": {"path": V2, "src_version": "mda_texts_v2", "ver_prefix": "pm_mb_tfidf_v1",
+    "self": {"path": V2, "src_version": "mda_texts", "ver_prefix": "pm_mb_tfidf_v1",
              "id_col": "code", "year_col": "year"},
     "teacher": {"path": TEACHER, "src_version": "teacher_mda_2023", "ver_prefix": "pm_mb_tfidf_teacher_v1",
                 "id_col": "firm_id", "year_col": "year"},
@@ -59,7 +59,7 @@ COLS = ["network_use_case", "network_version", "focal_id", "source_id",
 def load_texts(text_year, corpus="self"):
     """读入某文本年的 (id, text) 列表。
 
-    corpus="self"    → 自建 CNINFO 抽取（mda_texts_v2.csv，status=="ok" 过滤）
+    corpus="self"    → 自建 CNINFO 抽取（mda_texts.csv，status=="ok" 过滤）
     corpus="teacher" → 老师导出的 MD&A 面板（teacher_mda_panel.csv，status=="ok" 过滤）
     两个面板的行语义一致，仅列名与年份类型不同；返回 (panel_code, text)。
     """

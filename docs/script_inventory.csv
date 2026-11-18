@@ -67,7 +67,7 @@ build_monthly_returns_drive,,scripts/build_monthly_returns_drive.py,support,,
 build_monthly_returns_status,,scripts/build_monthly_returns_status.py,library,3,test_n_valid_days_semantics.py;test_sample_version_computed.py
 build_product_lexicon,,scripts/build_product_lexicon.py,support,,
 build_rev_factor,,scripts/build_rev_factor.py,stage,,
-build_share_capital_v2,,scripts/build_share_capital_v2.py,support,,
+build_share_capital,,scripts/build_share_capital.py,support,,
 build_sw2_industry_map,,scripts/build_sw2_industry_map.py,stage,,
 check_link_audit,,scripts/check_link_audit.py,oneoff,,
 code_design_audit,s3_code_design_audit,scripts/code_design_audit.py,oneoff,,
@@ -187,7 +187,7 @@ shadow_segment_break,p3b_n4_segment,scripts/shadow_segment_break.py,analysis,,
 shadow_turnover,p2_4_turnover_shadow,scripts/shadow_turnover.py,analysis,,test_drive_monthly_wide.py;test_shadow_turnover.py
 shadow_weight_matrix,p3b_s2_weight_matrix,scripts/shadow_weight_matrix.py,stage,,
 statsutil,,scripts/statsutil.py,library,8,test_script_utils.py
-text_business_extract_v7,s3_extract_business_v7,scripts/text_business_extract_v7.py,stage,,
+text_business_extract,s3_extract_business_v7,scripts/text_business_extract.py,stage,,
 text_layer_audit,s3_text_audit,scripts/text_layer_audit.py,oneoff,,
-text_mda_extract_v2,s3_extract_mda_v2,scripts/text_mda_extract_v2.py,library,1,test_network_mda_contracts.py
+text_mda_extract,s3_extract_mda_v2,scripts/text_mda_extract.py,library,1,test_network_mda_contracts.py
 tnic_structure_summary,,scripts/tnic_structure_summary.py,external,,

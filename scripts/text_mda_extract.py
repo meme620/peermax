@@ -13,9 +13,9 @@ v2 规则：
   - 合并 artifacts/review/mda_src_identity.csv：
       identity=mismatch 或 doc_type=announcement -> status=bad_source（text 置空）；
       dup_n>1 且无身份信号 -> status=suspect_source（保留文本待复核）。
-输出：data/processed/mda_texts_v2.csv
+输出：data/processed/mda_texts.csv
   code,year,text,anchor,length,status,extract_format,src_identity,content_code,dup_n,year_signal,reason
-用法：python scripts/text_mda_extract_v2.py [--limit N] [--out PATH]
+用法：python scripts/text_mda_extract.py [--limit N] [--out PATH]
 """
 import argparse
 import collections
@@ -26,7 +26,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 TXT = ROOT / "data/raw/cninfo/annual_txt"
-OUT = ROOT / "data/processed/mda_texts_v2.csv"
+OUT = ROOT / "data/processed/mda_texts.csv"
 IDENT = ROOT / "artifacts/review/mda_src_identity.csv"
 
 MIN_LEN = 500

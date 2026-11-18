@@ -42,7 +42,7 @@ ROOT = Path(__file__).resolve().parents[1]
 ATT = ROOT / 'data/external/sw_industry_all_stkcds_20260915.xlsx'
 LAT = ROOT / 'data/processed/sw2_industry_latest.csv'
 NAMES = ROOT / 'data/processed/sw2_l2_names.csv'
-MDA = ROOT / 'data/processed/mda_texts_v2.csv'
+MDA = ROOT / 'data/processed/mda_texts.csv'
 NETS = {'ma': ROOT / 'data/processed/network_ma', 'mb': ROOT / 'data/processed/network_mb'}
 OUT_JSON = ROOT / 'reports/data_gates/G0/sw2_third_source_audit.json'
 OUT_CSV = ROOT / 'artifacts/review/sw2_third_source_disagreements.csv'
@@ -50,7 +50,7 @@ OUT_CSV = ROOT / 'artifacts/review/sw2_third_source_disagreements.csv'
 YEARS = list(range(2017, 2026))
 LIFT_YEARS = [2017, 2021, 2025]
 CURRENT_TAU_TARGET = 56.0
-# 历史值：自建语料（mda_texts_v2）校准的 τ。2026-09-22 语料切换后主口径为老师语料，
+# 历史值：自建语料（mda_texts）校准的 τ。2026-09-22 语料切换后主口径为老师语料，
 # τ = 0.0888212137（见 reports/data_gates/G0/s3_b1_tau_calibration_teacher.json）；
 # 本脚本原为自建链的第三源稳定性审计，重跑主口径时须显式改用新 τ。
 CURRENT_TAU = 0.07093029099632986

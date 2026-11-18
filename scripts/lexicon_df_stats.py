@@ -6,7 +6,7 @@
 在产品语料中出现频率过高的词条无区分度，按阈值剔除（与 M-B 的 df_threshold 同一思路）。
 
 口径：
-  - 语料 = data/processed/business_texts_v7.csv 的 status=ok 行（M-A 输入，2017-2025）
+  - 语料 = data/processed/business_texts.csv 的 status=ok 行（M-A 输入，2017-2025）
   - 分词 = jieba + 词库作 userdict（保证多字产品词不被切碎；与 M-A 构网用同一分词路径）
   - df(term) = 含该词的文档数 / 总文档数；keep = df ≤ DF_MAX（默认 0.25）
   - 未被分出的词条 df=0（列为 never_fired，仅作诊断；不删，保留维度）
@@ -31,7 +31,7 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 LEX = ROOT / 'data/processed/product_lexicon_v1.csv'
-CORPUS = ROOT / 'data/processed/business_texts_v7.csv'
+CORPUS = ROOT / 'data/processed/business_texts.csv'
 OUT = ROOT / 'data/processed/product_lexicon_v2.csv'
 REPD = ROOT / 'reports/data_gates/G0'
 

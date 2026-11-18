@@ -44,39 +44,26 @@
 
 from __future__ import annotations
 
-import sys as _sys
-from pathlib import Path as _Path
+import sys
+from pathlib import Path
+from fileio import atomic_write_text as _atomic_write_text
+
 import argparse
 import csv
 import json
 import os
-import sys
 import time
 import warnings
 from datetime import datetime, timezone
-from pathlib import Path
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import normalize
 from pricing_lib import assert_m1_inputs_sha, require, sha256_file  # noqa: E402
 from network_business_lexicon import build_automaton, load_lexicon  # noqa: E402
 from network_business_cluster_grid import build_vectors, load_refs  # noqa: E402
+from fileio import json_default as _json_default
 
 
-from datetime import datetime, timezone
-from pathlib import Path
-from network_business_cluster_grid import build_vectors, load_refs  # noqa: E402
-from pricing_lib import assert_m1_inputs_sha, require, sha256_file  # noqa: E402
-from network_business_lexicon import build_automaton, load_lexicon  # noqa: E402
-from sklearn.preprocessing import normalize
-import csv
-import json
-import numpy as np
-import os
-import pandas as pd
-import sys
-import time
-import warnings
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -801,23 +788,8 @@ def vocab_sensitivity(probe: bool) -> dict:
 # --- scripts/lib bootstrap ---
 # --- end scripts/lib bootstrap ---
 
-import argparse
-import csv
-import json
-import os
-import sys
-import time
-import warnings
-from datetime import datetime, timezone
-from pathlib import Path
 
-import numpy as np
-import pandas as pd
-from sklearn.preprocessing import normalize
 
-from pricing_lib import assert_m1_inputs_sha, require, sha256_file  # noqa: E402
-from network_business_lexicon import build_automaton, load_lexicon  # noqa: E402
-from network_business_cluster_grid import build_vectors, load_refs  # noqa: E402
 
 # ---------------------------------------------------------------- 路径与常量
 

@@ -43,39 +43,25 @@
 
 from __future__ import annotations
 
-import sys as _sys
-from pathlib import Path as _Path
+import sys
+from pathlib import Path
+
 import argparse
 import csv
 import json
 import math
 import os
-import sys
 import time
 from datetime import datetime, timezone
-from pathlib import Path
 import numpy as np
 import pandas as pd
 from pricing_lib import (  # noqa: E402
     assert_m1_inputs_sha, fm_regression, newey_west, param_value,
     require, sha256_file, vif_table,
 )
+from fileio import json_default as _json_default
 
 
-from datetime import datetime, timezone
-from pathlib import Path
-from pricing_lib import (  # noqa: E402
-    assert_m1_inputs_sha, fm_regression, newey_west, param_value,
-    require, sha256_file, vif_table,
-)
-import csv
-import json
-import math
-import numpy as np
-import os
-import pandas as pd
-import sys
-import time
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -622,24 +608,9 @@ def cluster_industry_cross() -> tuple:
 # --- end scripts/lib bootstrap ---
 
 
-import argparse
-import csv
-import json
-import math
-import os
-import sys
-import time
-from datetime import datetime, timezone
-from pathlib import Path
-
-import numpy as np
-import pandas as pd
 
 
-from pricing_lib import (  # noqa: E402
-    assert_m1_inputs_sha, fm_regression, newey_west, param_value,
-    require, sha256_file, vif_table,
-)
+
 
 # ---------------------------------------------------------------- 路径与常量
 

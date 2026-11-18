@@ -1,6 +1,6 @@
 """S3-MA 业务文本数据契约测试（2026-09-13，P0.3）。
 
-读 data/processed/business_texts_v7.csv（不重跑提取）验证硬契约：
+读 data/processed/business_texts.csv（不重跑提取）验证硬契约：
   1. 唯一键 (code, year)
   2. 列完整（含审计列 src_identity/content_code/dup_n/year_signal/reason）
   3. status=ok：text 非空、length>0 且与 text 长度一致、无 CID 字形乱码
@@ -18,7 +18,7 @@ from collections import Counter
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-BIZ = ROOT / 'data/processed/business_texts_v7.csv'
+BIZ = ROOT / 'data/processed/business_texts.csv'
 RAW = ROOT / 'data/raw/cninfo/annual_txt'
 
 COLS = ['code', 'year', 'text', 'anchor', 'length', 'status',

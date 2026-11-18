@@ -20,9 +20,9 @@ from pathlib import Path
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
-V2 = ROOT / "data/processed/mda_texts_v2.csv"
+V2 = ROOT / "data/processed/mda_texts.csv"
 OUT = ROOT / "reports/data_gates/G0/s3_mb_full_matrix.json"
-SPEC = ROOT / "configs/s3a_final_spec_v1.yaml"
+SPEC = ROOT / "configs/s3a_final_spec.yaml"
 DF_CUTOFF = 0.25          # registry: df_threshold（2026-09-13 冻结）
 PEER_TARGET = 10          # 占位目标（正式 τ 校准待申万二级）
 
@@ -133,7 +133,7 @@ def main():
 
     import hashlib, yaml
     spec_hash = hashlib.sha256(SPEC.read_bytes()).hexdigest() if SPEC.exists() else None
-    out = {"spec_id": "s3a_final_spec_v1_20260909", "spec_hash": spec_hash,
+    out = {"spec_id": "s3a_final_spec_20260909", "spec_hash": spec_hash,
            "run_at": datetime.now(timezone.utc).isoformat(),
            "df_threshold": DF_CUTOFF, "peer_target_placeholder": PEER_TARGET,
            "note": ("M-B 全期相似度矩阵；τ 为占位（中位 peer≈10），正式校准待申万二级（P2）；"

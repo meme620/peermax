@@ -8,7 +8,7 @@ PeerMAX 项目的计算链代码：原始数据抓取 → 清洗与面板构建 
 
 **只收代码。** 不含数据（`data/`）、配置（`configs/`）、报告与审计产物（`reports/`）、汇报成品（`deliverables/`）、审计工作记录（`artifacts/`）。这些都在主仓库原路径。
 
-规模：**192 个 `.py` + 1 个 `.sh`**、**3,298,375 字节**、**62,294 行**（`.py` 部分），全部在 `scripts/` 一层。
+规模：**192 个 `.py` + 1 个 `.sh`**、**3,289,008 字节**、**61,891 行**（`.py` 部分），全部在 `scripts/` 一层。
 
 | 目录 | 内容 |
 |---|---|
@@ -51,8 +51,8 @@ PeerMAX 项目的计算链代码：原始数据抓取 → 清洗与面板构建 
 | S1 | 可得性盘点：expected universe、取数 manifest、schema/主键抽检、覆盖三分类 + 停牌核验、数据门状态表 | `inventory_universe` → `inventory_source_manifest` → `inventory_schema_check` → `inventory_coverage` → `inventory_gates` | `reports/data_gates/G0/`：`s1_expected_universe.json`、`data_access_manifest.json`、`s1_schema_check.json`、`field_mapping_manifest.json`、`s1_coverage_report.json`、`data_gate_report.json` |
 | S2 | 日面板（raw + qfq + `rraw` + 除权 flag）、日/月收益、质量门 8 项；配套 `build_*` | `daily_panel_build`、`daily_panel_quality_gate`、`daily_panel_market_value_check`、`build_id_map`… | `data/processed/daily_panel/{year}.csv`、`monthly_returns{,_clean,_clean_v2}.csv`、`corporate_action_events.csv`、`firm_id_map.csv`、`firm_chars_clean.csv`、`market_equity_panel.csv`、`share_capital_history_v2.csv`、`sw2_industry_{map,latest}.csv`；`G0/quality_report_s2.json`、`mv_crosscheck_report.json` |
 | S2.5 | 自建 FF4 日度因子、REV，7 项验收 | `factor_build`、`factor_validate`、`build_rev_factor`；全期扩展 `factor_full_period_build` | `factor_returns_daily.csv`、`rev_factor_monthly.csv`；`G0/factor_construction_report.json`、`factor_validation_report.json` |
-| S3 M-A | 年报业务章节提取 → 聚类参数网格 → 逐年 K 冻结 → 正式构边 | `text_business_extract_v7` → `network_business_cluster_grid` → `network_business_cluster_freeze` → `network_business_edges_build` | `business_texts_v7.csv`；`{net_dir}/clusters/{year}_clusters.csv`；`{net_dir}/{year}_{similarity,support}.csv`；`G0/s3_b3_ma_cluster_grid*.json`、`s3_b3_ma_param_freeze*.json` |
-| S3 M-B | 老师 MD&A 语料 TF-IDF 余弦全期矩阵 → τ 校准 → 正式构边 | `text_mda_extract_v2`、`network_mda_full_matrix`、`network_tau_calibrate`、`network_mda_edges_build` | `G0/s3_mb_full_matrix.json`、`s3_b1_tau_calibration.json`；`network_mb/`、`network_mb_teacher/` 下年度边表 |
+| S3 M-A | 年报业务章节提取 → 聚类参数网格 → 逐年 K 冻结 → 正式构边 | `text_business_extract` → `network_business_cluster_grid` → `network_business_cluster_freeze` → `network_business_edges_build` | `business_texts.csv`；`{net_dir}/clusters/{year}_clusters.csv`；`{net_dir}/{year}_{similarity,support}.csv`；`G0/s3_b3_ma_cluster_grid*.json`、`s3_b3_ma_param_freeze*.json` |
+| S3 M-B | 老师 MD&A 语料 TF-IDF 余弦全期矩阵 → τ 校准 → 正式构边 | `text_mda_extract`、`network_mda_full_matrix`、`network_tau_calibrate`、`network_mda_edges_build` | `G0/s3_mb_full_matrix.json`、`s3_b1_tau_calibration.json`；`network_mb/`、`network_mb_teacher/` 下年度边表 |
 | S3 审计 | 边精度抽样+审计、文本完整性、跨源归因、密度零模型、下游一致性、权重交叉、主链审计、九项验收 | `network_edge_precision_sample` → `network_edge_precision_audit`、`data_integrity_audit`、`text_layer_audit`、`network_cross_audit_attribution`、`network_cross_audit`、`network_business_acceptance_check`、`network_business_downstream_consistency`、`network_business_weighting_cross_audit`、`network_report_acceptance_check`、`network_mainline_audit`、`code_design_audit` | `G0/s3_*.json` / `*.md` |
 | S3A | CNRDS 分析师预测 → 覆盖快照 → 12 月窗口投影为公司网络 → 派生变量 → CF/NPM 复刻 → 9A–9M → Gate1/2/5 | `run_analyst_pipeline.py`（12 步）；9A–9M 与 step11 在 runner 外 | `data/raw/analyst/`、`data/processed/analyst/`、`G0/s3a_*.json` |
 | S4 | source-month MAX/argmax/完整月 gate → PeerMAXraw / OwnMAXraw / PeerReturn → C1 三轮验收 | `peermax_max_build` → `peermax_panel_build` → `peermax_panel_acceptance` | `source_month_argmax_panel.csv`；`monthly_pricing_panel_{ma,mb,ma_teacher,mb_teacher}_v4.csv`；`G0/s4_step2_{corpus}_v4_report.json`、`s4_c1_acceptance_{corpus}_v4.json` |
@@ -90,7 +90,7 @@ python scripts/build_rev_factor.py
 python scripts/factor_full_period_build.py   # 2006-2025 全期；子进程无 cwd，必须仓库根启动
 
 # S3 M-A（--corpus teacher = 主口径，网络年 2015-2023；缺省 self 为自建语料历史口径）
-python scripts/text_business_extract_v7.py
+python scripts/text_business_extract.py
 python scripts/network_business_cluster_grid.py --corpus teacher --years 2019 2021 2023
 python scripts/network_business_cluster_freeze.py --corpus teacher
 python scripts/network_business_edges_build.py --corpus teacher
@@ -233,7 +233,7 @@ python -m pytest tests/ -q        # 必须显式写 tests/
 
 `pricing_lib` **导入即校验** `configs/parameter_registry.yaml`：缺失、参数缺失/重复、值域非法 → `SystemExit(2)`。`configs/version_manifest.yaml` 的 sha 锚同理：缺条目、缺 sha、非 active、非 64-hex、与实际不符 → `SystemExit(2)`，源码注释明确「禁止回退实测值或自动刷新 manifest」。
 
-`analyst_meta` 是模块级读取 spec：缺 `configs/s3a_final_spec_v1.yaml` 时抛**未捕获的 `FileNotFoundError`**（不是 `SystemExit`）。两者都属设计上的 fail-closed：不许在无 spec/registry 的情况下跑出数字。
+`analyst_meta` 是模块级读取 spec：缺 `configs/s3a_final_spec.yaml` 时抛**未捕获的 `FileNotFoundError`**（不是 `SystemExit`）。两者都属设计上的 fail-closed：不许在无 spec/registry 的情况下跑出数字。
 
 ## 6. 外部依赖
 
@@ -259,7 +259,7 @@ python -m pytest tests/ -q        # 必须显式写 tests/
 | 文件 | 作用 |
 |---|---|
 | `parameter_registry.yaml` | 全部冻结参数、样本版本指针、阈值、控制集、`panel_versions`；`pricing_lib` 导入即校验 |
-| `s3a_final_spec_v1.yaml` | S3A 统一规格：输入路径、网络主版本、horizon |
+| `s3a_final_spec.yaml` | S3A 统一规格：输入路径、网络主版本、horizon |
 | `version_manifest.yaml` | 版本与 sha256 锚；M1 输入、网络版本白名单、产出登记 |
 | `m1_contracts.yaml` | M1 数据合同（Phase2 shadow 共用） |
 | `claim_registry.yaml` | claim 状态与禁止表述 |
@@ -313,7 +313,7 @@ python -m pytest tests/ -q        # 必须显式写 tests/
 |---|---|---|
 | `make_analyst_network_brief_pptx.py` | [非主线] 仅汇报 | Gate5 读其源码，故必须纳入 |
 
-`text_mda_extract_v2.py` 是**主线**（M-B 自建语料侧），不在此列。
+`text_mda_extract.py` 是**主线**（M-B 自建语料侧），不在此列。
 
 ## 11. 校验与重建
 

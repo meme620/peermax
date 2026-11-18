@@ -38,7 +38,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from analyst_meta import attach_meta
 
 EDGES = Path('data/processed/analyst/edges')
-SPEC = Path('configs/s3a_final_spec_v1.yaml')
+SPEC = Path('configs/s3a_final_spec.yaml')
 _SPEC = yaml.safe_load(SPEC.read_text(encoding='utf-8'))
 RET = Path(_SPEC['inputs']['returns'])
 MEQ = Path(_SPEC['inputs']['market_equity'])

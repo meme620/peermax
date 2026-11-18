@@ -80,8 +80,8 @@ K_TARGET = {'ma_teacher': 44, 'mb_teacher': None, 'ma': 56, 'mb': None}
 CORPUS = {
     'ma_teacher': 'teacher_mda_panel（老师 MD&A）',
     'mb_teacher': 'teacher_mda_panel（老师 MD&A）',
-    'ma': 'business_texts_v7（自建业务描述）',
-    'mb': 'business_texts_v7（自建业务描述）',
+    'ma': 'business_texts（自建业务描述）',
+    'mb': 'business_texts（自建业务描述）',
 }
 METHOD = {
     'ma_teacher': '等权 0/1 词向量 × 余弦 × average，K 目标 44',
@@ -385,7 +385,7 @@ def main():
         'outputs': {'csv': _rel(OUT_CSV), 'csv_sha256': csv_sha},
         'scope_note': (
             '共同窗口只消除 FM 窗口差异。K 目标（ma_teacher/mb_teacher 44；ma 56）、'
-            '语料（teacher_mda_panel vs business_texts_v7）与由二者决定的 N 差异仍在；'
+            '语料（teacher_mda_panel vs business_texts）与由二者决定的 N 差异仍在；'
             'mb_teacher/mb 为阈值网络（tau），无 K 目标。'),
     }
     OUT_JSON.write_text(json.dumps(_json_ready(counts), ensure_ascii=False, indent=1),
@@ -486,7 +486,7 @@ def main():
              '`K_TARGET_FALLBACK`；`network_business_edges_build.py` `k_rule`）；'
              'mb_teacher / mb 为 TF-IDF 阈值网络（tau=0.0888212137 / 0.0709302910），无 K 目标。')
     L.append('- **语料差异**：teacher 两列 = `teacher_mda_panel`（老师 MD&A）；'
-             'ma / mb = `business_texts_v7`（自建业务描述）。语料章节、抽取文本与长度均不同。')
+             'ma / mb = `business_texts`（自建业务描述）。语料章节、抽取文本与长度均不同。')
     L.append('- 因此：共同窗口只让 **FM 月份集合**对齐；跨列比较仍是'
              '「语料 + 方法/K 目标 + N」的复合差异，不能解释为单维章节效应。'
              '唯一接近单维的对照仍是 ma_teacher vs mb_teacher（设计上同语料、同窗口，'

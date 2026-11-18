@@ -1,6 +1,6 @@
 """S3-MB MD&A 数据契约测试（2026-09-11）。
 
-读 data/processed/mda_texts_v2.csv（不重跑）验证硬契约：
+读 data/processed/mda_texts.csv（不重跑）验证硬契约：
   1. 唯一键 (code, year) 且与原始 annual_txt 文件一一对应
   2. 列完整（含审计列 src_identity/content_code/dup_n/extract_format/reason）
   3. status=ok：text 非空（length>0）、src_identity != mismatch、extract_format ∈ {new,old,weak}
@@ -17,7 +17,7 @@ from collections import Counter
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-MDA_V2 = ROOT / 'data' / 'processed' / 'mda_texts_v2.csv'
+MDA_V2 = ROOT / 'data' / 'processed' / 'mda_texts.csv'
 IDENT = ROOT / 'artifacts' / 'review' / 'mda_src_identity.csv'
 RAW = ROOT / 'data' / 'raw' / 'cninfo' / 'annual_txt'
 MAX_LEN = 300000
@@ -50,7 +50,7 @@ def _raw_pairs():
 
 
 def test_mda_v2_exists_and_columns():
-    assert MDA_V2.exists(), f'缺少 {MDA_V2}（先运行 scripts/text_mda_extract_v2.py）'
+    assert MDA_V2.exists(), f'缺少 {MDA_V2}（先运行 scripts/text_mda_extract.py）'
     header, _ = _load_meta()
     assert header == COLS, f'列漂移: {header}'
 
@@ -87,7 +87,7 @@ def test_bad_source_rows_blank():
 
 def test_ok_rows_exclude_identity_mismatch_list():
     if not IDENT.exists():
-        return
+        pytest.skip(f'缺 {IDENT}；数据门 mda-source-identity 覆盖同一不变量')
     mis = set()
     with open(IDENT, encoding='utf-8') as f:
         for r in csv.DictReader(f):

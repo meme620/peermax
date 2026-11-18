@@ -14,7 +14,7 @@ SEEDS: tuple[int, ...] = (0, 1, 2, 3, 4)
 
 CONFIG_FILES: tuple[str, ...] = (
     'configs/parameter_registry.yaml',
-    'configs/s3a_final_spec_v1.yaml',
+    'configs/s3a_final_spec.yaml',
     'configs/version_manifest.yaml',
     'configs/m1_contracts.yaml',
     'configs/claim_registry.yaml',

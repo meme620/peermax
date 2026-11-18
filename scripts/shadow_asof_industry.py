@@ -34,17 +34,17 @@ as-of 定义（**口径限定，不得写成严格 PIT**）：
 
 from __future__ import annotations
 
-import sys as _sys
-from pathlib import Path as _Path
+import sys
+from pathlib import Path
+from fileio import atomic_write_text as _atomic_write_text
+
 import argparse
 import csv
 import importlib
 import json
 import os
-import sys
 import time
 from datetime import datetime, timezone
-from pathlib import Path
 import numpy as np
 import pandas as pd
 from pricing_lib import (  # noqa: E402
@@ -54,25 +54,9 @@ from pricing_lib import (  # noqa: E402
 from peermax_panel_build import (  # noqa: E402
     NETWORK_AVAILABLE_AT_RULE, load_versions, select_version,
 )
+from fileio import json_default as _json_default
 
 
-from datetime import datetime, timezone
-from pathlib import Path
-from pricing_lib import (  # noqa: E402
-    SAMPLE_WINDOW_END, SAMPLE_WINDOW_START, assert_m1_inputs_sha, load_me, load_sw2,
-    months_between, require, sha256_file,
-)
-from peermax_panel_build import (  # noqa: E402
-    NETWORK_AVAILABLE_AT_RULE, load_versions, select_version,
-)
-import csv
-import importlib
-import json
-import numpy as np
-import os
-import pandas as pd
-import sys
-import time
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -995,27 +979,9 @@ def step_accept(m: pd.DataFrame, years) -> tuple:
 # --- end scripts/lib bootstrap ---
 
 
-import argparse
-import csv
-import importlib
-import json
-import os
-import sys
-import time
-from datetime import datetime, timezone
-from pathlib import Path
-
-import numpy as np
-import pandas as pd
 
 
-from pricing_lib import (  # noqa: E402
-    SAMPLE_WINDOW_END, SAMPLE_WINDOW_START, assert_m1_inputs_sha, load_me, load_sw2,
-    months_between, require, sha256_file,
-)
-from peermax_panel_build import (  # noqa: E402
-    NETWORK_AVAILABLE_AT_RULE, load_versions, select_version,
-)
+
 
 # ---------------------------------------------------------------- 路径与常量
 

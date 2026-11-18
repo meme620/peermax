@@ -15,7 +15,7 @@ from hashlib import sha256
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SPEC = ROOT / 'configs/s3a_final_spec_v1.yaml'
+SPEC = ROOT / 'configs/s3a_final_spec.yaml'
 REQ = ['spec_id', 'spec_hash', 'input_hashes', 'network_version', 'run_at', 'command', 'status']
 
 MAIN_SCRIPTS = ['analyst_cf_mom_replication.py', 'analyst_npm_replication.py']
@@ -97,7 +97,6 @@ def main():
         'artifacts': artifacts,
         'checks': {
             'all_scripts_emit_metadata': all(r['emits_metadata'] for r in scripts),
-            'stale_artifacts_registered': True,
         },
         'stale_artifacts': [r['artifact'] for r in artifacts
                             if r.get('exists') and not r.get('has_metadata')],

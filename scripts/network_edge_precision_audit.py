@@ -13,7 +13,7 @@
      < 3 次（>= 3 次判为页眉，不计）。字段：`stop_heading_hits` / `out_of_scope`。
   ② 截断 flag：旧 `len >= 29900` 阈值来自**v1 提取器的 MAX_LEN=3e4**，
      v2 提取器已提到 3e5 → flag 失效。改为**读当前提取器的 MAX_LEN**：
-       self 语料：M-A = `text_business_extract_v7.SAFE_MAX`（3e4）、M-B = `text_mda_extract_v2.MAX_LEN`（3e5）；
+       self 语料：M-A = `text_business_extract.SAFE_MAX`（3e4）、M-B = `text_mda_extract.MAX_LEN`（3e5）；
        teacher 语料：老师导出面板无本仓库提取器 → 实测存在 **Excel 单元格上限 32767**
        （107 篇长度恰好 = 32767），按数据源上限登记（`cell_max_hit`），**不等价于本仓库截断**。
      字段：`len` / `at_max_len` / `max_len_used` / `max_len_source`。
@@ -51,11 +51,11 @@ OUT_DIR = ROOT / 'reports/data_gates/G0'
 TEACHER_CELL_MAX = 32767
 
 CORPUS_SPEC = {
-    ('self', 'ma'): {'file': 'data/processed/business_texts_v7.csv', 'id_col': 'code',
+    ('self', 'ma'): {'file': 'data/processed/business_texts.csv', 'id_col': 'code',
                      'lexicon': 'data/processed/product_lexicon_v2.csv',
-                     'extractor': ('text_business_extract_v7', 'SAFE_MAX')},
-    ('self', 'mb'): {'file': 'data/processed/mda_texts_v2.csv', 'id_col': 'code',
-                     'lexicon': None, 'extractor': ('text_mda_extract_v2', 'MAX_LEN')},
+                     'extractor': ('text_business_extract', 'SAFE_MAX')},
+    ('self', 'mb'): {'file': 'data/processed/mda_texts.csv', 'id_col': 'code',
+                     'lexicon': None, 'extractor': ('text_mda_extract', 'MAX_LEN')},
     ('teacher', 'ma'): {'file': 'data/processed/teacher_mda_panel.csv', 'id_col': 'firm_id',
                         'lexicon': 'data/processed/product_lexicon_v2_teacher.csv',
                         'extractor': None, 'cell_max': TEACHER_CELL_MAX},
@@ -70,8 +70,8 @@ CORPUS_SPEC = {
 def _load_stop_names() -> tuple[set, str]:
     """§8.10.5 的 STOP_NAMES（独占行判据用）。优先从当前提取器模块读取。"""
     try:
-        from text_mda_extract_v2 import STOP_NAMES
-        return set(STOP_NAMES), 'text_mda_extract_v2.STOP_NAMES'
+        from text_mda_extract import STOP_NAMES
+        return set(STOP_NAMES), 'text_mda_extract.STOP_NAMES'
     except Exception as exc:      # pragma: no cover - 兜底，保持脚本可复跑
         fallback = {"公司治理", "重要事项", "监事会报告", "监事报告",
                     "董事、监事、高级管理人员和员工情况", "公司治理及内部控制",
@@ -304,7 +304,7 @@ def sample_edges(net: str, year: int, net_dir: Path, n_per_stratum: int) -> pd.D
 def main() -> int:
     ap = argparse.ArgumentParser(description='S3 边级语义审计 v2（代理指标；两处失效 flag 已修）')
     ap.add_argument('--corpus', choices=['self', 'teacher'], default='self',
-                    help='self = 自建语料（business_texts_v7 / mda_texts_v2）；teacher = 老师导出 MD&A 面板')
+                    help='self = 自建语料（business_texts / mda_texts）；teacher = 老师导出 MD&A 面板')
     ap.add_argument('--years', default=','.join(str(y) for y in YEARS))
     ap.add_argument('--n-per-stratum', type=int, default=N_PER_STRATUM)
     ap.add_argument('--net-dir', default=None,

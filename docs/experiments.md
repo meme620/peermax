@@ -203,7 +203,7 @@ M1 数据门报告。阶段：M1/S5；脚本：`scripts/pricing_gate_report.py`�
 
 - 命令：`python -m peerlab run --exp network-business-text`
 - 脚本参数：`--corpus teacher`（主口径，老师 MD&A，网络年 2015-2023）；`--corpus self`（自建语料，历史口径）
-- 上游：`text_business_extract_v7.py` → `network_business_cluster_grid.py --corpus teacher --years 2019 2021 2023` → `network_business_cluster_freeze.py --corpus teacher`
+- 上游：`text_business_extract.py` → `network_business_cluster_grid.py --corpus teacher --years 2019 2021 2023` → `network_business_cluster_freeze.py --corpus teacher`
 
 ### Baseline
 

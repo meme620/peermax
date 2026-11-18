@@ -10,7 +10,7 @@
           src_identity / content_code / dup_n / year_signal / doc_type / md5_match_audit / n_hits
      —— **身份与年份校验沿用既有三轮审计口径**（`artifacts/review/mda_src_identity.csv`，由
      `corpus_mda_integrity_audit.py` → `corpus_mda_identity_second_pass.py` → `corpus_mda_identity_confirm.py` 产出），
-     status 判定与 `text_mda_extract_v2.py` 的 MD&A 面板**同规则**：
+     status 判定与 `text_mda_extract.py` 的 MD&A 面板**同规则**：
         identity=mismatch 或 doc_type=announcement            -> bad_source（文本置空）
         year_signal 以 mismatch 开头                          -> suspect_source（正文声明的年度与目录名不一致）
         identity=mismatch_weak                                -> suspect_source
@@ -81,7 +81,7 @@ def rel(p) -> str:
 
 
 def to_panel_code(num: str) -> str:
-    """与 text_mda_extract_v2.to_panel_code 同规则（firm_id_map 缺失时回退）。"""
+    """与 text_mda_extract.to_panel_code 同规则（firm_id_map 缺失时回退）。"""
     if num.startswith(('600', '601', '603', '605', '688', '689')):
         return 'sh' + num
     if num.startswith(('000', '001', '002', '003', '300', '301', '302')):
@@ -103,7 +103,7 @@ def load_meta() -> tuple[dict, dict]:
 
 
 def classify(meta: dict) -> tuple[str, str]:
-    """返回 (status, reason) —— 文本置空规则与 text_mda_extract_v2 一致（bad_source 置空）。"""
+    """返回 (status, reason) —— 文本置空规则与 text_mda_extract 一致（bad_source 置空）。"""
     src_identity = meta.get('identity', 'unknown') or 'unknown'
     doc_type = meta.get('doc_type', '') or ''
     year_signal = meta.get('year_signal', '') or ''
@@ -131,7 +131,7 @@ def _init_worker(lex_path: str, ident_path: str, idmap_path: str):
 
 
 def _work(item):
-    """读单文件 -> (row dict, hits int32 array)。文本置空规则与 text_mda_extract_v2 一致。"""
+    """读单文件 -> (row dict, hits int32 array)。文本置空规则与 text_mda_extract 一致。"""
     from network_business_lexicon import normalize
     code6, year, rel = item
     p = TXT / code6 / f'{year}.txt'

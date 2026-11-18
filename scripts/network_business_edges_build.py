@@ -3,7 +3,7 @@
 输入（全部冻结）：
   - 词库（self：`data/processed/product_lexicon_v2.csv`；teacher：`product_lexicon_v2_teacher.csv`）
     + 匹配器 `network_business_lexicon.py`
-  - 文本（self：`business_texts_v7.csv`；teacher：`teacher_mda_panel.csv`，均取 ok 行）
+  - 文本（self：`business_texts.csv`；teacher：`teacher_mda_panel.csv`，均取 ok 行）
   - 聚类标签 `{net_dir}/clusters/{year}_clusters.csv`（B3.2 产出，average 链 + 逐年 K）
   - 冻结参数：similarity_method_id=M-A / cluster_linkage=average / elbow_rule=per_year_target_peer_match /
     min_product_terms=10 / ma_sample_filter=剔 J,S + 上市不足 2 年
@@ -82,11 +82,11 @@ from network_business_cluster_grid import build_vectors, load_refs, row_median_e
 # 因为本脚本还需 ver_prefix/net_dir/years/net_use_case；两处数值必须一致，回归测试覆盖）。
 CORPORA = {
     'self': {
-        'path': ROOT / 'data/processed/business_texts_v7.csv',
+        'path': ROOT / 'data/processed/business_texts.csv',
         'id_col': 'code',
         'ver_prefix': 'pm_ma_ewcos_v1',
         'net_dir': ROOT / 'data/processed/network_ma',
-        'src_version': 'business_texts_v7+product_lexicon_v2',
+        'src_version': 'business_texts+product_lexicon_v2',
         'lexicon': ROOT / 'data/processed/product_lexicon_v2.csv',
         'years': list(range(2017, 2026)),
         'k_rule': 'per_year_target_peer_match(56)',

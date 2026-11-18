@@ -16,7 +16,7 @@ from pathlib import Path
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
-SPEC = ROOT / 'configs/s3a_final_spec_v1.yaml'
+SPEC = ROOT / 'configs/s3a_final_spec.yaml'
 REG = ROOT / 'configs/parameter_registry.yaml'
 MAN = ROOT / 'configs/version_manifest.yaml'
 MATRIX = ROOT / 'reports/execution/s3a/s3a_final_acceptance_matrix.md'

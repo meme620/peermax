@@ -49,13 +49,12 @@ PC → 预期收益 **为正**（表 4：+0.152/t=7.76、+0.130/t=5.40；表 3 H
 
 from __future__ import annotations
 
-import sys as _sys
-from pathlib import Path as _Path
+import sys
+from pathlib import Path
+
 import argparse
 import json
 import math
-import sys
-from pathlib import Path
 import numpy as np
 import pandas as pd
 from pricing_lib import (  # noqa: E402
@@ -63,7 +62,6 @@ from pricing_lib import (  # noqa: E402
 )
 
 
-from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -113,9 +111,6 @@ SEED = 20261021
 NW = 6
 
 NW_PAPER = 12
-import json
-import math
-import numpy as np
 
 def psay(step: str, msg: str) -> None:
     line = f'[D-{step}] {msg}'
@@ -159,8 +154,6 @@ def fmt_fm(blk: dict, keys=('PC',)) -> dict:
         s = blk['coefs'][c]
         out['coefs_pct'][c] = {'beta': pct(s['beta']), 't_nw': r4(s['t_nw']), 't_iid': r4(s['t_iid'])}
     return out
-from pathlib import Path
-import pandas as pd
 
 def load_pc(pc_dir: Path = PC_DIR, years=PC_YEARS) -> pd.DataFrame:
     frames = []
@@ -206,11 +199,6 @@ def sw2_asof(month_series: pd.Series, firm_series: pd.Series) -> pd.Series:
     mp['firm_id'] = mp['firm_id'].astype(str)
     lut = mp.drop_duplicates('firm_id').set_index('firm_id')['l2_code'].astype(str)
     return firm_series.map(lut)
-from pricing_lib import (  # noqa: E402
-    fm_regression, newey_west, param_value, rank_average_groups,
-)
-import numpy as np
-import pandas as pd
 
 def monthly_factors() -> pd.DataFrame:
     fac = pd.read_csv(FACTORS, dtype={'date': str})
@@ -301,12 +289,6 @@ def ctrl_compare(samp, label, ycol='R_next', nw_lag=NW):
         'coefs': {c: {'beta_pct': pct(blk['coefs'][c]['beta']), 't_nw': r4(blk['coefs'][c]['t_nw'])}
                   for c in ['PC'] + CONTROLS},
     }}
-from pricing_lib import (  # noqa: E402
-    fm_regression, newey_west, param_value, rank_average_groups,
-)
-import json
-import numpy as np
-import pandas as pd
 
 def run_H1(m, S, fmonth) -> dict:
     psay('H1', '状态 = 开始：H1 方向/排序 bug（注入检验 + 组均值核验 + 手算 OLS）')
@@ -1349,7 +1331,6 @@ def run_H8(m, S, panel, fmonth) -> dict:
     dump('H8', out)
     psay('H8', '状态 = 完成（含 REV2 修正轮：撤回 + 替代检验 a–f）')
     return out
-import json
 
 def assemble():
     parts = {}
@@ -2085,18 +2066,8 @@ def make_md(S: dict) -> None:
 # --- scripts/lib bootstrap ---
 # --- end scripts/lib bootstrap ---
 
-import argparse
-import json
-import math
-import sys
-from pathlib import Path
 
-import numpy as np
-import pandas as pd
 
-from pricing_lib import (  # noqa: E402
-    fm_regression, newey_west, param_value, rank_average_groups,
-)
 
 DIAG.mkdir(parents=True, exist_ok=True)
 

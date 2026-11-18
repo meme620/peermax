@@ -25,7 +25,7 @@ DIST_NAMES = {
 
 CONFIGS = [
     'parameter_registry.yaml',
-    's3a_final_spec_v1.yaml',
+    's3a_final_spec.yaml',
     'version_manifest.yaml',
     'm1_contracts.yaml',
     'claim_registry.yaml',

@@ -13,7 +13,7 @@
   5. 审计列     src_code / src_year / length / status / reason
 
 注意：本脚本**不**做分词、不构网；只把老师语料变成与自建语料同构的中间面板，
-供 M-B 构网（B′2）与桥接对账（B′4）使用。自建 mda_texts_v2.csv 保留为对照链。
+供 M-B 构网（B′2）与桥接对账（B′4）使用。自建 mda_texts.csv 保留为对照链。
 用法：python scripts/corpus_teacher_ingest.py
 """
 from __future__ import annotations

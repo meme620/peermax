@@ -21,7 +21,7 @@ from hashlib import sha256
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SPEC = ROOT / 'configs/s3a_final_spec_v1.yaml'
+SPEC = ROOT / 'configs/s3a_final_spec.yaml'
 MANIFEST = ROOT / 'configs/version_manifest.yaml'
 PATH_RE = re.compile(r"['\"]((?:data|reports|artifacts)/[^'\"]*?\.(?:csv|pkl|json|txt|parquet|xlsx))['\"]")
 WRITE_RE = re.compile(r"to_csv|json\.dump|write_text|write_bytes|open\([^)]*['\"][wa]")
@@ -194,7 +194,6 @@ def main():
         'checks': {
             'all_spec_inputs_match_hash': len(bad_inputs) == 0,
             'no_unregistered_inputs': len(classified['UNREGISTERED']) == 0,
-            'inputs_cover_required_groups': True,
         },
     }
     report['status'] = 'PASS' if all(report['checks'].values()) else 'FAIL'

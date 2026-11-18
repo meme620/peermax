@@ -27,7 +27,7 @@ import pandas as pd
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
-SPEC = ROOT / 'configs/s3a_final_spec_v1.yaml'
+SPEC = ROOT / 'configs/s3a_final_spec.yaml'
 _SPEC_BYTES = SPEC.read_bytes()
 SPEC_DATA = yaml.safe_load(_SPEC_BYTES.decode('utf-8'))
 SPEC_HASH = sha256(_SPEC_BYTES).hexdigest()

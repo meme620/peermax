@@ -22,6 +22,7 @@ A 股产品市场同侪的彩票型收益（MAX）溢出研究：计算链代码
 
 ```bash
 make env          # 建 .venv（Python 3.13）并装 requirements.txt
+lefthook install  # 装 git hooks：pre-commit 跑 lint + selftest，pre-push 跑数据门
 make doctor       # 解释器 / 依赖 / configs / 数据 四块自检
 make imports      # 逐个导入 scripts/ 下 192 个脚本
 make smoke        # L0 冒烟：10 个实验逐个判就绪
@@ -47,9 +48,8 @@ make selftest     # peerlab、共享模块与数据门单测
 ## 文档
 
 - [`docs/pipeline.md`](docs/pipeline.md)：阶段总表、分阶段命令、结构约束、配置文件与数据目录清单。
-- [`docs/materials.md`](docs/materials.md)：52 个外部输入文件的来源、批次、编码与时点快照说明。
+- [`docs/materials.md`](docs/materials.md)：52 个外部输入文件的来源与批次、`data/` 目录布局与入库策略、raw 目录就绪状态、交付包到代码路径的映射。
 - [`docs/environment.md`](docs/environment.md)：解释器与依赖版本、安装与检查命令、平台边界。
-- [`docs/data_layout.md`](docs/data_layout.md)：`data/` 结构、raw 目录就绪状态、交付包到代码路径的映射。
 - [`docs/script_naming.md`](docs/script_naming.md)：命名规则、lint 检查项、外部契约例外表。
 - [`docs/fork_log.md`](docs/fork_log.md)：与主仓库的分叉点与同步纪律。
 

@@ -62,17 +62,17 @@ N-11（PC 团-年常数）
 
 from __future__ import annotations
 
-import sys as _sys
-from pathlib import Path as _Path
+import sys
+from pathlib import Path
+from fileio import json_default as _json_default
+
 import argparse
 import csv
 import json
 import math
 import os
-import sys
 import time
 from datetime import datetime, timezone
-from pathlib import Path
 import numpy as np
 import pandas as pd
 from pricing_lib import (  # noqa: E402
@@ -84,20 +84,6 @@ from peermax_panel_build import (  # noqa: E402
 )
 
 
-from datetime import datetime, timezone
-from pathlib import Path
-from pricing_lib import (  # noqa: E402
-    assert_m1_inputs_sha, fm_regression, newey_west, param_value, require, sha256_file,
-    two_sided_p, winsor_bounds, _ols,
-)
-import csv
-import json
-import math
-import numpy as np
-import os
-import pandas as pd
-import sys
-import time
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -1201,27 +1187,9 @@ def write_long_tables(counts: dict) -> None:
 # --- end scripts/lib bootstrap ---
 
 
-import argparse
-import csv
-import json
-import math
-import os
-import sys
-import time
-from datetime import datetime, timezone
-from pathlib import Path
-
-import numpy as np
-import pandas as pd
 
 
-from pricing_lib import (  # noqa: E402
-    assert_m1_inputs_sha, fm_regression, newey_west, param_value, require, sha256_file,
-    two_sided_p, winsor_bounds, _ols,
-)
-from peermax_panel_build import (  # noqa: E402
-    ARGMAX, EXCLUDE_QUAL, RETURNS, load_versions, select_version,
-)
+
 
 # ---------------------------------------------------------------- 路径与常量
 

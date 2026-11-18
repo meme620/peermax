@@ -1,6 +1,6 @@
 """S3A Gate 2.2：B 线独立网络重实现。
 
-规则来源：`configs/s3a_final_spec_v1.yaml`（spec_hash 见输出），据此从冻结预测输入
+规则来源：`configs/s3a_final_spec.yaml`（spec_hash 见输出），据此从冻结预测输入
 重建 241 个月末网络，**不读生产 edges、不调用生产核心函数**。
 
 与生产实现（A 线 run_analyst_pipeline 的 step5+step67）的有意差异：
@@ -27,7 +27,7 @@ import pandas as pd
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
-SPEC = ROOT / 'configs/s3a_final_spec_v1.yaml'
+SPEC = ROOT / 'configs/s3a_final_spec.yaml'
 _SPEC_BYTES = SPEC.read_bytes()
 SPEC_DATA = yaml.safe_load(_SPEC_BYTES.decode('utf-8'))
 SPEC_HASH = sha256(_SPEC_BYTES).hexdigest()

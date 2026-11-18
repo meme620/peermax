@@ -21,7 +21,7 @@ import pandas as pd
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
-SPEC = ROOT / 'configs/s3a_final_spec_v1.yaml'
+SPEC = ROOT / 'configs/s3a_final_spec.yaml'
 SPEC_HASH = sha256(SPEC.read_bytes()).hexdigest()
 COV = ROOT / 'data/processed/analyst/firm_analyst_coverage.csv'
 EDGED = ROOT / 'data/processed/analyst/edges'

@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SPEC = ROOT / 'configs/s3a_final_spec_v1.yaml'
+SPEC = ROOT / 'configs/s3a_final_spec.yaml'
 _SPEC_BYTES = SPEC.read_bytes()
 _SPEC_HASH = hashlib.sha256(_SPEC_BYTES).hexdigest()
 

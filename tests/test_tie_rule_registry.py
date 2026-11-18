@@ -150,7 +150,8 @@ def test_current_registry_resolves_earliest(mod):
     assert len(entry) == 1
     assert info["headline_value"] == entry[0]["headline_value"]
     assert info["sensitivity_grid"] == entry[0]["sensitivity_grid"]
-    assert info["allowed_in_sensitivity_grid"] == ["earliest", "latest", "random"]
+    assert info["allowed_in_sensitivity_grid"] == [str(x).lower() for x in entry[0]["sensitivity_grid"]]
+    assert set(info["allowed_in_sensitivity_grid"]) <= {"earliest", "latest"}
 
 
 def test_default_core_fields_match_legacy_and_new_gate_columns(mod, tmp_path):

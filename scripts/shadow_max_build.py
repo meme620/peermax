@@ -38,7 +38,6 @@
 from __future__ import annotations
 
 import sys as _sys
-from pathlib import Path as _Path
 import argparse
 import csv
 import hashlib

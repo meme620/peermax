@@ -136,7 +136,7 @@ def c5_filter():
     _, X, stats = grid.build_vectors(YEAR, A, uni)
     clu = pd.read_csv(MA / 'clusters' / f'{YEAR}_clusters.csv', dtype={'firm_id': str})
     # 独立重算：语料 ok 数 − 三类剔除
-    corpus = pd.read_csv(ROOT / 'data/processed/business_texts_v7.csv',
+    corpus = pd.read_csv(ROOT / 'data/processed/business_texts.csv',
                          usecols=['code', 'year', 'status'])
     n_ok = int(((corpus['year'] == YEAR) & (corpus['status'] == 'ok')).sum())
     out['checks']['C5_sample_filter'] = {

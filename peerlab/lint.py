@@ -76,7 +76,9 @@ def check_path_names(paths) -> list:
             elif not SNAKE.match(pure.stem):
                 problems.append(f'{rel}: 文件名不是 snake_case')
             elif re.search(r'(?<!_v)\d$', pure.stem) and not re.search(r'_batch\d+$', pure.stem):
-                problems.append(f'{rel}: 文件名以裸数字结尾（版本请用 _v2）')
+                problems.append(f'{rel}: 文件名以裸数字结尾')
+        if re.search(r'_v\d+$', pure.stem):
+            problems.append(f'{rel}: 文件名带版本号后缀（口径版本只进产物名与 network_version）')
         if len(pure.parts) - 1 > MAX_DEPTH:
             problems.append(f'{rel}: 目录层级超过 {MAX_DEPTH} 层')
     counts = collections.Counter(str(pathlib.PurePosixPath(p).parent) for p in paths)

@@ -16,11 +16,11 @@ from hashlib import sha256
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SPEC = ROOT / 'configs/s3a_final_spec_v1.yaml'
+SPEC = ROOT / 'configs/s3a_final_spec.yaml'
 MAIN_SCRIPTS = ['analyst_cf_mom_replication.py', 'analyst_npm_replication.py']
 LEGACY_ENV_NAMES = ['S3A_RET_FILE', 'S3A_MEQ_FILE', 'S3A_NET_VER', 'H12_MIN_AVAIL', 'S3A_OUT_SUFFIX']
 ENV_READ_RE = re.compile(r'os\.environ|os\.getenv|getenv\(')
-SPEC_REF_RE = re.compile(r"s3a_final_spec_v1\.yaml")
+SPEC_REF_RE = re.compile(r"s3a_final_spec\.yaml")
 PATH_LITERAL_RE = re.compile(r"['\"](data/[^'\"]+\.(?:pkl|csv))['\"]")
 PKL_NAME_RE = re.compile(r"['\"]([a-z0-9_]+\.pkl)['\"]")
 

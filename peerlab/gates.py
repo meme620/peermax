@@ -243,7 +243,7 @@ def check_mda_source_identity(root: Path) -> dict:
 def check_share_capital_chain(root: Path) -> dict:
     """股本链：连续两年都由送转展开得到时，比值必须等于送转乘数。
 
-    来源：build_share_capital_v2.py 以"锚点 + 双向送转展开"修掉 v1 未展开送转的股本。
+    来源：build_share_capital.py 以"锚点 + 双向送转展开"修掉 v1 未展开送转的股本。
     展开链断了，市值/BM 全线错，且不会报错。
     """
     path = root / 'data' / 'processed' / 'share_capital_history_v2.csv'
@@ -251,7 +251,7 @@ def check_share_capital_chain(root: Path) -> dict:
     if not path.is_file() or not bonus_dir.is_dir():
         return {'problems': [], 'checked': 0,
                 'blocked': '缺 share_capital_history_v2.csv 或 data/raw/eastmoney/sharebonus/'}
-    module = _script('build_share_capital_v2')
+    module = _script('build_share_capital')
     problems = []
     rows = _rows(path)
     columns = _header(path)

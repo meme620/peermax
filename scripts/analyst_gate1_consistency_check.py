@@ -13,7 +13,7 @@ from hashlib import sha256
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SPEC = ROOT / 'configs/s3a_final_spec_v1.yaml'
+SPEC = ROOT / 'configs/s3a_final_spec.yaml'
 REG = ROOT / 'configs/parameter_registry.yaml'
 MAN = ROOT / 'configs/version_manifest.yaml'
 MATRIX = ROOT / 'reports/execution/s3a/s3a_final_acceptance_matrix.md'
@@ -84,7 +84,7 @@ def code_spec_reconciliation(spec):
     add('h12_min_available', spec['horizon']['h12_min_available_months'],
         "_SPEC['horizon']['h12_min_available_months']", "h12_min_available_months" in cf)
     add('main_scripts_read_spec', 'spec is single entry',
-        'SPEC = Path(configs/s3a_final_spec_v1.yaml)', 'configs/s3a_final_spec_v1.yaml' in cf)
+        'SPEC = Path(configs/s3a_final_spec.yaml)', 'configs/s3a_final_spec.yaml' in cf)
     return checks
 
 
@@ -124,7 +124,7 @@ def frozen_value_drift_check(spec):
 def manifest_check(spec):
     man = load(MAN)
     files = [x['file'] for x in man['deliverables']]
-    need = ['configs/s3a_final_spec_v1.yaml',
+    need = ['configs/s3a_final_spec.yaml',
             'reports/execution/s3a/s3a_final_acceptance_matrix.md',
             'reports/execution/s3a/s3a_parameter_snapshot_20260906.yaml',
             'reports/execution/s3a/s3a_three_person_cross_check_protocol.md',

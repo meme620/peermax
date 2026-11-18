@@ -32,7 +32,7 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 LAT = ROOT / 'data/processed/sw2_industry_latest.csv'
-CORPUS = ROOT / 'data/processed/mda_texts_v2.csv'
+CORPUS = ROOT / 'data/processed/mda_texts.csv'
 OUTN = ROOT / 'data/processed/sw2_l2_names.csv'
 REPD = ROOT / 'reports/data_gates/G0'
 UA = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36',

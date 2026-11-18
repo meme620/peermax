@@ -6,7 +6,7 @@
 |---|---|---|
 | `parameter_registry.yaml` | 参数登记表（26 条）：样本窗口、winsor、NW 滞后、M1 门禁阈值、S3A 冻结参数、面板版本指针 | `pricing_lib` 导入即校验；`peermax_panel_build`、`pricing_gate_report`、`analyst_gate1_consistency_check` 等 |
 | `version_manifest.yaml` | 版本清单：网络版本白名单（10 个目录）、M1 主输入登记 | `pricing_lib.load_manifest_entries`、`peermax_panel_build.load_versions` |
-| `s3a_final_spec_v1.yaml` | S3A 规格：输入路径、网络版本与规则、样本偏差登记 | `analyst_*` 全套 |
+| `s3a_final_spec.yaml` | S3A 规格：输入路径、网络版本与规则、样本偏差登记 | `analyst_*` 全套 |
 | `m1_contracts.yaml` | M1 九个主输入的合同（路径 / sha256 / 行数） | `shadow_monthly_status` 等 Phase2 脚本 |
 | `claim_registry.yaml` | claim 与七类连接登记（M1_headline、M1_portfolio） | `check_link_audit.py`、`tests/test_analyst_contracts.py` |
 | `scope_card.yaml` | 最小口径卡（treatment/outcome/窗口/上限） | `check_link_audit.py` |
@@ -21,14 +21,14 @@
 
 ## 还没锚定的东西
 
-`version_manifest.yaml` 的 `deliverables` 与 `m1_contracts.yaml` 的 `m1_inputs` 里，9 个 M1 主输入目前 `sha256: null`、`status: pending`——`data/processed/` 为空，算不出真实哈希。`s3a_final_spec_v1.yaml` 的 `provenance.input_hashes` 同理。
+`version_manifest.yaml` 的 `deliverables` 与 `m1_contracts.yaml` 的 `m1_inputs` 里，9 个 M1 主输入目前 `sha256: null`、`status: pending`——`data/processed/` 为空，算不出真实哈希。`s3a_final_spec.yaml` 的 `provenance.input_hashes` 同理。
 
 补锚步骤（数据生成后）：
 
 1. 对每个主输入算 `shasum -a 256`，写进 `version_manifest.yaml` 的 `deliverables[].sha256` 并把 `status` 改成 `active`；
 2. 同一哈希与行数写进 `m1_contracts.yaml` 的 `m1_inputs[].sha256 / expected_rows`；
-3. 把四份主输入的哈希写进 `s3a_final_spec_v1.yaml` 的 `provenance.input_hashes`；
-4. 重算 `s3a_final_spec_v1.yaml` 的 `governance.manifest_sha256 / registry_sha256`（manifest/registry 改过就要重算）；
+3. 把四份主输入的哈希写进 `s3a_final_spec.yaml` 的 `provenance.input_hashes`；
+4. 重算 `s3a_final_spec.yaml` 的 `governance.manifest_sha256 / registry_sha256`（manifest/registry 改过就要重算）；
 5. 跑 `python scripts/check_link_audit.py`、`python -m peerlab smoke --imports`、`python -m pytest tests -q`。
 
 在锚补齐之前，任何读 sha 的脚本都会按 fail-closed 退出 2——这是设计行为，不要用猜测值填。

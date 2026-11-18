@@ -14,15 +14,15 @@
 
 from __future__ import annotations
 
-import sys as _sys
-from pathlib import Path as _Path
+import sys
+from pathlib import Path
+from fileio import json_default as _json_default
+
 import argparse
 import json
 import os
-import sys
 import time
 from datetime import datetime, timezone
-from pathlib import Path
 import numpy as np
 import pandas as pd
 from pricing_lib import (  # noqa: E402
@@ -34,21 +34,6 @@ from peermax_panel_build import (  # noqa: E402
 )
 
 
-from datetime import datetime, timezone
-from pathlib import Path
-from pricing_lib import (  # noqa: E402
-    assert_m1_inputs_sha, fm_regression, param_value, require, sha256_file,
-    winsor_bounds, winsorize_by_month,
-)
-from peermax_panel_build import (  # noqa: E402
-    NETWORK_AVAILABLE_AT_RULE, load_versions, select_version,
-)
-import json
-import numpy as np
-import os
-import pandas as pd
-import sys
-import time
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -703,25 +688,9 @@ def evaluate_q_status(rows: pd.DataFrame, coverage: dict, net_metrics: dict,
 # --- end scripts/lib bootstrap ---
 
 
-import argparse
-import json
-import os
-import sys
-import time
-from datetime import datetime, timezone
-from pathlib import Path
-
-import numpy as np
-import pandas as pd
 
 
-from pricing_lib import (  # noqa: E402
-    assert_m1_inputs_sha, fm_regression, param_value, require, sha256_file,
-    winsor_bounds, winsorize_by_month,
-)
-from peermax_panel_build import (  # noqa: E402
-    NETWORK_AVAILABLE_AT_RULE, load_versions, select_version,
-)
+
 
 
 

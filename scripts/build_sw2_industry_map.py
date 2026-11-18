@@ -77,7 +77,7 @@ def main():
 
     # 覆盖率：对每个语料年，统计有映射的公司数
     cov = {}
-    for f, label in [('mda_texts_v2.csv', 'm_b_mda'), ('business_texts_v7.csv', 'm_a_business')]:
+    for f, label in [('mda_texts.csv', 'm_b_mda'), ('business_texts.csv', 'm_a_business')]:
         d = pd.read_csv(OUTD / f, usecols=['code', 'year', 'status'])
         d = d[d['status'] == 'ok'].copy()
         d['code6'] = d['code'].str[2:].str.zfill(6)

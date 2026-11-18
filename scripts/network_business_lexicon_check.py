@@ -20,7 +20,7 @@ sys.path.insert(0, str(ROOT / 'scripts'))
 from network_business_lexicon import build_automaton, load_lexicon, match_terms, normalize, LEXICON  # noqa: E402
 
 REPD = ROOT / 'reports/data_gates/G0'
-CORPUS = ROOT / 'data/processed/business_texts_v7.csv'
+CORPUS = ROOT / 'data/processed/business_texts.csv'
 
 
 def ng_intersect(text_norm, terms_set, max_len):

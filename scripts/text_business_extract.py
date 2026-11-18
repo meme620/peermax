@@ -16,10 +16,10 @@
   2. 主要业务（跳过目录行）
   3. 公司业务概要 / 业务概要（2020 前格式）
 
-输出：data/processed/business_texts_v7.csv
+输出：data/processed/business_texts.csv
   code, year, text, anchor, length, status, extract_format, src_identity,
   content_code, dup_n, year_signal, reason
-用法: python scripts/text_business_extract_v7.py [--out PATH] [--limit N]
+用法: python scripts/text_business_extract.py [--out PATH] [--limit N]
 """
 import argparse
 import csv
@@ -30,7 +30,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 TXT = ROOT / "data/raw/cninfo/annual_txt"
 IDENT = ROOT / "artifacts/review/mda_src_identity.csv"
-OUT = ROOT / "data/processed/business_texts_v7.csv"
+OUT = ROOT / "data/processed/business_texts.csv"
 
 SAFE_MAX = int(3e4)          # 安全上限（防异常长文）
 MIN_LEN = 40                 # 最小可信长度（2026-09-13 由 100 降至 40：部分银行年报业务章节仅一句话）

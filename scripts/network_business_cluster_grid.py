@@ -69,7 +69,7 @@ sys.path.insert(0, str(ROOT / 'scripts'))
 from network_business_lexicon import DF_MAX_DEFAULT, build_automaton, load_lexicon, normalize as norm_text  # noqa: E402
 
 REPD = ROOT / 'reports/data_gates/G0'
-# 语料真源 = 下面的 CORPORA（B″2 起）；此前的模块级单值 CORPUS=business_texts_v7.csv 已并入
+# 语料真源 = 下面的 CORPORA（B″2 起）；此前的模块级单值 CORPUS=business_texts.csv 已并入
 # CORPORA['self']['path']，避免第二份真源（无外部脚本 import 该常量）。
 IDMAP = ROOT / 'data/processed/firm_id_map.csv'
 IND = ROOT / 'data/raw/baostock/industry/all_current.csv'
@@ -84,11 +84,11 @@ SIM_ADJUST_CHOICES = ['none', 'median']
 # 冻结阈值与筛选规则（MIN_TERMS / IPO_MIN_YEARS / J,S 门类 / linkage / df_max）不随语料变。
 CORPORA = {
     'self': {
-        'path': ROOT / 'data/processed/business_texts_v7.csv',
+        'path': ROOT / 'data/processed/business_texts.csv',
         'id_col': 'code',
         'ver_prefix': 'pm_ma_ewcos_v1',
         'net_dir': ROOT / 'data/processed/network_ma',
-        'src_version': 'business_texts_v7+product_lexicon_v2',
+        'src_version': 'business_texts+product_lexicon_v2',
         'lexicon': ROOT / 'data/processed/product_lexicon_v2.csv',
         'years': list(range(2017, 2026)),
         # grid_years 同时是该语料下 `--years` 的**默认值**（self 保持历史默认 [2019,2021,2023] 不变）
@@ -351,7 +351,7 @@ def build_vectors_from_hits(year, A, uni, corpus, df_max=None):
 def build_vectors(year, A, uni, corpus='self', df_max=None):
     """逐年构产品词向量（稀疏 CSR）：等权 0/1（默认）或 IDF 加权（Phase B″10 对照变体）。
 
-    corpus='self'（默认）→ business_texts_v7.csv，id 列 `code`（历史口径，逐字节不变）；
+    corpus='self'（默认）→ business_texts.csv，id 列 `code`（历史口径，逐字节不变）；
     corpus='teacher'      → teacher_mda_panel.csv，id 列 `firm_id`（统一重命名为 `code`）。
     corpus='teacher_idf'  → 同上语料，但向量元素 = 该词文本年 smooth IDF（不升主口径）。
     corpus='ma_fulltext'  → annual_fulltext_panel.parquet（年报全文，**对表语料敏感性列**）+

@@ -7,7 +7,7 @@ from analyst_meta import attach_meta
 
 warnings.filterwarnings('ignore')
 
-SPEC = Path('configs/s3a_final_spec_v1.yaml')
+SPEC = Path('configs/s3a_final_spec.yaml')
 _SPEC = yaml.safe_load(SPEC.read_text(encoding='utf-8'))
 RET = Path(_SPEC['inputs']['returns'])
 EDGE_DIR = Path('data/processed/analyst/edges')

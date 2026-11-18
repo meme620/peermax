@@ -1,7 +1,7 @@
 """S3 数据与口径对抗审计（R3，2026-09-14）。
 
 核验项：
-  D1 文本年语义：business_texts_v7 / mda_texts_v2 的 year 是否等于**年报所属财年**
+  D1 文本年语义：business_texts / mda_texts 的 year 是否等于**年报所属财年**
      （抽样读正文里的"20XX年年度报告"字样，与文件名年一致）
   D2 语料资格：两网只使用 status=ok 行；入网节点数 = ok 行数（M-B）/ ok − 冻结筛选（M-A）
   D3 ID 映射：网络节点必须全部在 firm_id_map 中（映射失败率 = 0）
@@ -28,7 +28,7 @@ out = {'run_at': datetime.now(timezone.utc).isoformat(), 'checks': {}}
 rng = np.random.default_rng(19)
 
 # ---- D1 文本年语义 ----
-biz = pd.read_csv(ROOT / 'data/processed/business_texts_v7.csv', usecols=['code', 'year', 'status', 'text'])
+biz = pd.read_csv(ROOT / 'data/processed/business_texts.csv', usecols=['code', 'year', 'status', 'text'])
 AR = ROOT / 'data/raw/cninfo/annual_txt'
 smp_years = [2017, 2021, 2025]
 file_ok = body_ok = tot = 0
@@ -43,14 +43,14 @@ for y in smp_years:
 out['checks']['D1_text_year_semantics'] = {
     'sampled': tot, 'source_file_exists_annual_txt_code_year': file_ok, 'file_share': round(file_ok / max(1, tot), 3),
     'year_string_in_body': body_ok, 'body_share': round(body_ok / max(1, tot), 3),
-    'note': ('判据①：business_texts_v7 的 year 必须对应 data/raw/cninfo/annual_txt/{code}/{year}.txt 源文件；'
-             '判据②：正文任意位置出现"{year}年"。M-B 用 mda_texts_v2（同源同年）'),
+    'note': ('判据①：business_texts 的 year 必须对应 data/raw/cninfo/annual_txt/{code}/{year}.txt 源文件；'
+             '判据②：正文任意位置出现"{year}年"。M-B 用 mda_texts（同源同年）'),
     'pass': file_ok / max(1, tot) > 0.95 and body_ok / max(1, tot) > 0.8}
 
 # ---- D2 语料资格 ----
-corpus_v7 = pd.read_csv(ROOT / 'data/processed/business_texts_v7.csv', usecols=['code', 'year', 'status'])
-mda = pd.read_csv(ROOT / 'data/processed/mda_texts_v2.csv', usecols=['code', 'year', 'status'])
-res2 = {'years': {}, 'note': '两网语料不同源：M-A ← business_texts_v7（业务章节）；M-B ← mda_texts_v2（MD&A）——'
+corpus_v7 = pd.read_csv(ROOT / 'data/processed/business_texts.csv', usecols=['code', 'year', 'status'])
+mda = pd.read_csv(ROOT / 'data/processed/mda_texts.csv', usecols=['code', 'year', 'status'])
+res2 = {'years': {}, 'note': '两网语料不同源：M-A ← business_texts（业务章节）；M-B ← mda_texts（MD&A）——'
                             '提取器成功率不同导致逐年节点数不同（2021 年 M-B 4,519 vs M-A 4,513 ok），已登记'}
 ok_all = True
 for y in range(2017, 2026):
@@ -87,7 +87,7 @@ out['checks']['D3_id_mapping'] = res3
 
 # ---- D4 source_version 可追溯 ----
 res4 = {}
-for tag, d, expect in [('ma', MA, 'business_texts_v7'), ('mb', MB, 'mda_texts_v2')]:
+for tag, d, expect in [('ma', MA, 'business_texts'), ('mb', MB, 'mda_texts')]:
     vals = set()
     for y in range(2017, 2026):
         with open(d / f'{y}_similarity.csv', encoding='utf-8', newline='') as f:

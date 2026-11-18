@@ -2,7 +2,7 @@
 
 背景（execution_plan §8 Phase B″1）：
   `product_lexicon_v2.csv` 的 `doc_count/df_ratio/keep_df25` 是在**业务描述**语料
-  （`business_texts_v7.csv`，38,958 篇）上按全子串匹配口径算的。主口径改用老师 MD&A
+  （`business_texts.csv`，38,958 篇）上按全子串匹配口径算的。主口径改用老师 MD&A
   导出后必须在新语料上重算，否则 `ma_lexicon_df_max=0.25` 的通用词过滤形同虚设。
 
 口径（冻结，不新设阈值）：
@@ -49,7 +49,7 @@ from network_business_lexicon import build_automaton, normalize  # noqa: E402
 
 CORPORA = {
     'teacher': {'path': ROOT / 'data/processed/teacher_mda_panel.csv', 'id_col': 'firm_id'},
-    'self': {'path': ROOT / 'data/processed/business_texts_v7.csv', 'id_col': 'code'},
+    'self': {'path': ROOT / 'data/processed/business_texts.csv', 'id_col': 'code'},
 }
 LEXICON = ROOT / 'data/processed/product_lexicon_v2.csv'
 ORIG_DF_REPORT = ROOT / 'reports/data_gates/G0/product_lexicon_df_report.json'

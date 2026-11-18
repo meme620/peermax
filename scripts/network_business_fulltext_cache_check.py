@@ -10,7 +10,7 @@
      `status=='ok'` 的行要求 `text` 与磁盘源文件 `.txt` 解码结果**逐字符相等**、`length` = 字符数、
      `sha256` = 源文件 sha256 复算一致（三重）；`status!='ok'` 的行（bad_source / suspect_source）
      要求 `text==''` 且 `length==0`（**既有置空规则**：`network_business_fulltext_panel_build._work` 对非 ok 行
-     text 置空，承袭 `text_mda_extract_v2` 的 bad_source 置空）+ `sha256` = 源文件字节哈希。
+     text 置空，承袭 `text_mda_extract` 的 bad_source 置空）+ `sha256` = 源文件字节哈希。
      修订原因（R1 定性，见 `artifacts/tmp/fulltext_corr_progress.md` [FT-3a/R1]）：首跑 6 年 FAIL 的
      15 行**全部**为 `status!='ok'` 行，其源文件**非空**（295 KB–851 KB），面板 text 空是**设计性置空**
      而非漂移；原判据（对所有抽检行要求 text 逐字相等）把设计性置空误判为失败。**冻结值零改动**。

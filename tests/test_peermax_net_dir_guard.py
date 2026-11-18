@@ -61,12 +61,24 @@ def test_unknown_net_dir_with_explicit_paths_allowed():
 
 
 def test_registry_panel_versions_registered():
-    """W1 bundle：--panel-version 缺省来源 = registry panel_versions（4 个 corpus）。"""
+    """W1 bundle：--panel-version 缺省来源 = registry panel_versions（4 个 corpus）。
+
+    版本串必须带窗口，且窗口末端锚到 registry sample_end；窗口不写死在测试里。
+    """
+    import re
+
+    import yaml
+
     mod = _load()
     pv = mod.load_registry_panel_versions()
     assert set(pv) >= {'ma_teacher', 'mb_teacher', 'ma', 'mb'}
-    assert pv['ma_teacher'] == 's4_panel_ma_teacher_2015_01_2023_12_v1'
-    assert pv['ma'] == 's4_panel_ma_2018_01_2025_12_v1'
+    reg = yaml.safe_load((ROOT / 'configs/parameter_registry.yaml').read_text(encoding='utf-8'))
+    params = {p['name']: p['headline_value'] for p in reg['parameters']}
+    end = params['sample_end'][:7].replace('-', '_').split('_')
+    for key in ('ma_teacher', 'mb_teacher', 'ma', 'mb'):
+        value = pv[key]
+        assert re.fullmatch(r's4_panel_[a-z_]+_\d{4}_\d{2}_\d{4}_\d{2}_v1', value), value
+        assert value.split('_')[-3:-1] == end, f'{key} 窗口末端 {value} 与 registry sample_end 不一致'
 
 
 def test_v4_outputs_are_new_filenames_not_v3():

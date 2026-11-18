@@ -8,7 +8,7 @@
   5. available_at 一致且 PIT 安全：= 网络年 4-30；消费规则 max{available_at < d}
   6. support 表覆盖全部入网公司；无边的 focal 标 no-network-support（权重不填 0）
   7. 网络年映射：文本年 y → network_version pm_mb_tfidf_v1_y、available_at y+1-04-30
-  8. 与语料对账：入网公司数 = 该文本年语料 ok 数（--corpus self=mda_texts_v2 / teacher=teacher_mda_panel）
+  8. 与语料对账：入网公司数 = 该文本年语料 ok 数（--corpus self=mda_texts / teacher=teacher_mda_panel）
 
 产物：reports/data_gates/G0/s3_b2_acceptance.json（status PASS/FAIL + 逐项明细）
 用法：python scripts/network_report_acceptance_check.py [--dir data/processed/network_mb]
@@ -26,7 +26,7 @@ REPD = ROOT / 'reports/data_gates/G0'
 TXTS = [2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025]
 TXTS_TEACHER = [2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022]   # 老师语料（B′3）
 CORPORA = {
-    'self': {'path': ROOT / 'data/processed/mda_texts_v2.csv', 'id_col': 'code',
+    'self': {'path': ROOT / 'data/processed/mda_texts.csv', 'id_col': 'code',
              'ver_prefix': 'pm_mb_tfidf_v1', 'years': TXTS},
     'teacher': {'path': ROOT / 'data/processed/teacher_mda_panel.csv', 'id_col': 'firm_id',
                 'ver_prefix': 'pm_mb_tfidf_teacher_v1', 'years': TXTS_TEACHER},

@@ -24,17 +24,17 @@
 
 from __future__ import annotations
 
-import sys as _sys
-from pathlib import Path as _Path
+from pathlib import Path
+from fileio import json_default as _json_default
+
 import argparse
 import csv as _csv
 import json
 import os
-import sys
 from datetime import datetime, timezone
-from pathlib import Path
 import numpy as np
 import pandas as pd
+from fileio import atomic_write_text as _atomic_write_text  # noqa: E402
 from pricing_lib import (  # noqa: E402
     RETURNS_V2, ROOT, assert_m1_inputs_sha, fm_regression, load_amount_100m, load_edges,
     param_value, require, sha256_file, winsor_bounds, ym_add,
@@ -42,18 +42,6 @@ from pricing_lib import (  # noqa: E402
 from peermax_panel_build import load_versions, select_version  # noqa: E402
 
 
-from pathlib import Path
-from pricing_lib import (  # noqa: E402
-    RETURNS_V2, ROOT, assert_m1_inputs_sha, fm_regression, load_amount_100m, load_edges,
-    param_value, require, sha256_file, winsor_bounds, ym_add,
-)
-from peermax_panel_build import load_versions, select_version  # noqa: E402
-import argparse
-import csv as _csv
-import json
-import numpy as np
-import os
-import pandas as pd
 
 SHADOW_DIR = ROOT / 'data/processed/phase2_shadow'
 
@@ -1314,122 +1302,6 @@ def parse_args(argv=None):
     ap.add_argument('--out-csv', default=str(OUT_CSV))
     ap.add_argument('--out-json', default=str(OUT_JSON))
     return ap.parse_args(argv)
-
-
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
-# --- scripts/lib bootstrap ---
-# --- end scripts/lib bootstrap ---
-
-
-import argparse
-import csv as _csv
-import json
-import os
-import sys
-from datetime import datetime, timezone
-from pathlib import Path
-
-import numpy as np
-import pandas as pd
-
-from pricing_lib import (  # noqa: E402
-    RETURNS_V2, ROOT, assert_m1_inputs_sha, fm_regression, load_amount_100m, load_edges,
-    param_value, require, sha256_file, winsor_bounds, ym_add,
-)
-from peermax_panel_build import load_versions, select_version  # noqa: E402
-
-# ---------------------------------------------------------------- 路径
-
-
-
-
-
-
-
-
-# ---------------------------------------------------------------- IO / 守卫
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# ---------------------------------------------------------------- shadow 装载
-
-
-
-
-# ---------------------------------------------------------------- 边表 / 传播
-
-
-
-
-
-
-
-
-
-
-
-
-# ---------------------------------------------------------------- 组装
-
-
-
-
-
-
-
-
-
-
-# ---------------------------------------------------------------- 变体 / 规格
-
-
-
-
-
-
-
-
-# ---------------------------------------------------------------- 分块统计
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# ---------------------------------------------------------------- 输出表
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 # ---------------------------------------------------------------- main

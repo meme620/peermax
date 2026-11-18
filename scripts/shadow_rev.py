@@ -35,32 +35,22 @@ rev 口径（重要）：
 
 from __future__ import annotations
 
-import sys as _sys
-from pathlib import Path as _Path
-import argparse
-import json
-import os
 import sys
-from datetime import datetime, timezone
 from pathlib import Path
-import numpy as np
-import pandas as pd
-from pricing_lib import (  # noqa: E402
-    RETURNS_V2, ROOT, assert_m1_inputs_sha, fm_regression, param_value, require,
-    sha256_file, winsor_bounds, winsorize_by_month,
-)
 
-
-from pathlib import Path
-from pricing_lib import (  # noqa: E402
-    RETURNS_V2, ROOT, assert_m1_inputs_sha, fm_regression, param_value, require,
-    sha256_file, winsor_bounds, winsorize_by_month,
-)
 import argparse
 import json
-import numpy as np
 import os
+from datetime import datetime, timezone
+import numpy as np
 import pandas as pd
+from pricing_lib import (  # noqa: E402
+    RETURNS_V2, ROOT, assert_m1_inputs_sha, fm_regression, param_value, require,
+    sha256_file, winsor_bounds, winsorize_by_month,
+)
+from fileio import atomic_write_text as _atomic_write_text
+
+
 
 SAMPLE_PARQUET = ROOT / 'data/processed/m1_common_sample_ma_teacher_v2.parquet'
 
@@ -720,20 +710,8 @@ def absorption_block(matrix: dict) -> dict:
 # --- end scripts/lib bootstrap ---
 
 
-import argparse
-import json
-import os
-import sys
-from datetime import datetime, timezone
-from pathlib import Path
 
-import numpy as np
-import pandas as pd
 
-from pricing_lib import (  # noqa: E402
-    RETURNS_V2, ROOT, assert_m1_inputs_sha, fm_regression, param_value, require,
-    sha256_file, winsor_bounds, winsorize_by_month,
-)
 
 
 

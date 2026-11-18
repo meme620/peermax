@@ -14,7 +14,7 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-V2 = ROOT / "data/processed/mda_texts_v2.csv"
+V2 = ROOT / "data/processed/mda_texts.csv"
 ART = ROOT / "artifacts/review"
 OUTD = ROOT / "reports/data_gates/G0"
 K = 128

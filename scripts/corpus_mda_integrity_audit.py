@@ -29,7 +29,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 TXT = ROOT / "data/raw/cninfo/annual_txt"
-V2 = ROOT / "data/processed/mda_texts_v2.csv"
+V2 = ROOT / "data/processed/mda_texts.csv"
 ART = ROOT / "artifacts/review"
 OUTD = ROOT / "reports/data_gates/G0"
 A_STOCKS = ROOT / "data/raw/baostock/stock_basic/a_stocks.csv"
@@ -153,7 +153,7 @@ def doc_type(text):
 def iter_v2_texts():
     """v2 文本（status=ok / src_identity=match / dup_n=1）；缺 v2 直接停，不回退 v1。"""
     if not V2.is_file():
-        raise SystemExit("[MDA] 缺 data/processed/mda_texts_v2.csv；先跑 text_mda_extract_v2.py")
+        raise SystemExit("[MDA] 缺 data/processed/mda_texts.csv；先跑 text_mda_extract.py")
     with open(V2, encoding="utf-8", newline="") as f:
         for row in csv.DictReader(f):
             if row["status"] != "ok" or row["src_identity"] != "match" or row["dup_n"] != "1":
@@ -192,7 +192,7 @@ def misalign_only():
     summary["misalign_suspect"] = len(mis)
     summary["misalign_firms"] = len({m["code6"] for m in mis})
     summary["misalign_scanned_texts"] = n_scanned
-    summary["misalign_source"] = "mda_texts_v2.csv"
+    summary["misalign_source"] = "mda_texts.csv"
     jp.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"跨年错位: {len(mis)} 条 / {summary['misalign_firms']} 家（扫描 {n_scanned} 篇，源 "
           f"{summary['misalign_source']}）")

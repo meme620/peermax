@@ -7,7 +7,7 @@ K 的选取沿用 τ 校准同一套"阶梯函数→网格命中区间"方法。
 
 v3（2026-09-28，Phase B″2/B″3）：加 `--corpus {self,teacher}` / `--lexicon` / `--target` /
 `--out-dir` / `--out-report` / `--years` 参数化。**算法、阈值与筛选一字未改**：
-  - `--corpus self`（默认）= 历史口径：语料 business_texts_v7.csv、目标 56、
+  - `--corpus self`（默认）= 历史口径：语料 business_texts.csv、目标 56、
     聚类落 `data/processed/network_ma/clusters/`、报告落 `s3_b3_ma_param_freeze.json`；
   - `--corpus teacher`（主口径，Phase B″3）= 语料 teacher_mda_panel.csv、目标 = registry
     `ma_k_target_teacher`（44）、聚类落 `data/processed/network_ma_teacher/clusters/`、
@@ -334,7 +334,7 @@ def main():
                         '自建年报全文面板 annual_fulltext_panel.parquet（**对表语料敏感性列，本次不升主口径**；'
                         'registry `ma_fulltext_text_corpus`，2026-10-19）' if args.corpus == 'ma_fulltext' else
                         '老师 MD&A 导出 teacher_mda_panel.csv（主口径 Phase B″3）' if args.corpus == 'teacher'
-                        else '自建业务描述 business_texts_v7.csv（文本稳健性列）'),
+                        else '自建业务描述 business_texts.csv（文本稳健性列）'),
         'weighting_invariance': ('命中集合与样本筛选与权重无关：本变体逐年 n_nodes 与 filter_stats 应与'
                                  '主口径 teacher 逐值相等（只有相似度分布 / K_y / 边权可变化）'
                                  if _w == 'idf' else None),

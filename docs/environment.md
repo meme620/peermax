@@ -36,10 +36,13 @@
 ## 安装
 
 ```bash
-make env        # uv venv --python 3.13 .venv + uv pip install -r requirements.txt
+make env          # uv venv --python 3.13 .venv + uv pip install -r requirements.txt
+lefthook install  # 装 git hooks：pre-commit 跑 lint + selftest，pre-push 跑数据门（缺产物放行）
 ```
 
 `uv` 创建的 venv 不带 `pip`，装包与查看都用 uv：`uv pip list --python .venv/bin/python`、`uv pip freeze --python .venv/bin/python`。需要网络（PyPI）。
+
+hooks 由 `lefthook.yml` 定义（需要 `lefthook` 二进制）：`pre-commit` 并行跑 `peerlab lint` 与 `make selftest` 那组 pytest；`pre-push` 跑 `peerlab gate`，只把退出码 2（缺产物 blocked）当放行、退出码 1（判据违反）才阻断。
 
 ## 检查与当前基线
 
@@ -52,7 +55,7 @@ make env        # uv venv --python 3.13 .venv + uv pip install -r requirements.t
 | `make lint` | 命名、脚本清单与实验文档规范检查 | 通过 |
 | `make gate` | 数据不变量门：边表↔报告、样本窗口、board 列、MD&A 身份、股本链、analyst_cov | 6 个全部 blocked（缺 `data/processed` 与 `artifacts` 产物），退出码 2 |
 | `make selftest` | `pytest tests/test_peerlab_*.py tests/test_script_utils.py tests/test_gate_*.py` | 75 passed |
-| `make test` | 全量 `pytest`（`tests/`） | 收集期中断：1 error（缺 `data/processed/analyst/edges`） |
+| `make test` | 全量 `pytest`（`tests/`） | 直接跑会因缺 `data/processed/analyst/edges` 在收集期中断（1 error）；加 `--continue-on-collection-errors` 得 350 passed / 121 failed / 149 errors / 17 skipped，失败与报错全部来自缺 `data/processed` 产物 |
 
 `make imports`（即 `python -m peerlab smoke --imports --clean`）会执行每个脚本的模块级代码，部分脚本会在 `reports/data_gates/G0/`、`data/processed/` 下写出文件（如 `drive_batch1_schema.json`）。命令跑完会列出这些文件并删除；不加 `--clean` 时只列出，便于先看脚本写了什么。
 

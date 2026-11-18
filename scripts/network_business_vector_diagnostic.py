@@ -20,7 +20,7 @@ sys.path.insert(0, str(ROOT / 'scripts'))
 from network_business_lexicon import build_automaton, load_lexicon, normalize as norm_text  # noqa: E402
 
 REPD = ROOT / 'reports/data_gates/G0'
-CORPUS = ROOT / 'data/processed/business_texts_v7.csv'
+CORPUS = ROOT / 'data/processed/business_texts.csv'
 IDMAP = ROOT / 'data/processed/firm_id_map.csv'
 IND = ROOT / 'data/raw/baostock/industry/all_current.csv'
 SW2 = ROOT / 'data/processed/sw2_industry_latest.csv'
