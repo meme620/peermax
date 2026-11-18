@@ -1,4 +1,4 @@
-﻿category,rel_path,source_path,bytes,sha256,sha256_verified,mtime,provenance
+category,rel_path,source_path,bytes,sha256,sha256_verified,mtime,provenance
 立项文档,01_proposal/peer_lottery_proposal.pdf,archive/legacy_proposals/peer_lottery_proposal.pdf,77548,ca68b7748090de731a27446431dcaea9f0945d57d4977c7a65cdeae9ec02cbec,YES,2026-06-23 11:13:12,本人撰写，2026-04-09，13 页（Yangyi Liu，PDF 元数据作者/日期已核）
 立项文档,01_proposal/peer_Proposal_PeerMAX.pdf,archive/duplicate_docs/peer_Proposal_PeerMAX.pdf,106772,b90590d0c2aa96575dc563784bba0326cd75ea8a81d15c3da46a105e5ec3d460,YES,2026-07-15 13:05:08,本人撰写，2026-07-13，14 页 written proposal（Yangyi Liu，PDF 元数据已核）
 立项文档,01_proposal/peer_Proposal_PeerMAX_slides.pdf,archive/duplicate_docs/peer_Proposal_PeerMAX_slides.pdf,151756,9cac3ea4b63648552f403589e6a807fc91634bfa6ebfb1f92c6941995b616408,YES,2026-07-14 21:02:56,本人撰写，2026-07-13，29 页汇报版（与 written 版同源）
@@ -13,7 +13,7 @@
 老师数据,04_teacher_data/analyst_forecast/预测情况_字段说明.txt,data/raw/analyst/预测情况_字段说明.txt,1173,41388aa0364f0d31c59273ad823470ba8e0d04c4e4c6723b9d5f1ad10c112612,YES,2026-08-15 16:13:25,上述压缩包内字段说明的解出副本（内容一致，便于检索）
 老师数据,04_teacher_data/cfnd/CFND_网络新闻量化统计（按自然日）_ALL.zip,data/raw/cfnd/CFND_网络新闻量化统计（按自然日）_ALL.zip,126813456,72414fc41b4e872917560438a3d133df31eff4b85797919a263c351de95df77b,YES,2026-08-10 10:42:02,老师提供（CFND 网络新闻量化统计，2001–2025 按自然日，77 entries）
 老师数据,04_teacher_data/wsvi/WSVI_上市公司网络搜索指数_全国_ALL.zip,data/raw/wsvi/WSVI_上市公司网络搜索指数_全国_ALL.zip,512546566,f50e331c67c84e2b0da5c9ec51f83c6e3388074595f6d5e06b6b25563d266525,YES,2026-08-10 10:42:22,老师提供（WSVI 上市公司网络搜索指数，2011–2025，76 entries）
-老师数据,04_teacher_data/mda/mda_data_2023.csv,data/raw/teacher/mda_data_2023.csv,1054318585,364b1dc539d3a2cd1690e95869aa941eb1ecd9e25e55a1336cc4f043353d2ce4,YES,2026-09-12 22:46:30,"老师提供（MD&A 章节定向导出）：33,315 行 / 5,291 股 / 2014–2022，1.05 GB，GBK 编码"
+老师数据,04_teacher_data/mda/mda_data_2023.csv,data/raw/teacher/mda_data_2023.csv,1054318585,364b1dc539d3a2cd1690e95869aa941eb1ecd9e25e55a1336cc4f043353d2ce4,YES,2026-09-12 22:46:30,"老师提供（MD&A 章节定向导出）：33,315 行 / 5,291 股 / 2014–2022，1.05 GB，UTF-8 编码"
 老师数据,04_teacher_data/industry_classification/all_stkcds.xlsx,all_stkcds.xlsx,169062,11306982c9cc65310067c211c85fe17428f61255b973a1018a50b1b4a991116f,YES,2026-09-14 20:44:12,"老师提供（2026-09-15 微信）：申万 2021 版分类快照，5,800 只；与 data/external/sw_industry_all_stkcds_20260915.xlsx 字节一致"
 老师数据,04_teacher_data/drive/csi500_mask_monthly.pkl,data/raw/drive/csi500_mask_monthly.pkl,384037,8f5cfd8aa5e1e8a1ac8422a5a81eb042f83129012858cb6ec4bc4c3940ade317,YES,2026-08-28 18:07:24,老师提供（Google Drive `data sharing`，2026-08-16 接入；批次报告 reports/data_gates/G0/drive_batch*_report.md）
 老师数据,04_teacher_data/drive/daily_a_share_market_val_3_20260630.pkl,data/raw/drive/daily_a_share_market_val_3_20260630.pkl,274529092,d8b02e4d3770a99e7028824c514cfea8ccdaf1c97dfd5c94cc63089a99315fff,YES,2026-08-28 15:47:56,老师提供（Google Drive `data sharing`，2026-08-16 接入；批次报告 reports/data_gates/G0/drive_batch*_report.md）

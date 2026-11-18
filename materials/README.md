@@ -47,7 +47,7 @@
 | `analyst_forecast/预测情况_字段说明.txt` | 1.1 KiB | 上述压缩包内字段说明的解出副本（内容一致，便于检索；13 个字段：Scode/Anndats/Fpenddt/A_name/A_code/Star/B_name/B_code/Feps/Fpe/Fnetpro/Foperev/Anndats_act） |
 | `cfnd/CFND_网络新闻量化统计（按自然日）_ALL.zip` | 120.9 MiB | CFND 网络新闻量化统计，2001–2025 按自然日；77 个 entry（年度 xlsx + 每年字段说明 + 版权页） |
 | `wsvi/WSVI_上市公司网络搜索指数_全国_ALL.zip` | 488.8 MiB | WSVI 上市公司网络搜索指数（全国），2011–2025；76 个 entry（年度 xlsx 分片 + 字段说明 + 版权页） |
-| `mda/mda_data_2023.csv` | 1005.5 MiB | 老师 MD&A 章节定向导出：4 列（`f_id,f_stock_id,f_year,f_chapter_content`），33,315 行 / 5,291 股 / 2014–2022；**GBK 编码**，非 UTF-8 |
+| `mda/mda_data_2023.csv` | 1005.5 MiB | 老师 MD&A 章节定向导出：4 列（`f_id,f_stock_id,f_year,f_chapter_content`），33,315 行 / 5,291 股 / 2014–2022；**UTF-8 编码** |
 | `industry_classification/all_stkcds.xlsx` | 165.1 KiB | 申万 2021 版分类快照，5,800 只（31 一级 / 131 二级 / 337 三级）；2026-09-15 微信接收 |
 
 ### 2.3 老师 Google Drive（`04_teacher_data/drive/`）
@@ -110,7 +110,7 @@ PDF 元数据已核：作者 `Yangyi Liu`，创建日期分别为 2026-04-09 / 2
 ## 7. 使用注意
 
 1. `预测情况(1).7z` 扩展名是 `.7z`，但 7-Zip 识别为 **ZIP 容器**（`Type = zip`），解压时按 zip 处理即可。
-2. `mda_data_2023.csv` 是 **GBK** 编码，直接按 UTF-8 读会乱码；列名为 `f_id,f_stock_id,f_year,f_chapter_content`。
+2. `mda_data_2023.csv` 是 **UTF-8** 编码；列名为 `f_id,f_stock_id,f_year,f_chapter_content`，首字段内容形如 `"第四节 经营情况讨论与分析…"`。
 3. Drive 数据是**时点快照**：大部分为 20260630，`monthly_operating_revenue_mrq_0_20251231.pkl` 为 20251231；不是当前最新数据，使用时须记录快照日期。
 4. `all_stkcds.xlsx` 是**无日期快照**（申万 2021 版分类），项目已评估：第三源与现行分类在市一致率 98.68%，处置为「不替换现行分类」，仅作交叉核验证据（见 `reports/audits/sw2_third_source_recheck_20260915.md`）。
 5. `预测情况` 的字段说明与 `版权声明与数据来源说明.pdf` 保留在压缩包内，未单独解出（字段说明另有一份 `.txt` 副本）。

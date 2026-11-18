@@ -20,7 +20,7 @@ PeerMAX 项目的**计算链代码只读快照**：原始数据抓取 → 清洗
 | `scripts/deliverables/` | 1 | 23,016 | 420 | 仅 `make_s3a_brief_pptx.py`（被 Gate5 读源码，见 §8） |
 | `tests/` | 33 | 446,620 | 9,722 | 契约测试（33 模块；主仓库当前收集 568 个 test） |
 
-与仓库其它部分的分工：`materials/01_proposal/` 是立项/研究计划文档（PDF、TeX），本快照不含叙述性文档；`materials/04_teacher_data/` 是老师提供的原始数据包（分析师预测、CFND、WSVI、老师 MD&A、申万分类、Google Drive 共享），本仓库未收录该目录，代码按主仓库路径读取；`materials/README.md` 记录老师原始数据的落盘位置与快照日期，数据来源问题读那份。
+与仓库其它部分的分工：`materials/01_proposal/` 是立项/研究计划文档（PDF、TeX），本快照不含叙述性文档；`materials/04_teacher_data/` 是老师提供的原始数据包（分析师预测、CFND、WSVI、老师 MD&A、申万分类、Google Drive 共享），该目录已随仓库归档，代码按主仓库路径读取；`materials/README.md` 记录老师原始数据的落盘位置与快照日期，数据来源问题读那份。
 
 ## 2. 目录结构
 
@@ -319,7 +319,7 @@ M1 样本命名注意：**v1 文件没有 `_v1` 后缀**（实际为 `m1_common_
 
 数据门与阶段审计的登记证据（主仓库当前 154 个 `.json` + 37 个 `.md`）。脚本直接读写该目录，`s3_m1_lib.OUT_DIR` 即指向此处；这些 JSON/MD 属 registry/manifest 登记产物，不得手改。
 
-老师原始数据的落盘位置与快照日期（analyst_forecast 2026-05-27 打包、cfnd/wsvi 年度分片、mda `mda_data_2023.csv` 1005.5 MiB / GBK / 2014-2022、`all_stkcds.xlsx` 2026-09-15、drive 36 文件快照 20260630）记录在 `materials/README.md` 与 `materials/04_teacher_data/`（本仓库未收录后者），本快照不重复。
+老师原始数据的落盘位置与快照日期（analyst_forecast 2026-05-27 打包、cfnd/wsvi 年度分片、mda `mda_data_2023.csv` 1005.5 MiB / UTF-8 / 2014-2022、`all_stkcds.xlsx` 2026-09-15、drive 36 文件快照 20260630）记录在 `materials/README.md` 与 `materials/04_teacher_data/`，本快照不重复。
 
 ## 8. 共享模块最小闭包
 
