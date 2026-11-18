@@ -1,51 +1,51 @@
 # PeerMAX
 
-A 股产品市场同侪的彩票型收益（MAX）溢出研究：计算链代码与外部输入材料。
+A 股产品市场同侪的彩票型收益（MAX）溢出研究：计算链代码、外部输入材料与运行环境。
 
-仓库内容来自 **2026-11-17** 的代码快照与同期材料归档。数据（`data/`）、配置（`configs/`）、报告与审计产物（`reports/`）、汇报成品（`deliverables/`）、审计工作记录（`artifacts/`）都不在本仓库。
+代码是 **2026-11-17** 的主仓库快照；`scripts/` 与 `tests/` 按主仓库层级铺在仓库根（`parents[2]` / `parents[1]` 依赖这一层级），**不要移动或改名**。
 
 ## 目录
 
 | 路径 | 内容 |
 |---|---|
-| `scripts/data/` | 抓数与基础 builder（baostock / 东财 / 腾讯 / CNINFO / Drive / 申万 / 词库），35 个脚本 |
-| `scripts/data_audit/` | 项目主计算链：S1、S2、S2.5、S3 网络、S3A、S4、M1/S5、Phase2/3/3B shadow、Gate1/2/5，162 `.py` + 1 `.sh` |
-| `scripts/external/` | 外部基准（HP TNIC-3）结构统计 |
-| `scripts/deliverables/` | 汇报物料生成脚本 |
+| `scripts/` | 计算链：`data/` 抓数与 builder（35）、`data_audit/` 阶段管线与审计（163）、`external/`（1）、`deliverables/`（1） |
 | `tests/` | 契约测试，33 个模块 |
-| `docs/pipeline.md` | 计算链说明：阶段总表、分阶段命令、路径与运行约束、与主仓库的关系 |
-| `materials/` | 外部输入：立项文档 5 份、老师材料与参考论文 3 份、组内论文 2 份、老师原始数据 42 份（4.11 GiB，不入 Git），说明见 `materials/README.md` |
-| `code_MANIFEST.csv` | 代码快照逐文件清单，233 条 |
-| `code_SHA256SUMS.txt` | 代码快照校验和，233 行 |
+| `ref/` | 权威源头文档：立项文档 5、老师材料与参考论文 3、组内论文 2 |
+| `docs/` | 项目文档：`pipeline.md` 计算链、`materials.md` 材料来源、`environment.md` 环境、`data_layout.md` 数据布局 |
+| `data/` | 数据根：`raw/` 原始输入、`external/` 外部参照、`processed/` 派生（不入 Git） |
+| `configs/` | 冻结参数与版本锚（待主仓库提供） |
+| `tools/` | `preflight.py` 环境自检、`smoke_import.py` 导入冒烟、`test_preflight.py` 自检用例 |
+| `Makefile` `requirements.txt` `.python-version` `pytest.ini` | 环境定义 |
 
-## 来源与完整性
-
-四个投递包解压、逐文件校验后合并，投递包本体已删除：
-
-| 投递包 | sha256 | 解出到 |
-|---|---|---|
-| `code.zip` | `dc89f9ab10ab3e104b28fe178607c2bd7dfa807bdc490b5e422bb03ba8e2b1a9` | `scripts/`、`tests/`、`docs/pipeline.md`、`code_MANIFEST.csv`、`code_SHA256SUMS.txt` |
-| `01_proposal(1).zip` | `af4d35c1c8f7ee8a83c04a4ec9e8bdbe47b898f6b2d8466fd29ac7c7e887b63d` | `materials/01_proposal/` |
-| `02_teacher_note_and_papers(1).zip` | `31bc973bdd2443fb223a918e30997b2d7c438a08ff471ce11baeb06104d3dfda` | `materials/02_teacher_note_and_papers/` |
-| `03_team_papers(1).zip` | `e48c4352af6f9a8ab7576e5b3c97186da11982e196d2ac72396ffcb7e41da72d` | `materials/03_team_papers/` |
-
-校验：
+## 快速开始
 
 ```bash
-shasum -a 256 -c code_SHA256SUMS.txt            # 233 条全部 OK
-cd materials && shasum -a 256 -c SHA256SUMS.txt # 52 条全部 OK
+make env          # 建 .venv（Python 3.13）并装 requirements.txt
+make preflight    # 解释器 / 依赖 / configs / 数据 四块一次打印
+make smoke        # 逐个导入 scripts/ 下 199 个脚本
+make selftest     # preflight 自身的 5 个用例
 ```
 
-`materials/04_teacher_data/` 的 42 个数据文件（4.11 GiB）由 `04_teacher_data.zip` 补发，与归档清单 52/52 一致，体积原因不入 Git，只在工作区保留。
+## 当前状态
 
-| 补发包 | sha256 | 解出到 |
-|---|---|---|
-| `04_teacher_data.zip` | `65d69f0948342da516f074ab36fa5334b1c0ecf14c67b72632d71982cde8657f` | `materials/04_teacher_data/` |
+| 项 | 状态 |
+|---|---|
+| 环境 | 就绪：Python 3.13.12，14 个直接依赖与传递依赖全部固定版本 |
+| 脚本导入 | 145 ok / 24 缺配置 / 30 缺数据目录 / 0 个依赖问题 |
+| 教师数据 | 就绪：42 个文件在 `data/raw/` 与 `data/external/`（4.1 GB，不入 Git） |
+| `configs/` | **缺 6 个 YAML**，需主仓库提供；缺它时 `s3_m1_lib` 导入即 `SystemExit(2)` |
+| `data/processed/` | 空：需要跑链生成，而跑链又依赖 `configs/` |
+| 全量 `pytest` | 收集阶段即中断（同上原因），`make test` 现在必然红 |
 
-## 运行前提
+## 文档
 
-`scripts/` 与 `tests/` 按主仓库层级铺在仓库根：110 个脚本用 `Path(__file__).resolve().parents[2]` 定位仓库根，33 个测试用 `parents[1]`。仓库根当前缺 `configs/`、`data/`、`reports/`，直接运行会在 import 阶段失败（`s3_m1_lib` 找不到 `configs/parameter_registry.yaml`）。补齐这几层后按 `docs/pipeline.md` §3 的命令跑。老师原始数据在 `materials/04_teacher_data/` 是归档副本，代码读的是 `data/raw/{analyst,cfnd,wsvi,mda,drive}/`，归档副本不在这条路径上。
+- [`docs/pipeline.md`](docs/pipeline.md)：阶段总表、分阶段命令、六条运行硬约束、配置文件与数据目录清单。
+- [`docs/materials.md`](docs/materials.md)：52 个外部输入文件的来源、批次、编码与时点快照说明。
+- [`docs/environment.md`](docs/environment.md)：解释器与依赖版本、安装与三条检查命令、T1–T4 等级现状、平台边界。
+- [`docs/data_layout.md`](docs/data_layout.md)：`data/` 结构、14 个 raw 目录就绪状态、交付包到代码路径的映射。
 
-## 时间性
+## 使用纪律
 
-`scripts/`、`tests/` 是 2026-11-17 快照，主仓库之后的改动不会回流。引用前比对 `code_MANIFEST.csv` 的 `sha256` 列；刷新方式是回主仓库重新生成副本，不在副本上打补丁。
+- `scripts/`、`tests/` 是只读快照，编辑后当主线用会导致与主仓库对不上。
+- `data/` 与 `.venv/` 不入 Git；`data/` 有 4.1 GB，提交前先看 `git status --ignored`。
+- 补 `configs/` 时不要手改其中任何值：它们与 `version_manifest.yaml` 的 sha 锚绑定，fail-closed 脚本会逐项校验。
