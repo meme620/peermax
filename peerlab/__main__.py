@@ -1,4 +1,4 @@
-"""python -m peerlab：status / smoke / run / run-all / report。"""
+"""python -m peerlab：status / smoke / doctor / lint / run / run-all / report。"""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import json
 import sys
 from pathlib import Path
 
-from . import collect, registry, runner
+from . import collect, doctor, imports, lint, registry, runner
 
 ROOT = Path(__file__).resolve().parents[1]
 RESULT_DIR = ROOT / 'result'
@@ -33,7 +33,7 @@ def cmd_status(args) -> int:
     for row in rows:
         flag = 'ready  ' if row['ready'] else 'blocked'
         seeded = 'seed' if row['seeded'] else '    '
-        print('  ' + flag + '  ' + seeded + '  ' + row['id'].ljust(18) + row['title'])
+        print('  ' + flag + '  ' + seeded + '  ' + row['id'].ljust(22) + row['title'])
         if not row['ready']:
             print('            缺：' + _fmt_missing(row['missing']))
     return 0
@@ -95,6 +95,8 @@ def cmd_run_all(args) -> int:
 
 
 def cmd_smoke(args) -> int:
+    if args.imports:
+        return imports.run(ROOT)
     targets = [registry.get(args.exp)] if args.exp else list(registry.EXPERIMENTS)
     report = {'configs_missing': [], 'experiments': []}
     for name in registry.CONFIG_FILES:
@@ -117,10 +119,10 @@ def cmd_smoke(args) -> int:
     smoke_dir.mkdir(parents=True, exist_ok=True)
     (smoke_dir / 'report.json').write_text(json.dumps(report, ensure_ascii=False, indent=2) + chr(10), encoding='utf-8')
     lines = ['# 冒烟报告（L0 就绪检查）', '',
-             '配置缺失 ' + str(len(report['configs_missing'])) + ' 个：' + (_fmt_missing(report['configs_missing'])), '']
+             '配置缺失 ' + str(len(report['configs_missing'])) + ' 个：' + _fmt_missing(report['configs_missing']), '']
     for item in report['experiments']:
         state = 'ready' if item['ready'] else 'blocked'
-        lines.append('- ' + item['id'].ljust(18) + state)
+        lines.append('- ' + item['id'].ljust(22) + state)
         if item['missing_inputs']:
             lines.append('    - 缺输入：' + _fmt_missing(item['missing_inputs']))
         if item['missing_scripts']:
@@ -129,6 +131,25 @@ def cmd_smoke(args) -> int:
     print('冒烟：' + str(len(targets)) + ' 个实验，就绪 ' + str(len(targets) - blocked) + '，受阻 ' + str(blocked))
     print('报告：result/smoke/report.md')
     return 3 if blocked else 0
+
+
+def cmd_doctor(args) -> int:
+    levels = ['env', 'configs', 'data'] if args.level == 'all' else [args.level]
+    ok, text = doctor.run(levels, ROOT)
+    print(text)
+    print('' + chr(10) + '结论:', '通过' if ok else '未通过')
+    return 0 if ok else 1
+
+
+def cmd_lint(args) -> int:
+    code, problems = lint.run(ROOT)
+    if not problems:
+        print('规范检查通过')
+        return code
+    print('规范检查发现 ' + str(len(problems)) + ' 处问题：')
+    for item in problems:
+        print('  - ' + item)
+    return code
 
 
 def cmd_report(args) -> int:
@@ -149,9 +170,17 @@ def build_parser() -> argparse.ArgumentParser:
     p_status.add_argument('--json', action='store_true')
     p_status.set_defaults(func=cmd_status)
 
-    p_smoke = sub.add_parser('smoke', aliases=['-smoke'], help='冒烟：L0 就绪检查')
+    p_smoke = sub.add_parser('smoke', aliases=['-smoke'], help='冒烟：L0 就绪检查或 --imports 逐脚本导入')
     p_smoke.add_argument('--exp', default=None)
+    p_smoke.add_argument('--imports', action='store_true', help='逐个导入 scripts/ 下脚本')
     p_smoke.set_defaults(func=cmd_smoke)
+
+    p_doctor = sub.add_parser('doctor', help='解释器 / 依赖 / configs / 数据自检')
+    p_doctor.add_argument('--level', default='all', choices=['env', 'configs', 'data', 'all'])
+    p_doctor.set_defaults(func=cmd_doctor)
+
+    p_lint = sub.add_parser('lint', help='命名与实验文档规范检查')
+    p_lint.set_defaults(func=cmd_lint)
 
     p_run = sub.add_parser('run', help='跑一个实验的一次 seed')
     p_run.add_argument('--exp', required=True)

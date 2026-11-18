@@ -49,10 +49,11 @@ make env        # uv venv --python 3.13 .venv + uv pip install -r requirements.t
 | `make imports` | 逐个导入 `scripts/` 下 199 个脚本 | 145 ok、24 config、30 missing、**0 dep、0 other** |
 | `make smoke` | peerlab L0：10 个实验逐个判脚本与输入是否就绪 | 10 个全部 blocked（缺 configs），退出码 3 |
 | `make status` | 逐实验列出缺什么 | 0/10 就绪 |
-| `make selftest` | `pytest tools peerlab/tests` | 16 passed |
+| `make lint` | 命名与实验文档规范检查 | 通过 |
+| `make selftest` | `pytest peerlab/tests` | 22 passed |
 | `make test` | 全量 `pytest`（`tests/`） | **收集阶段 INTERNALERROR**：`s3_m1_lib` 导入即校验 registry，缺 `configs/parameter_registry.yaml` → `SystemExit(2)` |
 
-`make imports` 的判读：`config` 是被 fail-closed 的 registry 拦下、`missing` 是缺数据/报告目录，两者属预期；`dep`（`ModuleNotFoundError`）与 `other` 才算环境问题。
+`make imports`（即 `python -m peerlab smoke --imports`）的判读：`config` 是被 fail-closed 的 registry 拦下、`missing` 是缺数据/报告目录，两者属预期；`dep`（`ModuleNotFoundError`）与 `other` 才算环境问题。
 
 种子协议、实验注册表与结果聚合规则见 `docs/result_pipeline.md`：全局 `SEEDS = (0,1,2,3,4)`，每次运行注入 `PYTHONHASHSEED` 与 random/numpy 种子，脚本自带 `--seed` 的直传。
 

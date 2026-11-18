@@ -14,7 +14,8 @@ A 股产品市场同侪的彩票型收益（MAX）溢出研究：计算链代码
 | `docs/` | 项目文档：`pipeline.md` 计算链、`materials.md` 材料来源、`environment.md` 环境、`data_layout.md` 数据布局 |
 | `data/` | 数据根：`raw/` 原始输入、`external/` 外部参照、`processed/` 派生（不入 Git） |
 | `configs/` | 冻结参数与版本锚（待主仓库提供） |
-| `tools/` | `preflight.py` 环境自检、`smoke_import.py` 导入冒烟、`test_preflight.py` 自检用例 |
+| `scripts/` | 计算链：`data/` 抓数、`data_audit/` 阶段与库、`oneoff/` 一次性检查、`external/`、`deliverables/`（见 `scripts/README.md`） |
+| `experiments/` | 10 个实验的规范文档：目的、参数、baseline、实现细节、产物与验收（见 `experiments/README.md`） |
 | `peerlab/` | 执行 CLI：实验注册、种子注入、运行记录、结果聚合，`python -m peerlab --help` |
 | `result/` | 结果层：`tables/` 跨种子聚合表、`summary.md` 摘要、`runs/` 运行记录（见 `result/README.md`） |
 | `Makefile` `requirements.txt` `.python-version` `pytest.ini` | 环境定义 |
@@ -24,12 +25,14 @@ A 股产品市场同侪的彩票型收益（MAX）溢出研究：计算链代码
 ```bash
 make env          # 建 .venv（Python 3.13）并装 requirements.txt
 make preflight    # 解释器 / 依赖 / configs / 数据 四块一次打印
+make doctor       # 解释器 / 依赖 / configs / 数据 四块自检
 make imports      # 逐个导入 scripts/ 下 199 个脚本
-make smoke        # peerlab L0 冒烟：10 个实验逐个判就绪
+make smoke        # L0 冒烟：10 个实验逐个判就绪
+make lint         # 命名与实验文档规范检查
 make status       # 每个实验缺什么
 make run-all      # 全部实验 × SEEDS=(0,1,2,3,4)，当前全部 blocked
 make report       # 重算 result/tables 与 summary.md
-make selftest     # preflight 与 peerlab 的单测
+make selftest     # peerlab 单测
 ```
 
 ## 当前状态

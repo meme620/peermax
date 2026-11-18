@@ -1,22 +1,25 @@
 PY := .venv/bin/python
 
-.PHONY: env preflight imports smoke selftest status run-all report test
+.PHONY: env doctor imports smoke lint selftest status run-all report test
 
 env:
 	uv venv --python 3.13 .venv
 	uv pip install --python .venv/bin/python -r requirements.txt
 
-preflight:
-	$(PY) tools/preflight.py --level all
+doctor:
+	$(PY) -m peerlab doctor
 
 imports:
-	$(PY) tools/smoke_import.py
+	$(PY) -m peerlab smoke --imports
 
 smoke:
 	$(PY) -m peerlab smoke
 
+lint:
+	$(PY) -m peerlab lint
+
 selftest:
-	$(PY) -m pytest tools peerlab/tests -q
+	$(PY) -m pytest peerlab/tests -q
 
 status:
 	$(PY) -m peerlab status
