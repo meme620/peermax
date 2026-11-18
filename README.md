@@ -14,7 +14,7 @@ A 股产品市场同侪的彩票型收益（MAX）溢出研究：计算链代码
 | `scripts/deliverables/` | 汇报物料生成脚本 |
 | `tests/` | 契约测试，33 个模块 |
 | `docs/pipeline.md` | 计算链说明：阶段总表、分阶段命令、路径与运行约束、与主仓库的关系 |
-| `materials/` | 外部输入：立项文档 5 份、老师材料与参考论文 3 份、组内论文 2 份，说明见 `materials/README.md` |
+| `materials/` | 外部输入：立项文档 5 份、老师材料与参考论文 3 份、组内论文 2 份、老师原始数据 42 份（4.11 GiB，不入 Git），说明见 `materials/README.md` |
 | `code_MANIFEST.csv` | 代码快照逐文件清单，233 条 |
 | `code_SHA256SUMS.txt` | 代码快照校验和，233 行 |
 
@@ -33,14 +33,18 @@ A 股产品市场同侪的彩票型收益（MAX）溢出研究：计算链代码
 
 ```bash
 shasum -a 256 -c code_SHA256SUMS.txt            # 233 条全部 OK
-cd materials && shasum -a 256 -c SHA256SUMS.txt # 10 条 OK，42 条 missing（04_teacher_data 未随仓库分发）
+cd materials && shasum -a 256 -c SHA256SUMS.txt # 52 条全部 OK
 ```
 
-材料归档的 `04_teacher_data/`（老师数据 42 个文件、4.11 GiB）不在本仓库。
+`materials/04_teacher_data/` 的 42 个数据文件（4.11 GiB）由 `04_teacher_data.zip` 补发，与归档清单 52/52 一致，体积原因不入 Git，只在工作区保留。
+
+| 补发包 | sha256 | 解出到 |
+|---|---|---|
+| `04_teacher_data.zip` | `65d69f0948342da516f074ab36fa5334b1c0ecf14c67b72632d71982cde8657f` | `materials/04_teacher_data/` |
 
 ## 运行前提
 
-`scripts/` 与 `tests/` 按主仓库层级铺在仓库根：110 个脚本用 `Path(__file__).resolve().parents[2]` 定位仓库根，33 个测试用 `parents[1]`。仓库根当前缺 `configs/`、`data/`、`reports/`，直接运行会在 import 阶段失败（`s3_m1_lib` 找不到 `configs/parameter_registry.yaml`）。补齐这几层后按 `docs/pipeline.md` §3 的命令跑。
+`scripts/` 与 `tests/` 按主仓库层级铺在仓库根：110 个脚本用 `Path(__file__).resolve().parents[2]` 定位仓库根，33 个测试用 `parents[1]`。仓库根当前缺 `configs/`、`data/`、`reports/`，直接运行会在 import 阶段失败（`s3_m1_lib` 找不到 `configs/parameter_registry.yaml`）。补齐这几层后按 `docs/pipeline.md` §3 的命令跑。老师原始数据在 `materials/04_teacher_data/` 是归档副本，代码读的是 `data/raw/{analyst,cfnd,wsvi,mda,drive}/`，归档副本不在这条路径上。
 
 ## 时间性
 

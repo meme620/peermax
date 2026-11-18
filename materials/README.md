@@ -2,7 +2,7 @@
 
 本目录只收录**外部输入 / 立项输入**，即老师（及老师团队）提供的材料、组内/合作者提供的文献、本人撰写的立项文档。**不包含**项目自行下载的行情/财务数据，也不包含任何加工派生产物（面板、网络、MD&A 语料、回归结果等）。
 
-本仓库随附 01/02/03 三个分卷共 **10 个文件**；`04_teacher_data/` 的 42 个文件（4.11 GiB）未随仓库分发。`MANIFEST.csv` 与 `SHA256SUMS.txt` 仍保留完整 52 条记录，校验时未收录项报 missing 属预期。
+52 个文件全部就位，合计 4.11 GiB，`shasum -a 256 -c SHA256SUMS.txt` 52/52 通过。`04_teacher_data/` 的 42 个数据文件体积大，不入 Git，只在工作区保留；清单与校验和照常入库。
 
 - 归档文件：**52 个**（另加本 README、`MANIFEST.csv`、`SHA256SUMS.txt`）
 - 合计大小：**4.11 GiB**
@@ -16,7 +16,7 @@
 ├── 01_proposal/                     本人撰写的立项/研究计划（5 个）
 ├── 02_teacher_note_and_papers/      老师团队提供的方法说明与参考论文（3 个）
 ├── 03_team_papers/                  组内/合作者提供的论文（2 个）
-├── 04_teacher_data/                 老师提供的数据（42 个，本仓库未收录）
+├── 04_teacher_data/                 老师提供的数据（42 个，4.11 GiB，不入 Git）
 │   ├── analyst_forecast/            预测情况（CNRDS 分析师预测）
 │   ├── cfnd/                        CFND 网络新闻量化统计
 │   ├── wsvi/                        WSVI 上市公司网络搜索指数
@@ -120,7 +120,7 @@ PDF 元数据已核：作者 `Yangyi Liu`，创建日期分别为 2026-04-09 / 2
 
 ```bash
 cd materials
-shasum -a 256 -c SHA256SUMS.txt     # 10 条 OK；未收录的 42 条报 missing，属预期
+shasum -a 256 -c SHA256SUMS.txt     # 52 条全 OK
 ```
 
 逐文件来源、字节数、sha256、源路径、接收批次见 `MANIFEST.csv`（UTF-8 with BOM，Excel 可直接打开）。
