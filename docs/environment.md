@@ -53,7 +53,9 @@ make env        # uv venv --python 3.13 .venv + uv pip install -r requirements.t
 | `make selftest` | `pytest peerlab/tests` | 22 passed |
 | `make test` | 全量 `pytest`（`tests/`） | **收集阶段 INTERNALERROR**：`s3_m1_lib` 导入即校验 registry，缺 `configs/parameter_registry.yaml` → `SystemExit(2)` |
 
-`make imports`（即 `python -m peerlab smoke --imports`）的判读：`config` 是被 fail-closed 的 registry 拦下、`missing` 是缺数据/报告目录，两者属预期；`dep`（`ModuleNotFoundError`）与 `other` 才算环境问题。
+`make imports`（即 `python -m peerlab smoke --imports`）会执行每个脚本的模块级代码，部分脚本会在 `reports/data_gates/G0/`、`data/processed/` 下写出文件（如 `drive_batch1_schema.json`）。跑完用 `git status` 检查，把冒烟产物清掉，别和真实结果混在一起。
+
+`make imports` 的判读：`config` 是被 fail-closed 的 registry 拦下、`missing` 是缺数据/报告目录，两者属预期；`dep`（`ModuleNotFoundError`）与 `other` 才算环境问题。
 
 种子协议、实验注册表与结果聚合规则见 `docs/result_pipeline.md`：全局 `SEEDS = (0,1,2,3,4)`，每次运行注入 `PYTHONHASHSEED` 与 random/numpy 种子，脚本自带 `--seed` 的直传。
 
