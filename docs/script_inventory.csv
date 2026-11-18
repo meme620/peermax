@@ -1,0 +1,200 @@
+name,path,dir,role,stage_entry,imported,test_ref,reason,moved_to
+audit_free_sources,scripts/data/audit_free_sources.py,data,stage,yes,,,docs/pipeline.md §3.2 阶段入口,
+build_daily_returns,scripts/data/build_daily_returns.py,data,stage,yes,,,docs/pipeline.md §3.2 阶段入口,
+build_firm_chars,scripts/data/build_firm_chars.py,data,stage,yes,,,docs/pipeline.md §3.2 阶段入口,
+build_id_map,scripts/data/build_id_map.py,data,stage,yes,,,docs/pipeline.md §3.2 阶段入口,
+build_market_equity,scripts/data/build_market_equity.py,data,stage,yes,,,docs/pipeline.md §3.2 阶段入口,
+build_monthly_returns,scripts/data/build_monthly_returns.py,data,stage,yes,,,docs/pipeline.md §3.2 阶段入口,
+build_monthly_returns_drive,scripts/data/build_monthly_returns_drive.py,data,support,,,,抓数/基础 builder 或专用脚本,
+build_monthly_returns_status,scripts/data/build_monthly_returns_status.py,data,library,yes,yes,yes,被其它脚本 import，位置不可动,
+build_product_lexicon,scripts/data/build_product_lexicon.py,data,support,,,,抓数/基础 builder 或专用脚本,
+build_share_capital_v2,scripts/data/build_share_capital_v2.py,data,support,,,,抓数/基础 builder 或专用脚本,
+build_sw2_industry_map,scripts/data/build_sw2_industry_map.py,data,stage,yes,,,docs/pipeline.md §3.2 阶段入口,
+download_drive_file,scripts/data/download_drive_file.py,data,support,,,,抓数/基础 builder 或专用脚本,
+extract_announcement_events,scripts/data/extract_announcement_events.py,data,support,,,,抓数/基础 builder 或专用脚本,
+extract_ar_product_tables,scripts/data/extract_ar_product_tables.py,data,stage,yes,,,docs/pipeline.md §3.2 阶段入口,
+extract_share_capital,scripts/data/extract_share_capital.py,data,support,,,,抓数/基础 builder 或专用脚本,
+fetch_baostock_financial,scripts/data/fetch_baostock_financial.py,data,support,,,,抓数/基础 builder 或专用脚本,
+fetch_baostock_stocklist,scripts/data/fetch_baostock_stocklist.py,data,support,,,,抓数/基础 builder 或专用脚本,
+fetch_cninfo_announcements,scripts/data/fetch_cninfo_announcements.py,data,support,,,,抓数/基础 builder 或专用脚本,
+fetch_cninfo_annual,scripts/data/fetch_cninfo_annual.py,data,support,,,,抓数/基础 builder 或专用脚本,
+fetch_cninfo_prospectus,scripts/data/fetch_cninfo_prospectus.py,data,support,,,,抓数/基础 builder 或专用脚本,
+fetch_drive_batch1,scripts/data/fetch_drive_batch1.py,data,support,,,,抓数/基础 builder 或专用脚本,
+fetch_eastmoney_announcements,scripts/data/fetch_eastmoney_announcements.py,data,support,,,,抓数/基础 builder 或专用脚本,
+fetch_eastmoney_annual,scripts/data/fetch_eastmoney_annual.py,data,support,,,,抓数/基础 builder 或专用脚本,
+fetch_eastmoney_dragon_tiger,scripts/data/fetch_eastmoney_dragon_tiger.py,data,support,,,,抓数/基础 builder 或专用脚本,
+fetch_eastmoney_finance,scripts/data/fetch_eastmoney_finance.py,data,support,,,,抓数/基础 builder 或专用脚本,
+fetch_em_f10_business,scripts/data/fetch_em_f10_business.py,data,support,,,,抓数/基础 builder 或专用脚本,
+fetch_sogou_lexicon,scripts/data/fetch_sogou_lexicon.py,data,library,,yes,,被其它脚本 import，位置不可动,
+fetch_sw2_industry,scripts/data/fetch_sw2_industry.py,data,support,,,,抓数/基础 builder 或专用脚本,
+fetch_tencent_daily,scripts/data/fetch_tencent_daily.py,data,support,,,,抓数/基础 builder 或专用脚本,
+lexicon_df_stats,scripts/data/lexicon_df_stats.py,data,support,,,,抓数/基础 builder 或专用脚本,
+build_rev_factor,scripts/data_audit/build_rev_factor.py,data_audit,stage,yes,,,docs/pipeline.md §3.2 阶段入口,
+drive_download,scripts/data_audit/drive_download.py,data_audit,analysis,,,,链上分析步骤（未列入阶段命令表）,
+name_history_extract,scripts/data_audit/name_history_extract.py,data_audit,analysis,,,,链上分析步骤（未列入阶段命令表）,
+name_history_refine,scripts/data_audit/name_history_refine.py,data_audit,analysis,,,,链上分析步骤（未列入阶段命令表）,
+p2_1_build_monthly_status,scripts/data_audit/p2_1_build_monthly_status.py,data_audit,stage,yes,,yes,docs/pipeline.md §3.2 阶段入口,
+p2_2_build_max_shadow,scripts/data_audit/p2_2_build_max_shadow.py,data_audit,analysis,,,yes,链上分析步骤（未列入阶段命令表）,
+p2_3_build_adj_max_shadow,scripts/data_audit/p2_3_build_adj_max_shadow.py,data_audit,analysis,,,yes,链上分析步骤（未列入阶段命令表）,
+p2_4_turnover_shadow,scripts/data_audit/p2_4_turnover_shadow.py,data_audit,analysis,,,yes,链上分析步骤（未列入阶段命令表）,
+p2_5_rev_shadow,scripts/data_audit/p2_5_rev_shadow.py,data_audit,analysis,,,yes,链上分析步骤（未列入阶段命令表）,
+p2_6_shadow_m1_compare,scripts/data_audit/p2_6_shadow_m1_compare.py,data_audit,analysis,,,yes,链上分析步骤（未列入阶段命令表）,
+p3_1_build_asof_shadow,scripts/data_audit/p3_1_build_asof_shadow.py,data_audit,library,yes,yes,yes,被其它脚本 import，位置不可动,
+p3_2_build_calibration_shadow,scripts/data_audit/p3_2_build_calibration_shadow.py,data_audit,analysis,,,yes,链上分析步骤（未列入阶段命令表）,
+p3_3_pc_origrule_shadow,scripts/data_audit/p3_3_pc_origrule_shadow.py,data_audit,analysis,,,yes,链上分析步骤（未列入阶段命令表）,
+p3_4_inference_shadow,scripts/data_audit/p3_4_inference_shadow.py,data_audit,analysis,,,yes,链上分析步骤（未列入阶段命令表）,
+p3_5_industry_absorb,scripts/data_audit/p3_5_industry_absorb.py,data_audit,analysis,,,yes,链上分析步骤（未列入阶段命令表）,
+p3_6_shadow_network_m1,scripts/data_audit/p3_6_shadow_network_m1.py,data_audit,analysis,,,yes,链上分析步骤（未列入阶段命令表）,
+p3b_n4_segment,scripts/data_audit/p3b_n4_segment.py,data_audit,analysis,,,,链上分析步骤（未列入阶段命令表）,
+p3b_n6_common_window,scripts/data_audit/p3b_n6_common_window.py,data_audit,analysis,,,,链上分析步骤（未列入阶段命令表）,
+p3b_s2_weight_matrix,scripts/data_audit/p3b_s2_weight_matrix.py,data_audit,stage,yes,,,docs/pipeline.md §3.2 阶段入口,
+p3b_s6_bh,scripts/data_audit/p3b_s6_bh.py,data_audit,analysis,,,,链上分析步骤（未列入阶段命令表）,
+p3b_s7_a9_full,scripts/data_audit/p3b_s7_a9_full.py,data_audit,analysis,,,,链上分析步骤（未列入阶段命令表）,
+p4_1_rewrite_metadata,scripts/data_audit/p4_1_rewrite_metadata.py,data_audit,analysis,,,yes,链上分析步骤（未列入阶段命令表）,
+run_s3a_pipeline,scripts/data_audit/run_s3a_pipeline.py,data_audit,stage,yes,,,docs/pipeline.md §3.2 阶段入口,
+s1_step1_universe,scripts/data_audit/s1_step1_universe.py,data_audit,stage,yes,,,docs/pipeline.md §3.2 阶段入口,
+s1_step2_manifest,scripts/data_audit/s1_step2_manifest.py,data_audit,stage,yes,,,docs/pipeline.md §3.2 阶段入口,
+s1_step3_schema,scripts/data_audit/s1_step3_schema.py,data_audit,stage,yes,,,docs/pipeline.md §3.2 阶段入口,
+s1_step4_coverage,scripts/data_audit/s1_step4_coverage.py,data_audit,stage,yes,,,docs/pipeline.md §3.2 阶段入口,
+s1_step5_gates,scripts/data_audit/s1_step5_gates.py,data_audit,stage,yes,,,docs/pipeline.md §3.2 阶段入口,
+s25_build_factors,scripts/data_audit/s25_build_factors.py,data_audit,stage,yes,,,docs/pipeline.md §3.2 阶段入口,
+s25_full_period_factors,scripts/data_audit/s25_full_period_factors.py,data_audit,stage,yes,,,docs/pipeline.md §3.2 阶段入口,
+s25_validate_factors,scripts/data_audit/s25_validate_factors.py,data_audit,stage,yes,,,docs/pipeline.md §3.2 阶段入口,
+s2_build_daily_panel,scripts/data_audit/s2_build_daily_panel.py,data_audit,stage,yes,,yes,docs/pipeline.md §3.2 阶段入口,
+s2_mv_crosscheck,scripts/data_audit/s2_mv_crosscheck.py,data_audit,stage,yes,,,docs/pipeline.md §3.2 阶段入口,
+s2_step3_quality,scripts/data_audit/s2_step3_quality.py,data_audit,stage,yes,,,docs/pipeline.md §3.2 阶段入口,
+s3_b1_calibrate_tau,scripts/data_audit/s3_b1_calibrate_tau.py,data_audit,stage,yes,,,docs/pipeline.md §3.2 阶段入口,
+s3_b2_backfill_reports,scripts/data_audit/s3_b2_backfill_reports.py,data_audit,analysis,,,,链上分析步骤（未列入阶段命令表）,
+s3_b3_ma_cluster_grid,scripts/data_audit/s3_b3_ma_cluster_grid.py,data_audit,library,yes,yes,,被其它脚本 import，位置不可动,
+s3_b3_ma_freeze,scripts/data_audit/s3_b3_ma_freeze.py,data_audit,stage,yes,,,docs/pipeline.md §3.2 阶段入口,
+s3_build_network,scripts/data_audit/s3_build_network.py,data_audit,stage,yes,,,docs/pipeline.md §3.2 阶段入口,
+s3_code_design_audit,scripts/data_audit/s3_code_design_audit.py,data_audit,oneoff,,,,一次性检查；import data_audit 同级库，原位保留,
+s3_corpus_bridge_reconcile,scripts/data_audit/s3_corpus_bridge_reconcile.py,data_audit,analysis,,,,链上分析步骤（未列入阶段命令表）,
+s3_edge_precision_audit,scripts/data_audit/s3_edge_precision_audit.py,data_audit,library,,yes,,被其它脚本 import，位置不可动,
+s3_edge_precision_sample,scripts/data_audit/s3_edge_precision_sample.py,data_audit,analysis,,,,链上分析步骤（未列入阶段命令表）,
+s3_extract_business,scripts/data_audit/s3_extract_business.py,data_audit,stage,yes,,,docs/pipeline.md §3.2 阶段入口,
+s3_extract_business_v7,scripts/data_audit/s3_extract_business_v7.py,data_audit,stage,yes,,,docs/pipeline.md §3.2 阶段入口,
+s3_extract_mda,scripts/data_audit/s3_extract_mda.py,data_audit,stage,yes,,,docs/pipeline.md §3.2 阶段入口,
+s3_extract_mda_v2,scripts/data_audit/s3_extract_mda_v2.py,data_audit,library,,yes,yes,被其它脚本 import，位置不可动,
+s3_lift_pair_density,scripts/data_audit/s3_lift_pair_density.py,data_audit,library,,yes,,被其它脚本 import，位置不可动,
+s3_m1_1_build_sample,scripts/data_audit/s3_m1_1_build_sample.py,data_audit,stage,yes,,,docs/pipeline.md §3.2 阶段入口,
+s3_m1_2_fm_main,scripts/data_audit/s3_m1_2_fm_main.py,data_audit,library,yes,yes,,被其它脚本 import，位置不可动,
+s3_m1_3_portfolio_shape,scripts/data_audit/s3_m1_3_portfolio_shape.py,data_audit,stage,yes,,,docs/pipeline.md §3.2 阶段入口,
+s3_m1_4_robustness_placebo,scripts/data_audit/s3_m1_4_robustness_placebo.py,data_audit,stage,yes,,,docs/pipeline.md §3.2 阶段入口,
+s3_m1_5_length_industry,scripts/data_audit/s3_m1_5_length_industry.py,data_audit,stage,yes,,,docs/pipeline.md §3.2 阶段入口,
+s3_m1_6_gate_report,scripts/data_audit/s3_m1_6_gate_report.py,data_audit,stage,yes,,,docs/pipeline.md §3.2 阶段入口,
+s3_m1_lib,scripts/data_audit/s3_m1_lib.py,data_audit,library,,yes,yes,被其它脚本 import，位置不可动,
+s3_ma_K_explore,scripts/data_audit/s3_ma_K_explore.py,data_audit,oneoff,,,,一次性检查；import data_audit 同级库，原位保留,
+s3_ma_K_explore2,scripts/data_audit/s3_ma_K_explore2.py,data_audit,oneoff,,,,一次性检查；import data_audit 同级库，原位保留,
+s3_ma_build_edges,scripts/data_audit/s3_ma_build_edges.py,data_audit,stage,yes,,yes,docs/pipeline.md §3.2 阶段入口,
+s3_ma_chapter_cross_audit,scripts/data_audit/s3_ma_chapter_cross_audit.py,data_audit,library,,yes,,被其它脚本 import，位置不可动,
+s3_ma_df_grid,scripts/data_audit/s3_ma_df_grid.py,data_audit,analysis,,,,链上分析步骤（未列入阶段命令表）,
+s3_ma_downstream_consistency,scripts/data_audit/s3_ma_downstream_consistency.py,data_audit,analysis,,,,链上分析步骤（未列入阶段命令表）,
+s3_ma_fulltext_cache_verify,scripts/data_audit/s3_ma_fulltext_cache_verify.py,data_audit,oneoff,,,,一次性检查；import data_audit 同级库，原位保留,
+s3_ma_fulltext_lexicon_df,scripts/data_audit/s3_ma_fulltext_lexicon_df.py,data_audit,analysis,,,,链上分析步骤（未列入阶段命令表）,
+s3_ma_fulltext_panel_build,scripts/data_audit/s3_ma_fulltext_panel_build.py,data_audit,library,,yes,,被其它脚本 import，位置不可动,
+s3_ma_lexicon,scripts/data_audit/s3_ma_lexicon.py,data_audit,library,,yes,,被其它脚本 import，位置不可动,
+s3_ma_lexicon_check,scripts/data_audit/s3_ma_lexicon_check.py,data_audit,oneoff,,,,一次性检查；import data_audit 同级库，原位保留,
+s3_ma_lexicon_df_recompute,scripts/data_audit/s3_ma_lexicon_df_recompute.py,data_audit,analysis,,,,链上分析步骤（未列入阶段命令表）,
+s3_ma_pc_hhi,scripts/data_audit/s3_ma_pc_hhi.py,data_audit,analysis,,,,链上分析步骤（未列入阶段命令表）,
+s3_ma_segment_robustness,scripts/data_audit/s3_ma_segment_robustness.py,data_audit,analysis,,,,链上分析步骤（未列入阶段命令表）,
+s3_ma_vector_diag,scripts/data_audit/s3_ma_vector_diag.py,data_audit,oneoff,,,,一次性检查；import data_audit 同级库，原位保留,
+s3_ma_weighting_cross_audit,scripts/data_audit/s3_ma_weighting_cross_audit.py,data_audit,oneoff,,,,一次性检查；import data_audit 同级库，原位保留,
+s3_mb_build_edges,scripts/data_audit/s3_mb_build_edges.py,data_audit,library,yes,yes,,被其它脚本 import，位置不可动,
+s3_mb_full_matrix,scripts/data_audit/s3_mb_full_matrix.py,data_audit,stage,yes,,,docs/pipeline.md §3.2 阶段入口,
+s3_mda_build_redownload_queue,scripts/data_audit/s3_mda_build_redownload_queue.py,data_audit,analysis,,,,链上分析步骤（未列入阶段命令表）,
+s3_mda_text_dups,scripts/data_audit/s3_mda_text_dups.py,data_audit,analysis,,,,链上分析步骤（未列入阶段命令表）,
+s3_network_analyst_overlap,scripts/data_audit/s3_network_analyst_overlap.py,data_audit,analysis,,,,链上分析步骤（未列入阶段命令表）,
+s3_network_density_null,scripts/data_audit/s3_network_density_null.py,data_audit,analysis,,,,链上分析步骤（未列入阶段命令表）,
+s3_network_prospectus_anchor,scripts/data_audit/s3_network_prospectus_anchor.py,data_audit,analysis,,,,链上分析步骤（未列入阶段命令表）,
+s3_pc_corpus_contrast,scripts/data_audit/s3_pc_corpus_contrast.py,data_audit,analysis,,,,链上分析步骤（未列入阶段命令表）,
+s3_pc_pricing_correspondence,scripts/data_audit/s3_pc_pricing_correspondence.py,data_audit,analysis,,,,链上分析步骤（未列入阶段命令表）,
+s3_pc_sign_diag_h1h8,scripts/data_audit/s3_pc_sign_diag_h1h8.py,data_audit,oneoff,,,,一次性检查；import data_audit 同级库，原位保留,
+s3_sign_reversal_probe_batch1,scripts/data_audit/s3_sign_reversal_probe_batch1.py,data_audit,oneoff,,,,一次性检查；import data_audit 同级库，原位保留,
+s3_teacher_corpus_chapter_scan,scripts/data_audit/s3_teacher_corpus_chapter_scan.py,data_audit,analysis,,,,链上分析步骤（未列入阶段命令表）,
+s3_teacher_corpus_ingest,scripts/data_audit/s3_teacher_corpus_ingest.py,data_audit,analysis,,,yes,链上分析步骤（未列入阶段命令表）,
+s3a_9c_fm_regression,scripts/data_audit/s3a_9c_fm_regression.py,data_audit,analysis,,,,链上分析步骤（未列入阶段命令表）,
+s3a_9e_subsample,scripts/data_audit/s3a_9e_subsample.py,data_audit,analysis,,,,链上分析步骤（未列入阶段命令表）,
+s3a_9g_cffr,scripts/data_audit/s3a_9g_cffr.py,data_audit,analysis,,,,链上分析步骤（未列入阶段命令表）,
+s3a_9h_absorb,scripts/data_audit/s3a_9h_absorb.py,data_audit,analysis,,,,链上分析步骤（未列入阶段命令表）,
+s3a_9i_additional_tests,scripts/data_audit/s3a_9i_additional_tests.py,data_audit,analysis,,,,链上分析步骤（未列入阶段命令表）,
+s3a_9j_extra,scripts/data_audit/s3a_9j_extra.py,data_audit,analysis,,,,链上分析步骤（未列入阶段命令表）,
+s3a_9k_compare,scripts/data_audit/s3a_9k_compare.py,data_audit,oneoff,,,,一次性检查；import data_audit 同级库，原位保留,
+s3a_9k_nofy_build,scripts/data_audit/s3a_9k_nofy_build.py,data_audit,analysis,,,,链上分析步骤（未列入阶段命令表）,
+s3a_9m_cfret2,scripts/data_audit/s3a_9m_cfret2.py,data_audit,analysis,,,,链上分析步骤（未列入阶段命令表）,
+s3a_audit_delisting_20260903,scripts/data_audit/s3a_audit_delisting_20260903.py,data_audit,oneoff,,,,一次性检查；import data_audit 同级库，原位保留,
+s3a_cf_mom_alpha,scripts/data_audit/s3a_cf_mom_alpha.py,data_audit,library,,yes,,被其它脚本 import，位置不可动,
+s3a_cf_mom_replication,scripts/data_audit/s3a_cf_mom_replication.py,data_audit,library,,yes,,被其它脚本 import，位置不可动,
+s3a_fundamental_link,scripts/data_audit/s3a_fundamental_link.py,data_audit,analysis,,,,链上分析步骤（未列入阶段命令表）,
+s3a_gate1_consistency_check,scripts/data_audit/s3a_gate1_consistency_check.py,data_audit,stage,yes,,,docs/pipeline.md §3.2 阶段入口,
+s3a_gate1_entry_audit,scripts/data_audit/s3a_gate1_entry_audit.py,data_audit,stage,yes,,,docs/pipeline.md §3.2 阶段入口,
+s3a_gate1_metadata_audit,scripts/data_audit/s3a_gate1_metadata_audit.py,data_audit,stage,yes,,,docs/pipeline.md §3.2 阶段入口,
+s3a_gate1_provenance_audit,scripts/data_audit/s3a_gate1_provenance_audit.py,data_audit,stage,yes,,,docs/pipeline.md §3.2 阶段入口,
+s3a_gate2_path_registry,scripts/data_audit/s3a_gate2_path_registry.py,data_audit,stage,yes,,,docs/pipeline.md §3.2 阶段入口,
+s3a_gate2_pit_audit,scripts/data_audit/s3a_gate2_pit_audit.py,data_audit,stage,yes,,,docs/pipeline.md §3.2 阶段入口,
+s3a_gate5_closure_check,scripts/data_audit/s3a_gate5_closure_check.py,data_audit,stage,yes,,,docs/pipeline.md §3.2 阶段入口,
+s3a_industry_contrast,scripts/data_audit/s3a_industry_contrast.py,data_audit,analysis,,,,链上分析步骤（未列入阶段命令表）,
+s3a_meta,scripts/data_audit/s3a_meta.py,data_audit,library,,yes,,被其它脚本 import，位置不可动,
+s3a_npm_replication,scripts/data_audit/s3a_npm_replication.py,data_audit,library,,yes,,被其它脚本 import，位置不可动,
+s3a_panel_missing_analysis,scripts/data_audit/s3a_panel_missing_analysis.py,data_audit,analysis,,,,链上分析步骤（未列入阶段命令表）,
+s3a_read_xlsx,scripts/data_audit/s3a_read_xlsx.py,data_audit,library,,yes,,被其它脚本 import，位置不可动,
+s3a_rev_crosscheck,scripts/data_audit/s3a_rev_crosscheck.py,data_audit,oneoff,,,,一次性检查；import data_audit 同级库，原位保留,
+s3a_sens_specs,scripts/data_audit/s3a_sens_specs.py,data_audit,analysis,,,,链上分析步骤（未列入阶段命令表）,
+s3a_st_sensitivity,scripts/data_audit/s3a_st_sensitivity.py,data_audit,oneoff,,,,一次性检查；import data_audit 同级库，原位保留,
+s3a_step10_panel_merge,scripts/data_audit/s3a_step10_panel_merge.py,data_audit,stage,yes,,,docs/pipeline.md §3.2 阶段入口,
+s3a_step11_merge_chars,scripts/data_audit/s3a_step11_merge_chars.py,data_audit,stage,yes,,,docs/pipeline.md §3.2 阶段入口,
+s3a_step1_ingest,scripts/data_audit/s3a_step1_ingest.py,data_audit,analysis,,,,链上分析步骤（未列入阶段命令表）,
+s3a_step3_clean,scripts/data_audit/s3a_step3_clean.py,data_audit,analysis,,,,链上分析步骤（未列入阶段命令表）,
+s3a_step4_dedup,scripts/data_audit/s3a_step4_dedup.py,data_audit,analysis,,,,链上分析步骤（未列入阶段命令表）,
+s3a_step5_snapshot,scripts/data_audit/s3a_step5_snapshot.py,data_audit,analysis,,,,链上分析步骤（未列入阶段命令表）,
+s3a_step67_edges,scripts/data_audit/s3a_step67_edges.py,data_audit,analysis,,,,链上分析步骤（未列入阶段命令表）,
+s3a_step9_derived,scripts/data_audit/s3a_step9_derived.py,data_audit,analysis,,,,链上分析步骤（未列入阶段命令表）,
+s4_step1_max,scripts/data_audit/s4_step1_max.py,data_audit,library,yes,yes,yes,被其它脚本 import，位置不可动,
+s4_step2_acceptance,scripts/data_audit/s4_step2_acceptance.py,data_audit,stage,yes,,,docs/pipeline.md §3.2 阶段入口,
+s4_step2_peermax,scripts/data_audit/s4_step2_peermax.py,data_audit,stage,yes,,,docs/pipeline.md §3.2 阶段入口,
+s4_step2_peermax_formal,scripts/data_audit/s4_step2_peermax_formal.py,data_audit,library,yes,yes,yes,被其它脚本 import，位置不可动,
+make_s3a_brief_pptx,scripts/deliverables/make_s3a_brief_pptx.py,deliverables,deliverable,,,,抓数/基础 builder 或专用脚本,
+tnic_structure_summary,scripts/external/tnic_structure_summary.py,external,external,,,,抓数/基础 builder 或专用脚本,
+audit_drive_batch1,scripts/oneoff/audit_drive_batch1.py,oneoff,oneoff,,,,一次性检查/审计/复核，已移入 scripts/oneoff/,scripts/oneoff/audit_drive_batch1.py
+audit_drive_crosscheck,scripts/oneoff/audit_drive_crosscheck.py,oneoff,oneoff,,,,一次性检查/审计/复核，已移入 scripts/oneoff/,scripts/oneoff/audit_drive_crosscheck.py
+audit_schema,scripts/oneoff/audit_schema.py,oneoff,oneoff,,,,一次性检查/审计/复核，已移入 scripts/oneoff/,scripts/oneoff/audit_schema.py
+audit_sw2_with_ths,scripts/oneoff/audit_sw2_with_ths.py,oneoff,oneoff,,,,一次性检查/审计/复核，已移入 scripts/oneoff/,scripts/oneoff/audit_sw2_with_ths.py
+check_link_audit,scripts/oneoff/check_link_audit.py,oneoff,oneoff,,,,一次性检查/审计/复核，已移入 scripts/oneoff/,scripts/oneoff/check_link_audit.py
+drive_batch1_crosscheck,scripts/oneoff/drive_batch1_crosscheck.py,oneoff,oneoff,,,,一次性检查/审计/复核，已移入 scripts/oneoff/,scripts/oneoff/drive_batch1_crosscheck.py
+drive_batch2_crosscheck,scripts/oneoff/drive_batch2_crosscheck.py,oneoff,oneoff,,,,一次性检查/审计/复核，已移入 scripts/oneoff/,scripts/oneoff/drive_batch2_crosscheck.py
+run_universe_audit,scripts/oneoff/run_universe_audit.py,oneoff,oneoff,,,,一次性检查/审计/复核，已移入 scripts/oneoff/,scripts/oneoff/run_universe_audit.py
+s3_b2_acceptance_check,scripts/oneoff/s3_b2_acceptance_check.py,oneoff,oneoff,,,,一次性检查/审计/复核，已移入 scripts/oneoff/,scripts/oneoff/s3_b2_acceptance_check.py
+s3_bp_mainline_audit,scripts/oneoff/s3_bp_mainline_audit.py,oneoff,oneoff,,,,一次性检查/审计/复核，已移入 scripts/oneoff/,scripts/oneoff/s3_bp_mainline_audit.py
+s3_cross_audit_attribution,scripts/oneoff/s3_cross_audit_attribution.py,oneoff,oneoff,,,,一次性检查/审计/复核，已移入 scripts/oneoff/,scripts/oneoff/s3_cross_audit_attribution.py
+s3_data_integrity_audit,scripts/oneoff/s3_data_integrity_audit.py,oneoff,oneoff,,,,一次性检查/审计/复核，已移入 scripts/oneoff/,scripts/oneoff/s3_data_integrity_audit.py
+s3_ma_acceptance_check,scripts/oneoff/s3_ma_acceptance_check.py,oneoff,oneoff,,,,一次性检查/审计/复核，已移入 scripts/oneoff/,scripts/oneoff/s3_ma_acceptance_check.py
+s3_ma_fulltext_panel_audit,scripts/oneoff/s3_ma_fulltext_panel_audit.py,oneoff,oneoff,,,,一次性检查/审计/复核，已移入 scripts/oneoff/,scripts/oneoff/s3_ma_fulltext_panel_audit.py
+s3_mb_smoketest,scripts/oneoff/s3_mb_smoketest.py,oneoff,oneoff,,,,一次性检查/审计/复核，已移入 scripts/oneoff/,scripts/oneoff/s3_mb_smoketest.py
+s3_mda_identity_confirm,scripts/oneoff/s3_mda_identity_confirm.py,oneoff,oneoff,,,,一次性检查/审计/复核，已移入 scripts/oneoff/,scripts/oneoff/s3_mda_identity_confirm.py
+s3_mda_identity_pass2,scripts/oneoff/s3_mda_identity_pass2.py,oneoff,oneoff,,,,一次性检查/审计/复核，已移入 scripts/oneoff/,scripts/oneoff/s3_mda_identity_pass2.py
+s3_mda_integrity_audit,scripts/oneoff/s3_mda_integrity_audit.py,oneoff,oneoff,,,,一次性检查/审计/复核，已移入 scripts/oneoff/,scripts/oneoff/s3_mda_integrity_audit.py
+s3_network_cross_audit,scripts/oneoff/s3_network_cross_audit.py,oneoff,oneoff,,,,一次性检查/审计/复核，已移入 scripts/oneoff/,scripts/oneoff/s3_network_cross_audit.py
+s3_network_diagnostics,scripts/oneoff/s3_network_diagnostics.py,oneoff,oneoff,,,,一次性检查/审计/复核，已移入 scripts/oneoff/,scripts/oneoff/s3_network_diagnostics.py
+s3_sw2_third_source_recheck,scripts/oneoff/s3_sw2_third_source_recheck.py,oneoff,oneoff,,,,一次性检查/审计/复核，已移入 scripts/oneoff/,scripts/oneoff/s3_sw2_third_source_recheck.py
+s3_text_audit,scripts/oneoff/s3_text_audit.py,oneoff,oneoff,,,,一次性检查/审计/复核，已移入 scripts/oneoff/,scripts/oneoff/s3_text_audit.py
+s3a_cross_broker_diag,scripts/oneoff/s3a_cross_broker_diag.py,oneoff,oneoff,,,,一次性检查/审计/复核，已移入 scripts/oneoff/,scripts/oneoff/s3a_cross_broker_diag.py
+s3a_crosscheck_b_reimpl,scripts/oneoff/s3a_crosscheck_b_reimpl.py,oneoff,oneoff,,,,一次性检查/审计/复核，已移入 scripts/oneoff/,scripts/oneoff/s3a_crosscheck_b_reimpl.py
+s3a_crosscheck_c_auditor,scripts/oneoff/s3a_crosscheck_c_auditor.py,oneoff,oneoff,,,,一次性检查/审计/复核，已移入 scripts/oneoff/,scripts/oneoff/s3a_crosscheck_c_auditor.py
+s3a_crosscheck_summarize,scripts/oneoff/s3a_crosscheck_summarize.py,oneoff,oneoff,,,,一次性检查/审计/复核，已移入 scripts/oneoff/,scripts/oneoff/s3a_crosscheck_summarize.py
+s3a_identity_audit,scripts/oneoff/s3a_identity_audit.py,oneoff,oneoff,,,,一次性检查/审计/复核，已移入 scripts/oneoff/,scripts/oneoff/s3a_identity_audit.py
+s3a_identity_conflict_sensitivity,scripts/oneoff/s3a_identity_conflict_sensitivity.py,oneoff,oneoff,,,,一次性检查/审计/复核，已移入 scripts/oneoff/,scripts/oneoff/s3a_identity_conflict_sensitivity.py
+s3a_smoketest_a1_format_check,scripts/oneoff/s3a_smoketest_a1_format_check.py,oneoff,oneoff,,,,一次性检查/审计/复核，已移入 scripts/oneoff/,scripts/oneoff/s3a_smoketest_a1_format_check.py
+s3a_smoketest_a2_dedup_grain,scripts/oneoff/s3a_smoketest_a2_dedup_grain.py,oneoff,oneoff,,,,一次性检查/审计/复核，已移入 scripts/oneoff/,scripts/oneoff/s3a_smoketest_a2_dedup_grain.py
+s3a_smoketest_anndats_audit,scripts/oneoff/s3a_smoketest_anndats_audit.py,oneoff,oneoff,,,,一次性检查/审计/复核，已移入 scripts/oneoff/,scripts/oneoff/s3a_smoketest_anndats_audit.py
+s3a_smoketest_b2_control_redundancy,scripts/oneoff/s3a_smoketest_b2_control_redundancy.py,oneoff,oneoff,,,,一次性检查/审计/复核，已移入 scripts/oneoff/,scripts/oneoff/s3a_smoketest_b2_control_redundancy.py
+s3a_smoketest_c3_weight_coverage,scripts/oneoff/s3a_smoketest_c3_weight_coverage.py,oneoff,oneoff,,,,一次性检查/审计/复核，已移入 scripts/oneoff/,scripts/oneoff/s3a_smoketest_c3_weight_coverage.py
+s3a_smoketest_c4_min_months,scripts/oneoff/s3a_smoketest_c4_min_months.py,oneoff,oneoff,,,,一次性检查/审计/复核，已移入 scripts/oneoff/,scripts/oneoff/s3a_smoketest_c4_min_months.py
+s3a_smoketest_centrality_corr,scripts/oneoff/s3a_smoketest_centrality_corr.py,oneoff,oneoff,,,,一次性检查/审计/复核，已移入 scripts/oneoff/,scripts/oneoff/s3a_smoketest_centrality_corr.py
+s3a_smoketest_cf_filters,scripts/oneoff/s3a_smoketest_cf_filters.py,oneoff,oneoff,,,,一次性检查/审计/复核，已移入 scripts/oneoff/,scripts/oneoff/s3a_smoketest_cf_filters.py
+s3a_smoketest_cf_mom_no_super,scripts/oneoff/s3a_smoketest_cf_mom_no_super.py,oneoff,oneoff,,,,一次性检查/审计/复核，已移入 scripts/oneoff/,scripts/oneoff/s3a_smoketest_cf_mom_no_super.py
+s3a_smoketest_identity_threshold,scripts/oneoff/s3a_smoketest_identity_threshold.py,oneoff,oneoff,,,,一次性检查/审计/复核，已移入 scripts/oneoff/,scripts/oneoff/s3a_smoketest_identity_threshold.py
+s3a_smoketest_no_top1_variants,scripts/oneoff/s3a_smoketest_no_top1_variants.py,oneoff,oneoff,,,,一次性检查/审计/复核，已移入 scripts/oneoff/,scripts/oneoff/s3a_smoketest_no_top1_variants.py
+s3a_smoketest_rev_variants,scripts/oneoff/s3a_smoketest_rev_variants.py,oneoff,oneoff,,,,一次性检查/审计/复核，已移入 scripts/oneoff/,scripts/oneoff/s3a_smoketest_rev_variants.py
+s3a_smoketest_window_sensitivity,scripts/oneoff/s3a_smoketest_window_sensitivity.py,oneoff,oneoff,,,,一次性检查/审计/复核，已移入 scripts/oneoff/,scripts/oneoff/s3a_smoketest_window_sensitivity.py
+s3a_step2_audit,scripts/oneoff/s3a_step2_audit.py,oneoff,oneoff,,,,一次性检查/审计/复核，已移入 scripts/oneoff/,scripts/oneoff/s3a_step2_audit.py
+s3a_step8_diag,scripts/oneoff/s3a_step8_diag.py,oneoff,oneoff,,,,一次性检查/审计/复核，已移入 scripts/oneoff/,scripts/oneoff/s3a_step8_diag.py

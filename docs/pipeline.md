@@ -20,7 +20,7 @@ PeerMAX 项目的**计算链代码只读快照**：原始数据抓取 → 清洗
 | `scripts/deliverables/` | 1 | 23,016 | 420 | 仅 `make_s3a_brief_pptx.py`（被 Gate5 读源码，见 §8） |
 | `tests/` | 33 | 446,620 | 9,722 | 契约测试（33 模块；主仓库当前收集 568 个 test） |
 
-与仓库其它部分的分工：`ref/proposal/` 是立项/研究计划文档（PDF、TeX），本快照不含叙述性文档；老师提供的原始数据包（分析师预测、CFND、WSVI、老师 MD&A、申万分类、Google Drive 共享）在 `data/raw/{analyst,cfnd,wsvi,teacher,drive}` 与 `data/external/`，代码读的正是这些路径；落盘位置与快照日期见 `docs/materials.md`。
+与仓库其它部分的分工：`ref/proposals/` 是立项/研究计划文档（PDF、TeX），本快照不含叙述性文档；老师提供的原始数据包（分析师预测、CFND、WSVI、老师 MD&A、申万分类、Google Drive 共享）在 `data/raw/{analyst,cfnd,wsvi,teacher,drive}` 与 `data/external/`，代码读的正是这些路径；落盘位置与快照日期见 `docs/materials.md`。
 
 ## 2. 目录结构
 

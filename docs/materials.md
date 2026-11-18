@@ -13,9 +13,9 @@
 ```text
 仓库根/
 ├── ref/
-│   ├── proposal/                        本人撰写的立项/研究计划（5 个）
-│   ├── teacher/                         老师团队提供的方法说明与参考论文（3 个）
-│   └── team/                            组内/合作者提供的论文（2 个）
+│   ├── proposals/                       本人撰写的立项/研究计划（5 个）
+│   ├── teacher-materials/               老师团队提供的方法说明与参考论文（3 个）
+│   └── team-papers/                     组内/合作者提供的论文（2 个）
 └── data/
     ├── raw/analyst/                     预测情况（CNRDS 分析师预测）
     ├── raw/cfnd/                        CFND 网络新闻量化统计
@@ -27,7 +27,7 @@
 
 ## 2. 老师提供的材料
 
-### 2.1 方法说明与参考论文（`ref/teacher/`）
+### 2.1 方法说明与参考论文（`ref/teacher-materials/`）
 
 | 文件 | 大小 | 说明 |
 |---|---|---|
@@ -60,7 +60,7 @@
 
 来源证据（主仓库）：`reports/data_gates/G0/drive_batch1_report.md` 至 `drive_batch4_report.md` 均记录「数据源：Google Drive `data sharing`（老师提供）」。
 
-## 3. 立项文档（`ref/proposal/`）
+## 3. 立项文档（`ref/proposals/`）
 
 **注意：这几份 proposal 的作者是 Yangyi Liu（本人），不是老师撰写。** 收入本仓库是因为它们是项目立项/研究设计输入。
 
@@ -74,7 +74,7 @@
 
 PDF 元数据已核：作者 `Yangyi Liu`，创建日期分别为 2026-04-09 / 2026-07-13 / 2026-08-05。
 
-## 4. 组内/合作者提供（`ref/team/`）
+## 4. 组内/合作者提供（`ref/team-papers/`）
 
 | 文件 | 大小 | 说明 |
 |---|---|---|
