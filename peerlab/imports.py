@@ -53,7 +53,23 @@ def targets(root: pathlib.Path) -> list[pathlib.Path]:
     return sorted(p for p in (root / 'scripts').rglob('*.py') if '__pycache__' not in p.parts)
 
 
-def run(root: pathlib.Path = ROOT, jobs: int = 8, timeout: int = 180) -> int:
+WATCH_DIRS = ('reports/data_gates/G0', 'data/processed', 'artifacts')
+
+
+def _snapshot(root: pathlib.Path) -> set:
+    seen = set()
+    for rel in WATCH_DIRS:
+        base = root / rel
+        if base.is_dir():
+            for path in base.rglob('*'):
+                if path.is_file():
+                    seen.add(path.relative_to(root).as_posix())
+    return seen
+
+
+def run(root: pathlib.Path = ROOT, jobs: int = 8, timeout: int = 180,
+        clean: bool = False) -> int:
+    before = _snapshot(root)
     files = targets(root)
     results = []
     with futures.ThreadPoolExecutor(max_workers=jobs) as pool:
@@ -68,6 +84,23 @@ def run(root: pathlib.Path = ROOT, jobs: int = 8, timeout: int = 180) -> int:
     for kind in ('dep', 'other'):
         for rel, _, detail in buckets.get(kind, []):
             print(f'  [{kind}] {rel}: {detail}')
+    created = sorted(_snapshot(root) - before)
+    if created:
+        action = '已清理' if clean else '未清理（加 --clean 自动删除）'
+        print(f'导入过程写出 {len(created)} 个文件，{action}：')
+        for rel in created:
+            print('  ' + rel)
+        if clean:
+            for rel in created:
+                (root / rel).unlink(missing_ok=True)
+            for rel in WATCH_DIRS:
+                base = root / rel
+                if base.is_dir():
+                    for path in sorted(base.rglob('*'), reverse=True):
+                        if path.is_dir() and not any(path.iterdir()):
+                            path.rmdir()
+                    if base.is_dir() and not any(base.iterdir()):
+                        base.rmdir()
     failures = len(buckets.get('dep', [])) + len(buckets.get('other', []))
     print(chr(10) + '结论:', '通过' if failures == 0 else f'{failures} 个真失败')
     return 0 if failures == 0 else 1

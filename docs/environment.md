@@ -53,7 +53,7 @@ make env        # uv venv --python 3.13 .venv + uv pip install -r requirements.t
 | `make selftest` | `pytest peerlab/tests` | 22 passed |
 | `make test` | 全量 `pytest`（`tests/`） | **收集阶段 INTERNALERROR**：`s3_m1_lib` 导入即校验 registry，缺 `configs/parameter_registry.yaml` → `SystemExit(2)` |
 
-`make imports`（即 `python -m peerlab smoke --imports`）会执行每个脚本的模块级代码，部分脚本会在 `reports/data_gates/G0/`、`data/processed/` 下写出文件（如 `drive_batch1_schema.json`）。跑完用 `git status` 检查，把冒烟产物清掉，别和真实结果混在一起。
+`make imports`（即 `python -m peerlab smoke --imports --clean`）会执行每个脚本的模块级代码，部分脚本会在 `reports/data_gates/G0/`、`data/processed/` 下写出文件（如 `drive_batch1_schema.json`）。命令跑完会列出这些文件并删除；不加 `--clean` 时只列出，便于先看脚本写了什么。
 
 `make imports` 的判读：`config` 是被 fail-closed 的 registry 拦下、`missing` 是缺数据/报告目录，两者属预期；`dep`（`ModuleNotFoundError`）与 `other` 才算环境问题。
 

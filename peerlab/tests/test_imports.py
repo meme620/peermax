@@ -6,6 +6,21 @@ def test_classify_config_when_registry_missing():
     assert imports.classify(2, stderr) == 'config'
 
 
+def test_imports_clean_removes_files_written_during_import(tmp_path):
+    (tmp_path / 'scripts').mkdir()
+    (tmp_path / 'reports/data_gates/G0').mkdir(parents=True)
+    (tmp_path / 'scripts/writer.py').write_text(
+        "from pathlib import Path
+"
+        "Path('reports/data_gates/G0/probe.json').write_text('{}')
+",
+        encoding='utf-8',
+    )
+    code = imports.run(tmp_path, jobs=1, clean=True)
+    assert code == 0
+    assert not (tmp_path / 'reports/data_gates/G0/probe.json').exists()
+
+
 def test_classify_dependency_and_missing():
     assert imports.classify(1, "ModuleNotFoundError: No module named 'yaml'") == 'dep'
     assert imports.classify(1, 'FileNotFoundError: data/x.csv') == 'missing'

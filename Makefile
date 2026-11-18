@@ -10,7 +10,7 @@ doctor:
 	$(PY) -m peerlab doctor
 
 imports:
-	$(PY) -m peerlab smoke --imports
+	$(PY) -m peerlab smoke --imports --clean
 
 smoke:
 	$(PY) -m peerlab smoke

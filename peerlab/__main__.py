@@ -96,7 +96,7 @@ def cmd_run_all(args) -> int:
 
 def cmd_smoke(args) -> int:
     if args.imports:
-        return imports.run(ROOT)
+        return imports.run(ROOT, clean=args.clean)
     targets = [registry.get(args.exp)] if args.exp else list(registry.EXPERIMENTS)
     report = {'configs_missing': [], 'experiments': []}
     for name in registry.CONFIG_FILES:
@@ -173,6 +173,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_smoke = sub.add_parser('smoke', aliases=['-smoke'], help='冒烟：L0 就绪检查或 --imports 逐脚本导入')
     p_smoke.add_argument('--exp', default=None)
     p_smoke.add_argument('--imports', action='store_true', help='逐个导入 scripts/ 下脚本')
+    p_smoke.add_argument('--clean', action='store_true', help='删除导入过程写出的文件')
     p_smoke.set_defaults(func=cmd_smoke)
 
     p_doctor = sub.add_parser('doctor', help='解释器 / 依赖 / configs / 数据自检')
