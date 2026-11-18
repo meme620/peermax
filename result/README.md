@@ -21,7 +21,7 @@
 ```bash
 python -m peerlab status              # 每个实验缺什么
 python -m peerlab smoke               # L0 就绪检查，写 smoke/report.md
-python -m peerlab run --exp m1-main --seed 0
+python -m peerlab run --exp fm-main-table --seed 0
 python -m peerlab run-all             # 全部实验 × SEEDS=(0,1,2,3,4)
 python -m peerlab report              # 重算 tables/ 与 summary.md
 ```
