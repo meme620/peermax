@@ -46,11 +46,15 @@ make env        # uv venv --python 3.13 .venv + uv pip install -r requirements.t
 | 命令 | 做什么 | 2026-11-18 结果 |
 |---|---|---|
 | `make preflight` | 解释器 / 14 个依赖 / 6 个 configs / 数据目录，三块一次打印 | env 通过；configs 6 个缺失；raw 目录 5/14 就绪 |
-| `make smoke` | 逐个导入 `scripts/` 下 199 个脚本 | 145 ok、24 config、30 missing、**0 dep、0 other** |
-| `make selftest` | `pytest tools`（preflight 自身用例） | 5 passed |
+| `make imports` | 逐个导入 `scripts/` 下 199 个脚本 | 145 ok、24 config、30 missing、**0 dep、0 other** |
+| `make smoke` | peerlab L0：10 个实验逐个判脚本与输入是否就绪 | 10 个全部 blocked（缺 configs），退出码 3 |
+| `make status` | 逐实验列出缺什么 | 0/10 就绪 |
+| `make selftest` | `pytest tools peerlab/tests` | 16 passed |
 | `make test` | 全量 `pytest`（`tests/`） | **收集阶段 INTERNALERROR**：`s3_m1_lib` 导入即校验 registry，缺 `configs/parameter_registry.yaml` → `SystemExit(2)` |
 
-`make smoke` 的判读：`config` 是被 fail-closed 的 registry 拦下、`missing` 是缺数据/报告目录，两者属预期；`dep`（`ModuleNotFoundError`）与 `other` 才算环境问题。
+`make imports` 的判读：`config` 是被 fail-closed 的 registry 拦下、`missing` 是缺数据/报告目录，两者属预期；`dep`（`ModuleNotFoundError`）与 `other` 才算环境问题。
+
+种子协议、实验注册表与结果聚合规则见 `docs/result_pipeline.md`：全局 `SEEDS = (0,1,2,3,4)`，每次运行注入 `PYTHONHASHSEED` 与 random/numpy 种子，脚本自带 `--seed` 的直传。
 
 `make preflight` 的退出码：env 或 configs 不通过返回 1；data 级只报告不判失败，因为数据完备性取决于仓库外的决定。
 

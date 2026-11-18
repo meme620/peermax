@@ -7,3 +7,7 @@ __pycache__/
 # 数据载荷与临时产物：不入库
 data/
 artifacts/
+
+# 运行记录与冒烟产物：不入库（index.json、tables/、summary.md 入库）
+result/runs/
+result/smoke/

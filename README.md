@@ -15,6 +15,8 @@ A 股产品市场同侪的彩票型收益（MAX）溢出研究：计算链代码
 | `data/` | 数据根：`raw/` 原始输入、`external/` 外部参照、`processed/` 派生（不入 Git） |
 | `configs/` | 冻结参数与版本锚（待主仓库提供） |
 | `tools/` | `preflight.py` 环境自检、`smoke_import.py` 导入冒烟、`test_preflight.py` 自检用例 |
+| `peerlab/` | 执行 CLI：实验注册、种子注入、运行记录、结果聚合，`python -m peerlab --help` |
+| `result/` | 结果层：`tables/` 跨种子聚合表、`summary.md` 摘要、`runs/` 运行记录（见 `result/README.md`） |
 | `Makefile` `requirements.txt` `.python-version` `pytest.ini` | 环境定义 |
 
 ## 快速开始
@@ -22,8 +24,12 @@ A 股产品市场同侪的彩票型收益（MAX）溢出研究：计算链代码
 ```bash
 make env          # 建 .venv（Python 3.13）并装 requirements.txt
 make preflight    # 解释器 / 依赖 / configs / 数据 四块一次打印
-make smoke        # 逐个导入 scripts/ 下 199 个脚本
-make selftest     # preflight 自身的 5 个用例
+make imports      # 逐个导入 scripts/ 下 199 个脚本
+make smoke        # peerlab L0 冒烟：10 个实验逐个判就绪
+make status       # 每个实验缺什么
+make run-all      # 全部实验 × SEEDS=(0,1,2,3,4)，当前全部 blocked
+make report       # 重算 result/tables 与 summary.md
+make selftest     # preflight 与 peerlab 的单测
 ```
 
 ## 当前状态
