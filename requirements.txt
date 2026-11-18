@@ -1,0 +1,46 @@
+# PeerMAX 计算链依赖
+# 解释器：Python 3.13（见 .python-version）
+# 解析与验证：2026-11-18，uv 0.12.3；验证方式见 docs/environment.md
+# pandas 锁 2.x 的理由见 docs/environment.md
+
+# ---- 直接依赖（14）----
+# 核心
+pandas==2.3.3
+numpy==2.5.5
+scipy==1.18.1
+scikit-learn==1.9.1
+PyYAML==6.0.3
+pyarrow==21.0.0
+pytest==8.4.2
+
+# 条件依赖：分词、词库匹配、PDF 文本层、PPTX
+jieba==0.42.1
+pyahocorasick==2.3.1
+pymupdf==1.28.2
+pdfminer-six==20260107
+fonttools==4.68.0
+python-pptx==1.0.2
+
+# 仅抓数
+baostock==0.9.4
+
+# ---- 传递依赖（uv pip freeze）----
+cffi==2.1.1
+charset-normalizer==3.5.2
+cloudpickle==3.1.3
+cryptography==50.0.2
+iniconfig==2.3.1
+joblib==1.6.0
+lxml==6.1.3
+narwhals==2.29.0
+packaging==26.3
+pillow==13.0.0
+pluggy==1.7.0
+pycparser==3.12
+pygments==2.21.0
+python-dateutil==4.0.0
+pytz==2026.6
+threadpoolctl==3.8.0
+typing-extensions==4.16.0
+tzdata==2026.6
+xlsxwriter==3.3.1
