@@ -1,0 +1,12 @@
+scope_card_id: SC-2026-11-18-v1
+primary_treatment: PeerMAXraw
+primary_outcome: R_next
+sample_window: 2015-01..2023-12
+unit: firm-month
+horizon: next_month
+claim_ceiling: M1_headline 与 M1_portfolio；下游 claim 需另登记
+blocked_claims:
+  - S3A_FULL_REPLICATION
+meta:
+  baseline_date: '2026-11-18'
+  note: 新基线重建，数值口径随 registry 走

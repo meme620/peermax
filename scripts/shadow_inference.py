@@ -77,7 +77,7 @@ import numpy as np
 import pandas as pd
 from pricing_lib import (  # noqa: E402
     assert_m1_inputs_sha, fm_regression, newey_west, param_value, require, sha256_file,
-    two_sided_p, _ols,
+    two_sided_p, winsor_bounds, _ols,
 )
 from peermax_panel_build import (  # noqa: E402
     ARGMAX, EXCLUDE_QUAL, RETURNS, load_versions, select_version,
@@ -88,7 +88,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from pricing_lib import (  # noqa: E402
     assert_m1_inputs_sha, fm_regression, newey_west, param_value, require, sha256_file,
-    two_sided_p, _ols,
+    two_sided_p, winsor_bounds, _ols,
 )
 import csv
 import json
@@ -201,8 +201,7 @@ M1_REG = param_value('m1_sample_and_spec_registry')
 
 MIN_N = M1_REG['min_focal_count_per_month']
 
-WINSOR = (float(WINSOR[0]) if isinstance(WINSOR, (list, tuple)) else 0.01,
-          float(WINSOR[1]) if isinstance(WINSOR, (list, tuple)) else 0.99)
+WINSOR = winsor_bounds()
 
 REWIRE_REPS_REG = param_value('rewiring_reps')      # registry headline_value = 1000（登记值，本脚本不改）
 
@@ -1218,7 +1217,7 @@ import pandas as pd
 
 from pricing_lib import (  # noqa: E402
     assert_m1_inputs_sha, fm_regression, newey_west, param_value, require, sha256_file,
-    two_sided_p, _ols,
+    two_sided_p, winsor_bounds, _ols,
 )
 from peermax_panel_build import (  # noqa: E402
     ARGMAX, EXCLUDE_QUAL, RETURNS, load_versions, select_version,

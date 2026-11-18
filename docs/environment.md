@@ -46,12 +46,12 @@ make env        # uv venv --python 3.13 .venv + uv pip install -r requirements.t
 | 命令 | 做什么 | 2026-11-18 结果 |
 |---|---|---|
 | `make preflight` | 解释器 / 14 个依赖 / 6 个 configs / 数据目录，三块一次打印 | env 通过；configs 6 个缺失；raw 目录 5/14 就绪 |
-| `make imports` | 逐个导入 `scripts/` 下 203 个脚本 | 150 ok、24 config、29 missing、**0 dep、0 other** |
+| `make imports` | 逐个导入 `scripts/` 下 203 个脚本 | 192 ok、0 config、11 missing、**0 dep、0 other** |
 | `make smoke` | peerlab L0：10 个实验逐个判脚本与输入是否就绪 | 10 个全部 blocked（缺 configs），退出码 3 |
 | `make status` | 逐实验列出缺什么 | 0/10 就绪 |
 | `make lint` | 命名与实验文档规范检查 | 通过 |
 | `make selftest` | `pytest tests/test_peerlab_*.py tests/test_script_utils.py` | 34 passed |
-| `make test` | 全量 `pytest`（`tests/`） | **收集阶段 INTERNALERROR**：`pricing_lib` 导入即校验 registry，缺 `configs/parameter_registry.yaml` → `SystemExit(2)` |
+| `make test` | 全量 `pytest`（`tests/`） | 配置已就位，收集不再中断；当前 309 passed / 123 failed / 149 errors，全部因 `data/processed/` 与 `reports/` 为空 |
 
 `make imports`（即 `python -m peerlab smoke --imports --clean`）会执行每个脚本的模块级代码，部分脚本会在 `reports/data_gates/G0/`、`data/processed/` 下写出文件（如 `drive_batch1_schema.json`）。命令跑完会列出这些文件并删除；不加 `--clean` 时只列出，便于先看脚本写了什么。
 
@@ -67,7 +67,7 @@ make env        # uv venv --python 3.13 .venv + uv pip install -r requirements.t
 |---|---|---|
 | T1 环境 | venv 可重建、依赖齐、脚本全部能导入 | 达成 |
 | T2 数据 | 教师数据在代码读取的路径 | 达成（42 个文件，5 个 raw 目录 + external） |
-| T3 配置 | `configs/` 六个 YAML 到位 | **未达成**：需主仓库提供，不可重建 |
+| T3 配置 | `configs/` 六个 YAML 到位 | 达成（2026-11-18 新基线重建，来源与未锚项见 `configs/README.md`） |
 | T4 运行 | 跑通管线并产出 `data/processed/` | **未达成**：依赖 T3 |
 
 ## 平台边界

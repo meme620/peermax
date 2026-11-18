@@ -27,7 +27,7 @@ PeerMAX 项目的计算链代码：原始数据抓取 → 清洗与面板构建 
 ├── docs/pipeline.md             本文件
 ├── ref/                         外部输入文档：立项文档、老师材料、组内论文
 ├── data/                        教师数据（raw/）与派生产物（processed/）
-├── configs/                     冻结参数与版本锚（待主仓库提供）
+├── configs/                     冻结参数与版本锚（新基线重建，见 configs/README.md）
 ├── scripts/                     203 个 .py + ocr_tesseract_chunk.sh（平铺）
 ├── tests/                       39 个测试模块 + conftest.py
 ├── peerlab/                     执行 CLI
@@ -193,7 +193,7 @@ python -m pytest tests/ -q        # 必须显式写 tests/
 
 ### ① 目录层级
 
-`scripts/` 平铺在仓库根：脚本用 `Path(__file__).resolve().parents[1]` 定位仓库根，`tests/` 同样用 `parents[1]`。`ocr_tesseract_chunk.sh` 无 Python 路径逻辑，由 `network_prospectus_anchor.py` 经 `wsl.exe` 调用（路径由该脚本的 `ROOT` 拼出）。本仓库根**没有** `configs/`、`reports/`、`deliverables/`，直接就地运行会在 import 阶段就失败——`pricing_lib` 找不到 `configs/parameter_registry.yaml`，测试收集直接 `SystemExit: 2`。
+`scripts/` 平铺在仓库根：脚本用 `Path(__file__).resolve().parents[1]` 定位仓库根，`tests/` 同样用 `parents[1]`。`ocr_tesseract_chunk.sh` 无 Python 路径逻辑，由 `network_prospectus_anchor.py` 经 `wsl.exe` 调用（路径由该脚本的 `ROOT` 拼出）。`configs/` 已按新基线重建（`configs/README.md`），但 M1 主输入的 sha256 锚尚未登记；读锚的脚本会按 fail-closed 退出 2。`reports/`、`deliverables/` 仍不在本仓。
 
 **违反会怎样**：把脚本再下移一层，`parents[1]` 会指向 `scripts/`，读不到 registry/spec/manifest，或写到错误目录。
 

@@ -37,11 +37,11 @@ make selftest     # peerlab 与共享模块单测
 | 项 | 状态 |
 |---|---|
 | 环境 | 就绪：Python 3.13.12，14 个直接依赖与传递依赖全部固定版本 |
-| 脚本导入 | 203 个：150 ok / 24 缺配置 / 29 缺数据目录 / 0 依赖问题 / 0 其它 |
+| 脚本导入 | 203 个：192 ok / 0 缺配置 / 11 缺数据目录 / 0 依赖问题 / 0 其它 |
 | 教师数据 | 就绪：42 个文件在 `data/raw/` 与 `data/external/`（4.1 GB，不入 Git） |
-| `configs/` | **缺 6 个 YAML**，需主仓库提供；缺它时 `pricing_lib` 导入即 `SystemExit(2)` |
+| `configs/` | 六个 YAML 已按新基线重建（`configs/README.md`）；M1 输入与 S3A 输入的 sha256 锚待数据生成后补 |
 | `data/processed/` | 空：需要跑链生成，而跑链又依赖 `configs/` |
-| 全量 `pytest tests` | 收集阶段即中断（同上原因），`make test` 现在必然红 |
+| 全量 `pytest tests` | 收集不再中断；309 passed / 123 failed / 149 errors，全部因 `data/processed/` 与 `reports/` 为空 |
 
 ## 文档
 

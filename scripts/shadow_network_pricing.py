@@ -27,7 +27,7 @@ import numpy as np
 import pandas as pd
 from pricing_lib import (  # noqa: E402
     assert_m1_inputs_sha, fm_regression, param_value, require, sha256_file,
-    winsorize_by_month,
+    winsor_bounds, winsorize_by_month,
 )
 from peermax_panel_build import (  # noqa: E402
     NETWORK_AVAILABLE_AT_RULE, load_versions, select_version,
@@ -38,7 +38,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from pricing_lib import (  # noqa: E402
     assert_m1_inputs_sha, fm_regression, param_value, require, sha256_file,
-    winsorize_by_month,
+    winsor_bounds, winsorize_by_month,
 )
 from peermax_panel_build import (  # noqa: E402
     NETWORK_AVAILABLE_AT_RULE, load_versions, select_version,
@@ -144,7 +144,7 @@ MIN_N = int(param_value('m1_sample_and_spec_registry')['min_focal_count_per_mont
 
 NW_LAG = int(param_value('nw_lag'))
 
-WINSOR = (float(WINSOR[0]), float(WINSOR[1])) if isinstance(WINSOR, (list, tuple)) else (0.01, 0.99)
+WINSOR = winsor_bounds()
 
 _TEE = None
 
@@ -717,7 +717,7 @@ import pandas as pd
 
 from pricing_lib import (  # noqa: E402
     assert_m1_inputs_sha, fm_regression, param_value, require, sha256_file,
-    winsorize_by_month,
+    winsor_bounds, winsorize_by_month,
 )
 from peermax_panel_build import (  # noqa: E402
     NETWORK_AVAILABLE_AT_RULE, load_versions, select_version,

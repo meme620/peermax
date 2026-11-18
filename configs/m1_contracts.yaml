@@ -1,0 +1,41 @@
+m1_contracts_version: 1.0-baseline
+meta:
+  baseline_date: '2026-11-18'
+  note: 新基线：9 个 M1 主输入的 sha256 与行数待数据生成后登记；当前 sha256 为空，读取方按 fail-closed 拒绝
+m1_inputs:
+  monthly_returns_clean_v2:
+    file: data/processed/monthly_returns_clean_v2.csv
+    sha256: null
+    expected_rows: null
+  monthly_returns_adj_full_2006_2025:
+    file: data/processed/monthly_returns_adj_full_2006_2025.csv
+    sha256: null
+    expected_rows: null
+  source_month_argmax_panel:
+    file: data/processed/source_month_argmax_panel.csv
+    sha256: null
+    expected_rows: null
+  market_equity_panel_full_2006_2025:
+    file: data/processed/market_equity_panel_full_2006_2025.csv
+    sha256: null
+    expected_rows: null
+  sw2_industry_latest:
+    file: data/processed/sw2_industry_latest.csv
+    sha256: null
+    expected_rows: null
+  firm_analyst_derived:
+    file: data/processed/analyst/firm_analyst_derived.csv
+    sha256: null
+    expected_rows: null
+  firm_chars_clean:
+    file: data/processed/firm_chars_clean.csv
+    sha256: null
+    expected_rows: null
+  firm_id_map:
+    file: data/processed/firm_id_map.csv
+    sha256: null
+    expected_rows: null
+  market_equity_panel:
+    file: data/processed/market_equity_panel.csv
+    sha256: null
+    expected_rows: null

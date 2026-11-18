@@ -1,0 +1,112 @@
+registry_version: 1.5.32-peermax-baseline
+meta:
+  baseline_date: '2026-11-18'
+  source: 按代码与契约测试重建；非主仓库原文件
+parameters:
+  - name: sample_start
+    headline_value: '2015-01-01'
+    note: 契约测试 test_registry_param_binding 断言
+  - name: sample_end
+    headline_value: '2023-12-31'
+    note: 同上
+  - name: winsorization_pct
+    headline_value:
+      - 0.01
+      - 0.99
+    note: 月截面 winsor 分位；契约测试断言
+  - name: nw_lag
+    headline_value: 6
+    note: Newey-West Bartlett 滞后；源码注释 NW_LAG=6
+  - name: min_valid_days
+    headline_value: 15
+    note: complete_month = volume>0 交易日 >= 15；build_monthly_returns_status 注释
+  - name: alpha_m1
+    headline_value: 0.05
+    note: 单侧显著性门 M1-2 的 alpha；基线取值（原主仓库值不可得）
+  - name: K_Econ_M1
+    headline_value: 0.05
+    note: M1-3 经济量级门 |beta*IQR| 阈值；基线取值
+  - name: K_Spread_M1
+    headline_value: 0.05
+    note: M1-4 组合 spread 阈值（月收益单位）；基线取值
+  - name: K_Consist_M1
+    headline_value: 0.05
+    sensitivity_grid:
+      - 0.025
+      - 0.05
+      - 0.1
+    note: M1-5 EW/VW 一致性阈值；基线取值，敏感网格供 gate 报告
+  - name: portfolio_breakpoints
+    headline_value:
+      - 0.2
+      - 0.4
+      - 0.6
+      - 0.8
+    note: 五分位断点；基线取值
+  - name: random_seed
+    headline_value: 20260727
+    note: 源码注释登记值（network_density_null 等）
+  - name: rewiring_reps
+    headline_value: 1000
+    note: 零模型重连次数；契约测试断言 1000
+  - name: rewiring_seed
+    headline_value: 20260727
+    note: 零模型重连 seed；与 random_seed 同值
+  - name: tie_rule
+    headline_value: earliest
+    sensitivity_grid:
+      - earliest
+      - latest
+    note: argmax 并列取值规则；peermax_max_build.resolve_tie_rule 读取
+  - name: m_b_tau_fixed
+    headline_value: 0.25
+    note: M-B 固定阈值 tau；network_mda_full_matrix 注释
+  - name: df_threshold
+    headline_value: 0.25
+    note: 词库 df 阈值；code_design_audit 断言 0.25
+  - name: min_product_terms
+    headline_value: 10
+    note: M-A 构边最少产品词数；code_design_audit 断言 10
+  - name: cluster_linkage
+    headline_value: average
+    note: M-A 聚类 linkage；code_design_audit 读取
+  - name: sw2_median_peer_target
+    headline_value: 56
+    note: M-A 逐年 K 的目标同伴数（目标密度 56）；docs/pipeline.md
+  - name: m1_sample_and_spec_registry
+    headline_value:
+      sample_version: m1_s5_v3_20261115
+      min_focal_count_per_month: 100
+      min_effective_month_count: 60
+      iqr_scale_rule_id: IQR_POOL_TREATMENT_ONLY_v1
+      iqr_scale_rule: treatment-only 宇宙单一池化 IQR（数值 0.02341287，见 pricing_lib.IQR_POOL_REGISTERED）
+      portfolio_tie_rule_id: rank_average
+      tost_rule_id: TOST_EW_VW_K_Consist_M1
+    note: M1 样本与规格登记块；min_focal=100 由契约测试断言，其余为基线值
+  - name: sample_filter_thresholds
+    headline_value:
+      microcap_exclusion: monthly_market_equity_q10
+      ipo_exclusion: listed_less_than_6_months
+      st_exclusion: st_flag_focal
+      limit_hit_source: daily_limit_hit_flag
+      no_network_support: network_support_status!=support
+    note: 样本筛除口径；字段名由 pricing_sample_build 读取，值为基线口径
+  - name: panel_versions
+    headline_value:
+      ma_teacher: s4_panel_ma_teacher_2015_01_2023_12_v1
+      mb_teacher: s4_panel_mb_teacher_2015_01_2023_12_v1
+      ma: s4_panel_ma_2018_01_2023_12_v1
+      mb: s4_panel_mb_2018_01_2023_12_v1
+    note: S4 面板版本指针；peermax_panel_build.load_registry_panel_versions 读取
+  - name: coverage_window
+    headline_value: 12
+    note: S3A 分析师覆盖的 12 月滚动窗口（analyst_gate1_consistency_check 读取）
+  - name: epsilon_weight
+    headline_value: 0.0001
+    note: 有效边权重平方和下限 1e-4（network_diagnostics docstring）
+  - name: network_cutoff_rule
+    headline_value: 月末（month_end）
+    note: 网络时点取月末（analyst_smoketest_window_sensitivity 变体之一）
+  - name: s3a_weight_rule
+    headline_value: equal_weight_over_common_analysts
+    note: S3A 共同分析师边的权重规则（一致性检查按子串匹配）

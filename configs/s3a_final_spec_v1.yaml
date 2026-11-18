@@ -1,0 +1,58 @@
+spec_id: S3A-FINAL-v1-peermax-baseline
+meta:
+  baseline_date: '2026-11-18'
+  note: 新基线重建：键按 analyst_* 代码读取面重建，input_hashes 待数据生成后登记
+inputs:
+  returns: data/processed/monthly_returns_clean_v2.csv
+  returns_post_adjusted: data/processed/monthly_returns_adj_full_2006_2025.csv
+  market_equity: data/processed/market_equity_panel.csv
+  firm_id_map: data/processed/firm_id_map.csv
+  sw2_industry_latest: data/processed/sw2_industry_latest.csv
+  analyst_forecast: data/processed/analyst/analyst_forecast_clean.csv
+network:
+  primary_version: pm_ma_teacher_v1
+  coverage_window_months: 12
+  epsilon_weight: 0.0001
+  cutoff_rule: month_end
+  analyst_code_regex: ^A\d{5}$
+  cutoff_range: 2005-12-31..2025-12-31
+  cutoff_count: 241
+  availability_rule: searchsorted(cutoff, side="right")
+  fy_rule: Fpenddt_dt.dt.year - report_date.dt.year
+  weight_formula: c / denom[i]
+horizon:
+  h12_min_available_months: 12
+samples:
+  s3a_signal_range: 2018-01..2025-12
+sample_filters:
+  market_value_basis_current: total_market_value
+  market_value_basis_registry_target: float_market_value
+  st_primary_current: include_st
+  recent_ipo_months: 6
+  microcap_rule: groupby('month')['me'].quantile(0.10)
+governance:
+  s3a_frozen_values_recheck:
+    coverage_window: 12
+    epsilon_weight: 0.0001
+    sample_start: '2015-01-01'
+    sample_end: '2023-12-31'
+    s3a_weight_rule: equal_weight_over_common_analysts
+  manifest_sha256: 9a6d6d73f29df59091a23ea5fafe6bf92e688f4d0428c756a767b4c40d96a664
+  registry_sha256: 4deaeb994d83f09321cfaa5835baea97111882df6d091239bd413a572c13efd6
+provenance:
+  input_hashes: {}
+  input_collections: {}
+  edge_collections: {}
+registered_deviations:
+  - id: market_value_basis
+    spec: total_market_value
+    registry: float_market_value
+    note: 流通市值日频序列不可得，改用总市值；报告与样本报告登记
+  - id: st_exclusion
+    spec: include_st
+    registry: exclude_st
+    note: 含 ST + 焦点侧敏感性并报
+  - id: sample_period_full
+    spec: 2018-01..2025-12
+    registry: 2015-01..2023-12
+    note: S3A 全期复刻窗口与 registry 主线样本窗口不同口径

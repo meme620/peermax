@@ -1,0 +1,37 @@
+claim_registry_version: 1.0-baseline
+claims:
+  - claim_id: M1_headline
+    status: active
+    treatment: PeerMAXraw
+    outcome: R_next
+    unit: firm-month
+    horizon: next_month
+    formula_id:
+      - F_M1_HEADLINE_v1
+    input_tables:
+      - data/processed/m1_common_sample_ma_teacher_v3.parquet
+    input_fields:
+      - PeerMAXraw
+      - OwnMAXraw
+      - PeerReturn
+      - R_next
+    required_gates:
+      - G1
+      - G2
+      - G5
+  - claim_id: M1_portfolio
+    status: candidate
+    treatment: PeerMAXraw
+    outcome: R_next
+    unit: firm-month
+    horizon: next_month
+    formula_id:
+      - F_M1_PORTFOLIO_v1
+    input_tables:
+      - data/processed/m1_common_sample_ma_teacher_v2.parquet
+    input_fields:
+      - PeerMAXraw
+      - R_next
+    required_gates:
+      - G1
+      - G5

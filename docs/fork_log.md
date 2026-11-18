@@ -19,6 +19,7 @@
 | 22 个测试模块改名（`test_p2_*`/`test_p3_*` → `test_shadow_*` 等），`tests_lib/` 与 `peerlab/tests/` 并入 `tests/` | 测试只剩一个根；`make selftest` 显式列 6 个快测文件 |
 | `experiments/<id>/README.md` → `experiments/<id>.md` | 10 个单文件目录消失，lint 改读单文件 |
 | `peerlab/lint.py` 新增路径层规则：阶段代号、大写、裸数字、目录深度、单文件目录、本地 import 可解析 | `make lint` 现在会拦住旧命名回流 |
+| `configs/` 六个 YAML 按新基线重建（原主仓库 registry 1.5.32 / manifest 1.0.110 不可得） | 参数取契约测试、源码注释与保守基线值；M1 输入的 sha256 与 S3A 输入哈希留空，待数据生成后按 `configs/README.md` 补齐 |
 
 **没有改的**：`configs/*.yaml` 文件名、`reports/data_gates/G0/` 与 `data/processed/` 的产物名、`data/raw/` 输入名。它们是主仓库 `version_manifest.yaml` 的 sha 锚与门禁登记契约，本仓没有 `configs/`，改不了登记表。退役条件写在 `docs/script_naming.md` 的例外表里。
 
