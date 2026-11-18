@@ -116,6 +116,7 @@ DIAG_SPEC_DEFS = {
 }
 
 def write_json(path: Path, obj) -> None:
+    assert_output_path_guard(path)
     _atomic_write_text(path, json.dumps(obj, ensure_ascii=False, indent=1))
     print(f'  -> {path.relative_to(ROOT)}', flush=True)
 

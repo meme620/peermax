@@ -47,10 +47,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(Path(__file__).parent))
-from pricing_lib import (  # noqa: E402
-    aggregate_stat, assert_anchored_file_sha, assert_m1_inputs_sha,
-    assert_named_m1_input_sha, param_value, sha256_file,
-)
+from pricing_lib import aggregate_stat, assert_m1_inputs_sha, assert_named_m1_input_sha, param_value, sha256_file
 
 ARGMAX = ROOT / 'data/processed/source_month_argmax_panel.csv'
 RETURNS = ROOT / 'data/processed/monthly_returns_clean_v2.csv'

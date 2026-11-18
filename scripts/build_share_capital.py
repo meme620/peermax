@@ -10,7 +10,6 @@
 输出: data/processed/share_capital_history_v2.csv
 """
 import csv
-import glob
 import os
 import sys
 

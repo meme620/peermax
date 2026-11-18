@@ -6,7 +6,6 @@
 产出 JSON：reports/data_gates/G0/s3a_gate1_consistency_check.json
 """
 import json
-import re
 import sys
 from datetime import datetime, timezone
 from hashlib import sha256

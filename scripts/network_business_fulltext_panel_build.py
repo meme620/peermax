@@ -33,7 +33,6 @@ import csv
 import hashlib
 import json
 import os
-import re
 import sys
 import time
 from collections import Counter

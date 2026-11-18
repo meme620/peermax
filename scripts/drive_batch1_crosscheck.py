@@ -1,6 +1,6 @@
 """批次1 交叉检验：limit flag vs 自算、ST vs 名称、close_none vs 腾讯 raw。"""
 import pickle, warnings, json
-import pandas as pd, numpy as np
+import pandas as pd
 from pathlib import Path
 warnings.filterwarnings('ignore')
 d = Path('data/raw/drive')

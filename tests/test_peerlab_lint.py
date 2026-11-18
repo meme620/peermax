@@ -87,6 +87,20 @@ def test_existing_script_literal_ok(tmp_path: Path) -> None:
     assert lint.check_script_literals(tmp_path, paths=['docs/note.md']) == []
 
 
+def test_text_io_without_encoding_reported(tmp_path: Path) -> None:
+    (tmp_path / 'scripts').mkdir()
+    (tmp_path / 'scripts' / 'bad.py').write_text(
+        "open('x')\nPath('y').read_text()\n", encoding='utf-8')
+    problems = lint.check_text_io_encoding(tmp_path)
+    assert len(problems) == 2
+
+
+def test_binary_open_needs_no_encoding(tmp_path: Path) -> None:
+    (tmp_path / 'scripts').mkdir()
+    (tmp_path / 'scripts' / 'ok.py').write_text("open('x', 'rb')\n", encoding='utf-8')
+    assert lint.check_text_io_encoding(tmp_path) == []
+
+
 def test_script_literal_in_tests_ignored(tmp_path: Path) -> None:
     (tmp_path / 'docs').mkdir()
     (tmp_path / 'tests').mkdir()

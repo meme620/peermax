@@ -216,6 +216,40 @@ def check_oneoff_imports(root: pathlib.Path) -> list:
     return problems
 
 
+def check_text_io_encoding(root: pathlib.Path) -> list:
+    """文本模式 open() 与 Path.read_text/write_text 必须显式 encoding。
+
+    不写 encoding 就吃系统 locale：macOS 是 UTF-8、Windows 是 cp936，同一脚本跨平台
+    读同一文件会解出不同字节。二进制模式（mode 含 b）不受此约束。
+    """
+    import ast
+
+    problems = []
+    for base in ('scripts', 'peerlab', 'tests'):
+        for path in sorted((root / base).glob('*.py')):
+            rel = path.relative_to(root).as_posix()
+            tree = ast.parse(path.read_text(encoding='utf-8'))
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Call):
+                    continue
+                func = node.func
+                if isinstance(func, ast.Name) and func.id == 'open':
+                    mode = None
+                    if len(node.args) > 1 and isinstance(node.args[1], ast.Constant):
+                        mode = node.args[1].value
+                    for kw in node.keywords:
+                        if kw.arg == 'mode' and isinstance(kw.value, ast.Constant):
+                            mode = kw.value.value
+                    if mode and 'b' in str(mode):
+                        continue
+                    if not any(kw.arg == 'encoding' for kw in node.keywords):
+                        problems.append(f'{rel}:{node.lineno}: open() 未指定 encoding')
+                elif isinstance(func, ast.Attribute) and func.attr in {'read_text', 'write_text'}:
+                    if not any(kw.arg == 'encoding' for kw in node.keywords):
+                        problems.append(f'{rel}:{node.lineno}: {func.attr}() 未指定 encoding')
+    return problems
+
+
 def check_script_sources(root: pathlib.Path) -> list:
     """scripts/ 已拍平到一层：再出现两层相对回退或 parents[2] 就是把仓库根算错。"""
     problems = []
@@ -236,6 +270,7 @@ def run(root: pathlib.Path = ROOT, experiments=None) -> tuple:
                 + check_paths(root)
                 + check_local_imports(root)
                 + check_script_sources(root)
+                + check_text_io_encoding(root)
                 + check_script_literals(root)
                 + check_inventory(root)
                 + check_oneoff_imports(root))

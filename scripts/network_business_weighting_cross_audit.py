@@ -142,7 +142,7 @@ def structure_difference_facts(per_year: list, ew_freeze: Path, idf_freeze: Path
                 'sum_abs_peer_median_dev_from_44': dev, 'max_abs_dev': mx}
     out['K_calibration_precision'] = {'ew': prec(ew_freeze, 'ew'), 'idf': prec(idf_freeze, 'idf'),
                                      'note': '两侧命中精度相当 → **不得**表述为「IDF 的 K 精度更低」'}
-    out['reading'] = ('权重改变使聚类划分与边集显著变化（边 Jaccard ' 
+    out['reading'] = ('权重改变使聚类划分与边集显著变化（边 Jaccard '
                       + (f'{out["edge_jaccard_range"][0]}–{out["edge_jaccard_range"][1]}' if out['edge_jaccard_range'] else 'NA')
                       + '、K 系统性下降 ' + (f'{abs(out["K_change_pct_range"][1]):.1f}%–{abs(out["K_change_pct_range"][0]):.1f}%'
                                              if out['K_change_pct_range'] else 'NA')

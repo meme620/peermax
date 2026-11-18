@@ -13,7 +13,7 @@
 import csv
 import json
 import sys
-from collections import Counter, defaultdict
+from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 

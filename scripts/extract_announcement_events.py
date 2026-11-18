@@ -17,27 +17,12 @@
 import csv
 import glob
 import os
-import re
 import sys
 import time
-from datetime import datetime, timezone
 
 BASE = os.path.join(os.path.dirname(__file__), "..", "data", "raw", "eastmoney", "announcements")
 OUT = os.path.join(os.path.dirname(__file__), "..", "data", "raw", "institutional")
 os.makedirs(OUT, exist_ok=True)
-
-
-def ts_to_date(ts: str) -> str:
-    """CNINFO announcementTime：13 位毫秒或 10 位秒 → YYYY-MM-DD。"""
-    if not ts:
-        return ""
-    try:
-        v = int(ts)
-    except ValueError:
-        return ""
-    if v > 10**12:  # 毫秒
-        v //= 1000
-    return datetime.fromtimestamp(v, tz=timezone.utc).strftime("%Y-%m-%d")
 
 
 def is_suspend_start(title: str) -> bool:

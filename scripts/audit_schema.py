@@ -15,7 +15,6 @@ import csv
 import glob
 import os
 import sys
-from collections import defaultdict
 
 BASE = os.path.join(os.path.dirname(__file__), "..", "data", "raw")
 OUT = os.path.join(os.path.dirname(__file__), "..", "data", "processed")
@@ -31,7 +30,7 @@ def rec(table, check, result, detail):
 
 def load_calendar():
     days = {}
-    with open(os.path.join(BASE, "baostock", "calendar", "trade_dates_2016_2026.csv"), encoding="utf-8") as f:
+    with open(os.path.join(BASE, "baostock", "calendar", "trade_dates_2016_2026.csv"), encoding="utf-8", newline='') as f:
         for r in csv.reader(f):
             if len(r) >= 2 and r[0][:4].isdigit():
                 days[r[0]] = r[1]
@@ -57,7 +56,7 @@ def main():
         y = os.path.basename(p)[:4]
         seen = set()
         row_count = 0
-        with open(p, encoding="utf-8") as f:
+        with open(p, encoding="utf-8", newline='') as f:
             for r in csv.reader(f):
                 if not r or not r[0][:4].isdigit():
                     continue
@@ -98,7 +97,7 @@ def main():
     for p in sample:
         code = os.path.basename(p)[:6]
         seen = set()
-        with open(p, encoding="utf-8") as f:
+        with open(p, encoding="utf-8", newline='') as f:
             rows = list(csv.reader(f))
         hdr = rows[0]
         try:
@@ -128,7 +127,7 @@ def main():
 
     # 3. 年报文本
     a = {}
-    with open(os.path.join(BASE, "baostock", "stock_basic", "a_stocks.csv"), encoding="utf-8") as f:
+    with open(os.path.join(BASE, "baostock", "stock_basic", "a_stocks.csv"), encoding="utf-8", newline='') as f:
         for r in csv.reader(f):
             if r and len(r) >= 4 and "." in r[0]:
                 a[r[0].split(".")[1]] = r
@@ -155,7 +154,7 @@ def main():
     dt_mcap = 0
     dt_rows = 0
     for p in random.sample(dt_files, min(100, len(dt_files))):
-        with open(p, encoding="utf-8") as f:
+        with open(p, encoding="utf-8", newline='') as f:
             rows = list(csv.reader(f))
         hdr = rows[0]
         try:
@@ -188,7 +187,7 @@ def main():
     sb_ratio = 0
     sb_rows = 0
     for p in random.sample(sb_files, min(200, len(sb_files))):
-        with open(p, encoding="utf-8") as f:
+        with open(p, encoding="utf-8", newline='') as f:
             rows = list(csv.reader(f))
         hdr = rows[0]
         try:

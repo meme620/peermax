@@ -24,7 +24,7 @@ import argparse
 import csv
 import json
 import re
-from collections import Counter, defaultdict
+from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -199,18 +199,6 @@ def select_and_weight(codes, Xn, tau=None, peer_target=10):
             "mass_retained_ratio": float(
                 sum(r[2] for r in rows) / all_mass.sum()) if all_mass.sum() > 0 else None}
     return rows, support_rows, meta
-
-
-def select_network_version(event_date, versions):
-    """消费侧规则（plan L1693/L3696/L4313）：给定事件日 d，选 max{available_at_v < d} 的版本。
-
-    versions: [(version_name, available_at_iso_str), ...]
-    返回版本名；无可用版本返回 None（此时该事件不得用任何网络 → no-network-support 语义）。
-    """
-    cand = [(v, a) for v, a in versions if a < event_date]
-    if not cand:
-        return None
-    return max(cand, key=lambda x: x[1])[0]
 
 
 def main():

@@ -19,7 +19,6 @@
   python scripts/lexicon_df_stats.py [--df-max 0.25]
 """
 import argparse
-import csv
 import json
 import time
 from collections import Counter

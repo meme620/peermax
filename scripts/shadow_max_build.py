@@ -37,38 +37,19 @@
 
 from __future__ import annotations
 
-import sys as _sys
 import argparse
 import csv
-import hashlib
-import json
 import math
 import os
 import sys
 from pathlib import Path
 import numpy as np
 import pandas as pd
-from peermax_max_build import (  # noqa: E402
-    LIMIT_CHINEXT_STAR,
-    LIMIT_MAIN,
-    LIMIT_MAIN_ST,
-    board_of,
-    load_st_flags,
-    pick_argmax,
-    resolve_tie_rule,
-)
+from peermax_max_build import LIMIT_CHINEXT_STAR, LIMIT_MAIN, LIMIT_MAIN_ST, board_of, load_st_flags, resolve_tie_rule
 
 
 from pathlib import Path
-from peermax_max_build import (  # noqa: E402
-    LIMIT_CHINEXT_STAR,
-    LIMIT_MAIN,
-    LIMIT_MAIN_ST,
-    board_of,
-    load_st_flags,
-    pick_argmax,
-    resolve_tie_rule,
-)
+from peermax_max_build import LIMIT_CHINEXT_STAR, LIMIT_MAIN, LIMIT_MAIN_ST, board_of, load_st_flags, resolve_tie_rule
 import csv
 import math
 import numpy as np
@@ -907,8 +888,6 @@ def write_audit_csv(df: pd.DataFrame, path: Path) -> None:
 
 import argparse
 import csv
-import hashlib
-import json
 import math
 import os
 import sys
@@ -919,15 +898,7 @@ import pandas as pd
 
 
 # 只复用 Phase 1 已登记实现：tie rule / ST / 板块 / limit 阈值（不复制逻辑）。
-from peermax_max_build import (  # noqa: E402
-    LIMIT_CHINEXT_STAR,
-    LIMIT_MAIN,
-    LIMIT_MAIN_ST,
-    board_of,
-    load_st_flags,
-    pick_argmax,
-    resolve_tie_rule,
-)
+from peermax_max_build import LIMIT_CHINEXT_STAR, LIMIT_MAIN, LIMIT_MAIN_ST, board_of, load_st_flags, resolve_tie_rule
 
 
 

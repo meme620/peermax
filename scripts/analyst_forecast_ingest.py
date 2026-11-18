@@ -6,12 +6,11 @@
   data/raw/analyst/step1_acceptance.json  验收报告
   data/raw/analyst/预测情况_字段说明.txt   字段说明解出落盘
 """
-import sys, zipfile, io, json, csv, re
-import xml.etree.ElementTree as ET
+import sys, zipfile, io, json, csv
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from analyst_xlsx_read import load_shared_strings, iter_rows, col_index
+from analyst_xlsx_read import load_shared_strings, iter_rows
 
 OUT = Path('data/raw/analyst')
 OUT.mkdir(parents=True, exist_ok=True)

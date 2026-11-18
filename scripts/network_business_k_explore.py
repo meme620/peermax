@@ -8,12 +8,9 @@
 import json
 import sys
 import time
-from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
-import pandas as pd
-import scipy.sparse as sp
 from scipy.cluster.hierarchy import fcluster, linkage
 from scipy.spatial.distance import squareform
 from sklearn.preprocessing import normalize

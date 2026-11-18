@@ -10,7 +10,6 @@
 """
 import json
 from pathlib import Path
-from collections import defaultdict
 import pandas as pd
 import numpy as np
 

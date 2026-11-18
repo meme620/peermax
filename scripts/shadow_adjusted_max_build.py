@@ -45,15 +45,12 @@
 
 from __future__ import annotations
 
-import sys as _sys
 import argparse
 import csv
 import hashlib
-import json
 import math
 import os
 import shutil
-import sys
 from pathlib import Path
 import numpy as np
 import pandas as pd
@@ -843,11 +840,9 @@ def build_exrights_audit(ev: pd.DataFrame, source: pd.DataFrame,
 import argparse
 import csv
 import hashlib
-import json
 import math
 import os
 import shutil
-import sys
 from pathlib import Path
 
 import numpy as np

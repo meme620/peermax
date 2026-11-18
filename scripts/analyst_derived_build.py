@@ -22,7 +22,6 @@ v2 变更（2026-08-12，对抗检查 R2-3/P2-1 修复）:
 """
 import json
 from pathlib import Path
-from collections import defaultdict
 import pandas as pd
 import numpy as np
 

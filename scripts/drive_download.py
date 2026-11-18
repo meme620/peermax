@@ -1,7 +1,7 @@
 """Drive 批量下载（socks5h 代理 + confirm token 处理）。
 用法: python scripts/drive_download.py --ids artifacts/review/drive_file_ids.json --names "name1" "name2" ...
 """
-import argparse, io, json, os, re, subprocess, sys
+import argparse, json, re, subprocess
 from pathlib import Path
 
 PROXY = "socks5h://127.0.0.1:7993"

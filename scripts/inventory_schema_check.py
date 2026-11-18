@@ -16,9 +16,7 @@ import csv
 import json
 import random
 import statistics
-import sys
 import urllib.request
-from collections import Counter
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]

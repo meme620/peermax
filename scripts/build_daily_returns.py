@@ -32,7 +32,7 @@ def read_year(prefix: str, code6: str, year: int):
     p = os.path.join(RAW, "daily_raw", f"{prefix}{code6}", f"{year}.csv")
     d = {}
     if os.path.exists(p):
-        with open(p, encoding="utf-8") as f:
+        with open(p, encoding="utf-8", newline='') as f:
             for r in csv.reader(f):
                 if r and len(r) >= 5 and r[0][:4].isdigit():
                     try:
@@ -46,7 +46,7 @@ def read_year_qfq(prefix: str, code6: str, year: int):
     p = os.path.join(RAW, "daily_qfq", f"{prefix}{code6}", f"{year}.csv")
     d = {}
     if os.path.exists(p):
-        with open(p, encoding="utf-8") as f:
+        with open(p, encoding="utf-8", newline='') as f:
             for r in csv.reader(f):
                 if r and len(r) >= 5 and r[0][:4].isdigit():
                     try:
@@ -101,7 +101,7 @@ def main():
     # 输出年份 2018-2025；years 含 2017 仅作跨年衔接（2017 年数据读入但只用于 prev）
     out_years = [y for y in years if y >= 2018]
 
-    with open(A_STOCKS, encoding="utf-8") as f:
+    with open(A_STOCKS, encoding="utf-8", newline='') as f:
         stocks = [r for r in csv.reader(f)][1:]
     codes = [(r[0].split(".")[1], r[0].split(".")[0]) for r in stocks if r and "." in r[0]]
     if args.max_codes:
@@ -135,7 +135,7 @@ def main():
         "epsilon_return_source": EPSILON,
         "source_version": "tencent_raw_v1",
     }
-    with open(os.path.join(OUT, "MANIFEST.json"), "w", encoding="utf-8") as f:
+    with open(os.path.join(OUT, "MANIFEST.json"), "w", encoding="utf-8", newline='') as f:
         json.dump(manifest, f, ensure_ascii=False, indent=2)
     print(f"完成: {len(codes)} 只, {total_rows} 行, dup {total_dup}", file=sys.stderr)
 

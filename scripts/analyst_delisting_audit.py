@@ -13,7 +13,7 @@ from pathlib import Path
 import numpy as np, pandas as pd
 warnings.filterwarnings('ignore')
 sys.path.insert(0, str(Path('scripts').resolve()))
-from analyst_cf_mom_replication import _next_month, EDGES, RET, MEQ, NET_VER
+from analyst_cf_mom_replication import _next_month, EDGES, RET, NET_VER
 
 d = Path('data/raw/drive')
 mv = pd.read_pickle(d / 'daily_a_share_market_val_3_20260630.pkl')

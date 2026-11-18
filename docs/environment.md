@@ -54,7 +54,7 @@ hooks 由 `lefthook.yml` 定义（需要 `lefthook` 二进制）：`pre-commit` 
 | `make status` | 逐实验列出缺什么 | 8/10 就绪 |
 | `make lint` | 命名、脚本清单与实验文档规范检查 | 通过 |
 | `make gate` | 数据不变量门：边表↔报告、样本窗口、board 列、MD&A 身份、股本链、analyst_cov | 6 个全部 blocked（缺 `data/processed` 与 `artifacts` 产物），退出码 2 |
-| `make selftest` | `pytest tests/test_peerlab_*.py tests/test_script_utils.py tests/test_gate_*.py` | 75 passed |
+| `make selftest` | `pytest tests/test_peerlab_*.py tests/test_script_utils.py tests/test_gate_*.py` | 77 passed |
 | `make test` | 全量 `pytest`（`tests/`） | 直接跑会因缺 `data/processed/analyst/edges` 在收集期中断（1 error）；加 `--continue-on-collection-errors` 得 350 passed / 121 failed / 149 errors / 17 skipped，失败与报错全部来自缺 `data/processed` 产物 |
 
 `make imports`（即 `python -m peerlab smoke --imports --clean`）会执行每个脚本的模块级代码，部分脚本会在 `reports/data_gates/G0/`、`data/processed/` 下写出文件（如 `drive_batch1_schema.json`）。命令跑完会列出这些文件并删除；不加 `--clean` 时只列出，便于先看脚本写了什么。

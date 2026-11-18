@@ -12,7 +12,6 @@
 """
 import csv
 import json
-import re
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path

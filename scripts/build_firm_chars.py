@@ -31,7 +31,7 @@ MIN_TO = 15    # min_valid_days_turnover 候选
 def main():
     # 1. 月末市值 (month -> code -> me)
     me = {}
-    with open(os.path.join(PROC, "market_equity_panel.csv"), encoding="utf-8") as f:
+    with open(os.path.join(PROC, "market_equity_panel.csv"), encoding="utf-8", newline='') as f:
         for r in csv.reader(f):
             # 全期版（2026-08-29）：[firm_id, date, market_equity] 3 列；旧版 [firm_id, date, close, end_share, market_equity]
             if r and r[0] != "firm_id":
@@ -54,7 +54,7 @@ def main():
 
     # 2. 月收益
     mr = defaultdict(dict)
-    with open(os.path.join(PROC, "monthly_returns_clean.csv"), encoding="utf-8") as f:
+    with open(os.path.join(PROC, "monthly_returns_clean.csv"), encoding="utf-8", newline='') as f:
         for r in csv.reader(f):
             if r and len(r) > 2 and r[0] != "firm_id" and r[2]:
                 fid = r[0][2:] if r[0].startswith(("sh", "sz")) else r[0]  # 统一 6 位
@@ -64,7 +64,7 @@ def main():
     eq = {}
     for p in glob.glob(os.path.join(FIN, "*.csv")):
         code = os.path.basename(p)[:6]
-        with open(p, encoding="utf-8") as f:
+        with open(p, encoding="utf-8", newline='') as f:
             rows = list(csv.reader(f))
         if len(rows) < 2:
             continue
@@ -124,7 +124,7 @@ def main():
             to = None
             if os.path.exists(p_raw) and os.path.exists(p_ret):
                 amt_map = {}
-                with open(p_raw, encoding="utf-8") as f:
+                with open(p_raw, encoding="utf-8", newline='') as f:
                     for r in csv.reader(f):
                         if r and r[0][:7] == month and len(r) > 8:
                             try:
@@ -136,7 +136,7 @@ def main():
                 n_liq = 0
                 s_to = 0.0
                 n_to = 0
-                with open(p_ret, encoding="utf-8") as f:
+                with open(p_ret, encoding="utf-8", newline='') as f:
                     for r in csv.reader(f):
                         if r and len(r) > 5 and r[1][:7] == month and r[5] == "1" and r[2]:
                             amt_vol = amt_map.get(r[1])

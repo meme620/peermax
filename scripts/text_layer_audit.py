@@ -12,7 +12,7 @@ B. 模板文本检测：
   artifacts/review/s3_misalign_suspect.csv          疑似错位清单
   artifacts/review/s3_template_texts.csv            模板/近重复文本清单
 """
-import csv, hashlib, re
+import hashlib, re
 from pathlib import Path
 from collections import defaultdict
 import pandas as pd

@@ -13,12 +13,11 @@
 用法: python scripts/analyst_cffr.py
 """
 import json
-import sys
 from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from analyst_cf_mom_replication import nw_t, _next_month, EDGES, RET, NET_VER
+from analyst_cf_mom_replication import nw_t, EDGES, NET_VER
 from analyst_meta import attach_meta
 
 SRC = 'data/processed/analyst/s3a_step3_clean.csv'

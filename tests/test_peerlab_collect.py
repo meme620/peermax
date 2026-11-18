@@ -20,7 +20,7 @@ def _fake_run(result_dir: Path, exp_id: str, seed: int, value: float) -> None:
     (out / ('s3_m1_pricing_table_s' + str(seed) + '.json')).write_text(json.dumps(doc), encoding='utf-8')
     (run_dir / 'run.json').write_text('{}', encoding='utf-8')
     index = result_dir / 'index.json'
-    doc_index = json.loads(index.read_text()) if index.is_file() else {'runs': []}
+    doc_index = json.loads(index.read_text(encoding='utf-8')) if index.is_file() else {'runs': []}
     doc_index['runs'].append({'run_id': run_id, 'exp': exp_id, 'seed': seed,
                               'status': 'ok', 'smoke': False})
     index.write_text(json.dumps(doc_index), encoding='utf-8')

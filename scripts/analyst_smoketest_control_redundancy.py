@@ -11,7 +11,6 @@ AnalystNetworkMass/EffectivePeerCount/Top1Weight）。
 import json
 from pathlib import Path
 import pandas as pd
-import numpy as np
 
 DER = 'data/processed/analyst/firm_analyst_derived.csv'
 OUT = Path('data/processed/analyst/smoketest_b2_control_redundancy.json')

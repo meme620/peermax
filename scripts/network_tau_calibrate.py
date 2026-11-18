@@ -19,9 +19,7 @@ Plan §8 Phase B1 的可执行实现：
 import argparse
 import csv
 import json
-import re
 import sys
-from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -29,7 +27,7 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'scripts'))
-from network_mda_edges_build import build_similarity, load_texts  # noqa: E402  复用已冻结的实现
+from network_mda_edges_build import build_similarity
 
 V2 = ROOT / 'data/processed/mda_texts.csv'
 LAT = ROOT / 'data/processed/sw2_industry_latest.csv'

@@ -45,7 +45,6 @@ Phase 1 / I-17（2026-10-26）：
 用法：python scripts/build_monthly_returns_status.py
 """
 import argparse
-import csv
 import hashlib
 import json
 from pathlib import Path

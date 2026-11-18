@@ -16,7 +16,6 @@ m1_formula_ids）。
 
 from __future__ import annotations
 
-import sys as _sys
 import json
 import math
 import os

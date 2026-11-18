@@ -20,7 +20,6 @@
       python scripts/fetch_cninfo_annual.py --pairs artifacts/review/mda_redownload_pairs.csv
 """
 import argparse
-import collections
 import csv
 import json
 import os
@@ -247,23 +246,6 @@ def pick_targets(anns, y: int):
             if _pub_year(a) == y + 1:
                 bydate.append(a)
     return exact + good + bydate + soft + cancelled
-
-
-def verify_year(txt_path: str, year: int):
-    """年份校验（v6，按出现次数，审计用）：目标年缺席或被他年压制 -> False；
-    无信号 -> None 放行。判据同 corpus_mda_integrity_audit.year_signal（四轮收敛过程见其 docstring）。
-    """
-    with open(txt_path, encoding="utf-8", errors="replace") as f:
-        head = re.sub(r"\s+", "", f.read(3000))
-    cnt = collections.Counter(m.group(1) for m in re.finditer(r"(20\d\d)年年度报告", head))
-    if not cnt:
-        cnt = collections.Counter(m.group(1) for m in re.finditer(r"(20\d\d)年报", head))
-        cnt = collections.Counter({k: v for k, v in cnt.items() if v >= 3})
-    if not cnt:
-        return None
-    my = cnt.get(str(year), 0)
-    others = {k: v for k, v in cnt.items() if k != str(year)}
-    return my > 0 and my >= max(others.values(), default=0)
 
 
 def verify_text_identity(txt_path: str, code6: str):

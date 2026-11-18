@@ -29,7 +29,7 @@ def test_readiness_reports_missing(tmp_path: Path):
     assert check['ready'] is False
     assert 'configs/parameter_registry.yaml' in check['missing']
     (tmp_path / 'configs').mkdir()
-    (tmp_path / 'configs/parameter_registry.yaml').write_text('x: 1')
+    (tmp_path / 'configs/parameter_registry.yaml').write_text('x: 1', encoding='utf-8')
     (tmp_path / 'data/processed').mkdir(parents=True)
     assert runner.readiness(exp, tmp_path)['ready'] is True
 

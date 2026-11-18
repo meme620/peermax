@@ -70,7 +70,6 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import scipy.sparse as sp
 from sklearn.preprocessing import normalize
 
 ROOT = Path(__file__).resolve().parents[1]

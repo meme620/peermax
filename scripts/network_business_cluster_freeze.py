@@ -63,7 +63,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
-import pandas as pd
 from scipy.cluster.hierarchy import fcluster
 from scipy.spatial.distance import squareform
 

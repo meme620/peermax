@@ -23,14 +23,10 @@
 import csv
 import gzip
 import json
-import re
 import ssl
-import struct
 import sys
 import urllib.parse
 import urllib.request
-import zipfile
-from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 

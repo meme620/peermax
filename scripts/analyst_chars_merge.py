@@ -10,7 +10,6 @@
       重跑后须再执行本脚本（见 build_firm_chars.py 头部注释）。
 """
 import shutil
-from pathlib import Path
 import pandas as pd
 
 DERIVED = 'data/processed/analyst/firm_analyst_derived.csv'

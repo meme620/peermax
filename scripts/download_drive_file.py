@@ -1,5 +1,5 @@
 """Drive 文件下载（socks5h 代理 + confirm 处理）。用法: python download_drive_file.py <file_id> <out_path>"""
-import sys, subprocess, tempfile, re, os, time
+import sys, subprocess, re, time
 from pathlib import Path
 
 PROXY = "socks5h://127.0.0.1:7993"

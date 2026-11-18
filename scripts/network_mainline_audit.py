@@ -23,7 +23,6 @@ from __future__ import annotations
 import csv
 import json
 import pathlib
-from collections import Counter
 from datetime import datetime, timezone
 
 import numpy as np

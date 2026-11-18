@@ -1,7 +1,7 @@
 """批次 1 下载：Drive → data/raw/drive/（走 socks5h://127.0.0.1:7993 代理）。
 大文件用 drive.usercontent.google.com 端点（免 confirm token）。
 """
-import json, subprocess, sys, time
+import json, subprocess, time
 from pathlib import Path
 
 OUT = Path('data/raw/drive')

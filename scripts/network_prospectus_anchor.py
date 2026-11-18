@@ -27,7 +27,6 @@
 
 from __future__ import annotations
 
-import sys as _sys
 import argparse
 import collections
 import csv
@@ -37,7 +36,6 @@ import os
 import re
 import shutil
 import subprocess
-import sys
 import time
 from datetime import datetime, timezone
 import pymupdf
@@ -536,7 +534,7 @@ def cid_recover_text(code, pdf_path):
     cache = os.path.join(_CID_CACHE, f"{code}.txt")
     key = os.path.join(_CID_CACHE, f"{code}.key")
     size = str(os.path.getsize(pdf_path))
-    if os.path.exists(cache) and os.path.exists(key) and open(key).read().strip() == size:
+    if os.path.exists(cache) and os.path.exists(key) and open(key, encoding="utf-8").read().strip() == size:
         return open(cache, encoding="utf-8").read(), "pdfminer+cid_gid（缓存命中）"
     import pdfminer.high_level
     rev = _gid2uni()
@@ -556,7 +554,7 @@ def cid_recover_text(code, pdf_path):
     dec = re.sub(r"\(cid:(\d+)\)", sub, raw)
     with open(cache, "w", encoding="utf-8") as f:
         f.write(dec)
-    with open(key, "w") as f:
+    with open(key, "w", encoding="utf-8") as f:
         f.write(size)
     return dec, f"pdfminer+cid_gid（未映射 CID {n_unmapped[0]}）"
 
@@ -582,7 +580,7 @@ def ocr_recover_text(code, pdf_path):
     cache = os.path.join(cache_dir, f"{code}.txt")
     keyf = os.path.join(cache_dir, f"{code}.key")
     size = str(os.path.getsize(pdf_path))
-    if os.path.exists(cache) and os.path.exists(keyf) and open(keyf).read().strip() == size:
+    if os.path.exists(cache) and os.path.exists(keyf) and open(keyf, encoding="utf-8").read().strip() == size:
         return open(cache, encoding="utf-8").read(), "ocr_tesseract_chi_sim（缓存命中）"
     tmpd = os.path.join(ROOT, "artifacts", "tmp", "tier2_full", "ocr_render", code)
     shutil.rmtree(tmpd, ignore_errors=True)
@@ -632,7 +630,7 @@ def ocr_recover_text(code, pdf_path):
         text = "\n".join(parts)
         with open(cache, "w", encoding="utf-8") as f:
             f.write(text)
-        with open(keyf, "w") as f:
+        with open(keyf, "w", encoding="utf-8") as f:
             f.write(size)
         return text, (f"ocr_tesseract_chi_sim（{n_pages}p，render {render_sec:.0f}s + "
                       f"ocr {ocr_sec:.0f}s，缺页 {missing}）")
@@ -2891,7 +2889,6 @@ import os
 import re
 import shutil
 import subprocess
-import sys
 import time
 from datetime import datetime, timezone
 

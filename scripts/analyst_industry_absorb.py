@@ -13,7 +13,6 @@
 用法: python scripts/analyst_industry_absorb.py
 """
 import json
-import sys
 from pathlib import Path
 import numpy as np
 import pandas as pd

@@ -582,13 +582,6 @@ def acceptance(m: pd.DataFrame, years) -> tuple:
         rows.append(row)
     return rows, detail
 
-def freeze_report_value(y: int, field: str):
-    p = ART / f'3.1_freeze_p3asof_{y}.json'
-    if not p.is_file():
-        return None
-    d = json.loads(p.read_text(encoding='utf-8'))
-    return d.get('years', {}).get(str(y), {}).get(field)
-
 def step_map(months, panel_srcm) -> dict:
     t0 = time.time()
     m = load_sw2_map()

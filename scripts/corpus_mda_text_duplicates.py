@@ -7,7 +7,6 @@
 """
 import csv
 import collections
-import hashlib
 import heapq
 import json
 import re
