@@ -136,13 +136,6 @@ def test_derived_unique_key_and_version():
     assert d['month'].nunique() == cov['network_cutoff'].nunique(), "派生变量月数与覆盖表 cutoff 数不一致"
 
 
-# ---------------- 5. 面板合并率 ----------------
-
-def test_panel_merge_rate():
-    m = json.loads((ANALYST / 'step10_panel_merge.json').read_text(encoding='utf-8'))
-    assert m['merge_rate_pct'] > 50.0, f"面板合并率 {m['merge_rate_pct']}% 过低"
-
-
 # ---------------- 6. step3 源码↔产物列名一致性（防源码漂移） ----------------
 
 def test_step3_output_columns_contract():

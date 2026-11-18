@@ -4,7 +4,7 @@
   把「相似度 → 边选择 → 权重归一化 → 合同字段输出」写成可复用管线，
   用现有全期相似度矩阵先跑通到「待 τ」接口；τ 一到（B1 校准后）替换参数即可出正式边表。
 
-与 pilot（network_pilot_build.py）的关键差别：
+实现口径（与早期 Top-200 截断构图的关键差别）：
   1. **边选择层与权重归一化层分离**：边选择用阈值（τ 或 percentile），
      权重归一化用**全集有效 source** 的相似度之和作分母，不用 Top-k 截断后的 Σsim；
   2. 输出完整 `network_edges` 合同字段（含 available_at / coverage_flag / network_support_status）；

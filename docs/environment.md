@@ -45,13 +45,14 @@ make env        # uv venv --python 3.13 .venv + uv pip install -r requirements.t
 
 | 命令 | 做什么 | 2026-11-18 结果 |
 |---|---|---|
-| `make preflight` | 解释器 / 14 个依赖 / 6 个 configs / 数据目录，三块一次打印 | env 通过；configs 6 个缺失；raw 目录 5/14 就绪 |
-| `make imports` | 逐个导入 `scripts/` 下 203 个脚本 | 192 ok、0 config、11 missing、**0 dep、0 other** |
-| `make smoke` | peerlab L0：10 个实验逐个判脚本与输入是否就绪 | 10 个全部 blocked（缺 configs），退出码 3 |
-| `make status` | 逐实验列出缺什么 | 0/10 就绪 |
-| `make lint` | 命名与实验文档规范检查 | 通过 |
-| `make selftest` | `pytest tests/test_peerlab_*.py tests/test_script_utils.py` | 34 passed |
-| `make test` | 全量 `pytest`（`tests/`） | 配置已就位，收集不再中断；当前 309 passed / 123 failed / 149 errors，全部因 `data/processed/` 与 `reports/` 为空 |
+| `make doctor` | 解释器 / 14 个依赖 / 6 个 configs / 数据目录，分块自检 | 通过（环境与配置就绪；raw 目录 5/14 就绪） |
+| `make imports` | 逐个导入 `scripts/` 下 192 个脚本 | 182 ok、0 config、10 missing、**0 dep、0 other** |
+| `make smoke` | peerlab L0：10 个实验逐个判脚本与输入是否就绪 | 8 就绪 / 2 受阻（缺上游网络目录），退出码 3 |
+| `make status` | 逐实验列出缺什么 | 8/10 就绪 |
+| `make lint` | 命名、脚本清单与实验文档规范检查 | 通过 |
+| `make gate` | 数据不变量门：边表↔报告、样本窗口、board 列、MD&A 身份、股本链、analyst_cov | 6 个全部 blocked（缺 `data/processed` 与 `artifacts` 产物），退出码 2 |
+| `make selftest` | `pytest tests/test_peerlab_*.py tests/test_script_utils.py tests/test_gate_*.py` | 75 passed |
+| `make test` | 全量 `pytest`（`tests/`） | 收集期中断：1 error（缺 `data/processed/analyst/edges`） |
 
 `make imports`（即 `python -m peerlab smoke --imports --clean`）会执行每个脚本的模块级代码，部分脚本会在 `reports/data_gates/G0/`、`data/processed/` 下写出文件（如 `drive_batch1_schema.json`）。命令跑完会列出这些文件并删除；不加 `--clean` 时只列出，便于先看脚本写了什么。
 
@@ -59,7 +60,7 @@ make env        # uv venv --python 3.13 .venv + uv pip install -r requirements.t
 
 种子协议、实验注册表与结果聚合规则见 `docs/result_pipeline.md`：全局 `SEEDS = (0,1,2,3,4)`，每次运行注入 `PYTHONHASHSEED` 与 random/numpy 种子，脚本自带 `--seed` 的直传。
 
-`make preflight` 的退出码：env 或 configs 不通过返回 1；data 级只报告不判失败，因为数据完备性取决于仓库外的决定。
+`make doctor` 的退出码：环境或 configs 不通过返回 1；数据目录只报告不判失败，因为数据完备性取决于仓库外的决定。
 
 ## 等级与现状
 
@@ -68,7 +69,7 @@ make env        # uv venv --python 3.13 .venv + uv pip install -r requirements.t
 | T1 环境 | venv 可重建、依赖齐、脚本全部能导入 | 达成 |
 | T2 数据 | 教师数据在代码读取的路径 | 达成（42 个文件，5 个 raw 目录 + external） |
 | T3 配置 | `configs/` 六个 YAML 到位 | 达成（2026-11-18 新基线重建，来源与未锚项见 `configs/README.md`） |
-| T4 运行 | 跑通管线并产出 `data/processed/` | **未达成**：依赖 T3 |
+| T4 运行 | 跑通管线并产出 `data/processed/` | **未达成**：产物目录只有占位文件，需要按 `docs/experiments.md` 跑链生成 |
 
 ## 平台边界
 

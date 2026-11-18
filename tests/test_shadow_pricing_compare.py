@@ -42,7 +42,7 @@ SHADOW_MAX = ROOT / "data/processed/phase2_shadow/source_month_argmax_panel_p2sh
 
 HEADLINE_ANCHORS = {
     # BL-01（I-16）后 = metadata-only 重写（追加 window_requested / sample_window_actual）的新 sha；
-    # 原列逐值不变（见 scripts/panel_metadata_rewrite.py --verify）
+    # 原列逐值不变（metadata-only 改写的验收口径）
     "m1_common_sample_ma_teacher_v2.parquet":
         "5e9a8504b7c7bfff811cecc4c4dc325f9e502108420df245ba38eddea04e96fd",
     "s3_m1_pricing_table_v2.json":

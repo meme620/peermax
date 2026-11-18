@@ -5,7 +5,7 @@
   python scripts/run_analyst_pipeline.py 5           # 从步骤 5 起（snapshot 之后）
 
 步骤号：1=ingest 2=audit 3=clean 4=dedup 5=snapshot 6=edges 7=diag
-        8=derived 9=panel 10=sens 11=cf_mom 12=alpha 13=identity
+        8=derived 9=sens 10=cf_mom 11=alpha 12=identity
 
 全流程会重跑 step1-4（约 10-20 分钟，读取原始 7z/xlsx 并重新拆分），
 日常增量建议从 5 开始（覆盖表已在冻结口径 v2 下生成）。
@@ -28,11 +28,10 @@ STEPS = [
     ('6_edges', 'analyst_edges_build.py', []),
     ('7_diag', 'analyst_network_diagnostic.py', []),
     ('8_derived', 'analyst_derived_build.py', []),
-    ('9_panel', 'analyst_panel_merge.py', []),
-    ('10_sens', 'analyst_sensitivity_specs.py', []),
-    ('11_cf_mom', 'analyst_cf_mom_replication.py', []),   # 实际参数见 CF_MOM_ARGS（4 变体）
-    ('12_alpha', 'analyst_cf_mom_alpha.py', []),
-    ('13_identity', 'analyst_identity_audit.py', []),
+    ('9_sens', 'analyst_sensitivity_specs.py', []),
+    ('10_cf_mom', 'analyst_cf_mom_replication.py', []),   # 实际参数见 CF_MOM_ARGS（4 变体）
+    ('11_alpha', 'analyst_cf_mom_alpha.py', []),
+    ('12_identity', 'analyst_identity_audit.py', []),
 ]
 
 # cf_mom 参数映射（4 个变体：count/ln × h1/h12）
@@ -68,7 +67,7 @@ def main():
     for idx, (label, script, _) in enumerate(STEPS, start=1):
         if idx < start:
             continue
-        if label == '11_cf_mom':
+        if label == '10_cf_mom':
             for args in CF_MOM_ARGS:
                 run([SCRIPTS / 'analyst_cf_mom_replication.py'] + args, f'{label}:{args}')
         else:

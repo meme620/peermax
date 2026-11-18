@@ -1,6 +1,6 @@
 # scripts/
 
-计算链代码，**全部平铺**在这一层：203 个 `.py` + `ocr_tesseract_chunk.sh`。脚本用 `Path(__file__).resolve().parents[1]` 定位仓库根，同目录互相 import。
+计算链代码，**全部平铺**在这一层：192 个 `.py` + `ocr_tesseract_chunk.sh`。脚本用 `Path(__file__).resolve().parents[1]` 定位仓库根，同目录互相 import。
 
 ## 命名家族
 
@@ -17,7 +17,7 @@
 | `peermax_` | MAX / PeerMAX 面板 | `peermax_panel_build.py` |
 | `shadow_` | Phase2/3/3B shadow 对照 | `shadow_inference.py` |
 | `fetch_` `build_` `extract_` | 抓数与基础构建 | `fetch_tencent_daily.py` |
-| `audit_` `*_check` `*_smoketest` | 一次性审计与复核（56 个，不当主线入口） | `network_business_acceptance_check.py` |
+| `audit_` `*_check` `*_smoketest` | 一次性审计与复核（54 个，不当主线入口） | `network_business_acceptance_check.py` |
 
 共享模块 4 个：`fileio.py`（原子写、JSON、sha）、`fmt.py`、`dates.py`、`statsutil.py`（NW / OLS）。
 

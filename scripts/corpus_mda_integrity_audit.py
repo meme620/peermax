@@ -29,7 +29,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 TXT = ROOT / "data/raw/cninfo/annual_txt"
-MDA = ROOT / "data/processed/mda_texts.csv"
+V2 = ROOT / "data/processed/mda_texts_v2.csv"
 ART = ROOT / "artifacts/review"
 OUTD = ROOT / "reports/data_gates/G0"
 A_STOCKS = ROOT / "data/raw/baostock/stock_basic/a_stocks.csv"
@@ -150,41 +150,29 @@ def doc_type(text):
     return "other"
 
 
-def misalign_only():
-    """只跑跨年错位扫描，不回写身份列。
+def iter_v2_texts():
+    """v2 文本（status=ok / src_identity=match / dup_n=1）；缺 v2 直接停，不回退 v1。"""
+    if not V2.is_file():
+        raise SystemExit("[MDA] 缺 data/processed/mda_texts_v2.csv；先跑 text_mda_extract_v2.py")
+    with open(V2, encoding="utf-8", newline="") as f:
+        for row in csv.DictReader(f):
+            if row["status"] != "ok" or row["src_identity"] != "match" or row["dup_n"] != "1":
+                continue
+            code = row["code"]
+            yield (code[2:] if code[:2] in ("sz", "sh") else code), row["year"], row["text"]
 
-    优先用 v2 产物（status=ok 且 src_identity=match 且 dup_n==1）；否则回退 v1。
-    """
-    v2 = ROOT / "data/processed/mda_texts_v2.csv"
+
+def misalign_only():
+    """只跑跨年错位扫描，不回写身份列（读 v2 产物，status=ok 且 src_identity=match 且 dup_n==1）。"""
     mis = []
     n_scanned = 0
-    if v2.exists():
-        with open(v2, encoding="utf-8", newline="") as f:
-            r = csv.DictReader(f)
-            sig = {}
-            for row in r:
-                if row["status"] != "ok" or row["src_identity"] != "match" or row["dup_n"] != "1":
-                    continue
-                num = row["code"][2:] if row["code"][:2] in ("sz", "sh") else row["code"]
-                s = minhash_sig(row["text"])
-                if s:
-                    sig[(num, row["year"])] = s
-                if row["text"]:
-                    n_scanned += 1
-    else:
-        rows = list(csv.DictReader(open(ART / "mda_src_identity.csv", encoding="utf-8")))
-        good = {(r["code6"], r["year"]) for r in rows
-                if r["identity"] == "match" and int(r.get("dup_n") or 1) == 1}
-        sig = {}
-        with open(MDA, encoding="utf-8", newline="") as f:
-            r = csv.reader(f)
-            next(r)
-            for row in r:
-                code, year, text = row[0], row[1], row[2]
-                num = code[2:] if code[:2] in ("sz", "sh") else code
-                if (num, year) in good:
-                    sig[(num, year)] = minhash_sig(text)
-                    n_scanned += 1
+    sig = {}
+    for num, year, text in iter_v2_texts():
+        s = minhash_sig(text)
+        if s:
+            sig[(num, year)] = s
+        if text:
+            n_scanned += 1
     bycode = collections.defaultdict(list)
     for k in sig:
         bycode[k[0]].append(k)
@@ -204,7 +192,7 @@ def misalign_only():
     summary["misalign_suspect"] = len(mis)
     summary["misalign_firms"] = len({m["code6"] for m in mis})
     summary["misalign_scanned_texts"] = n_scanned
-    summary["misalign_source"] = "mda_texts_v2.csv" if v2.exists() else "mda_texts.csv(v1)"
+    summary["misalign_source"] = "mda_texts_v2.csv"
     jp.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"跨年错位: {len(mis)} 条 / {summary['misalign_firms']} 家（扫描 {n_scanned} 篇，源 "
           f"{summary['misalign_source']}）")
@@ -281,14 +269,9 @@ def main():
     sig = {}
     mis = []
     if not args.skip_misalign:
-        with open(MDA, encoding="utf-8", newline="") as f:
-            r = csv.reader(f)
-            next(r)
-            for row in r:
-                code, year, text = row[0], row[1], row[2]
-                num = code[2:] if code[:2] in ("sz", "sh") else code
-                if (num, year) in good:
-                    sig[(num, year)] = minhash_sig(text)
+        for num, year, text in iter_v2_texts():
+            if (num, year) in good:
+                sig[(num, year)] = minhash_sig(text)
         bycode = collections.defaultdict(list)
         for k in sig:
             bycode[k[0]].append(k)

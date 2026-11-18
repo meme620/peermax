@@ -24,8 +24,8 @@ os.makedirs(OUT, exist_ok=True)
 YEARS = list(range(2018, 2026))
 
 
-def load_bonus(code: str):
-    p = os.path.join(BONUS, f"{code}.csv")
+def load_bonus(code: str, bonus_dir=None):
+    p = os.path.join(bonus_dir or BONUS, f"{code}.csv")
     evts = []
     if not os.path.exists(p):
         return evts

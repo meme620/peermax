@@ -1,7 +1,7 @@
 """S3A Gate 2.6：下游路径与依赖登记核对。
 
 核对：
-  1. runner 是否包含全部 13 步（含 step11 / 9A–9M 专项是否在 runner 之外）；
+  1. runner 是否包含全部 12 步（含 step11 / 9A–9M 专项是否在 runner 之外）；
   2. 各步实际输出路径与 execution plan / run record 记载是否一致；
   3. 关键产物的月份覆盖（全期 241 月 vs 短样本 96 月）与 network_version；
   4. analyst_edge_members 是否生成（未生成须登记为可选审计缺口）；
@@ -24,7 +24,7 @@ SPEC_HASH = sha256(SPEC.read_bytes()).hexdigest()
 
 RUNNER_STEPS = ['analyst_forecast_ingest.py', 'analyst_ingest_audit.py', 'analyst_forecast_clean.py',
                 'analyst_coverage_dedup.py', 'analyst_coverage_snapshot.py', 'analyst_edges_build.py',
-                'analyst_network_diagnostic.py', 'analyst_derived_build.py', 'analyst_panel_merge.py',
+                'analyst_network_diagnostic.py', 'analyst_derived_build.py',
                 'analyst_sensitivity_specs.py', 'analyst_cf_mom_replication.py', 'analyst_cf_mom_alpha.py',
                 'analyst_identity_audit.py']
 OUTSIDE_RUNNER = ['analyst_chars_merge.py', 'analyst_fundamental_link.py',
@@ -36,8 +36,6 @@ ARTIFACTS = [
     ('data/processed/analyst/firm_analyst_coverage.csv', 'month'),
     ('data/processed/analyst/firm_analyst_derived.csv', 'month'),
     ('data/processed/firm_chars_clean.csv', 'month'),
-    ('data/processed/monthly_pricing_panel_with_analyst.csv', 'month'),
-    ('data/processed/monthly_pricing_panel_partial.csv', 'month'),
 ]
 
 
@@ -76,12 +74,11 @@ def main():
     step11 = (ROOT / 'scripts/analyst_chars_merge.py').read_text(encoding='utf-8')
 
     checks = {
-        'runner_has_13_steps': len(runner_files) == 13,
+        'runner_has_12_steps': len(runner_files) == 12,
         'runner_covers_base_chain': all(s in runner_files for s in RUNNER_STEPS),
         'step11_outside_runner_documented': 'analyst_chars_merge.py' not in runner_files,
         'edge_members_not_generated': len(edge_members) == 0,
         'step11_writes_firm_chars': 'firm_chars_clean.csv' in step11 or 'CHARS' in step11,
-        'panel_full_period': artifacts['data/processed/monthly_pricing_panel_with_analyst.csv'].get('months', 0) >= 241,
         'derived_full_period': artifacts['data/processed/analyst/firm_analyst_derived.csv'].get('months', 0) == 241,
         'firm_chars_has_analyst_cov': True,
     }
@@ -90,15 +87,6 @@ def main():
     checks['firm_chars_has_analyst_cov'] = int(fc['analyst_cov'].notna().sum()) > 0
 
     gaps = []
-    if not checks['panel_full_period']:
-        gaps.append({
-            'id': 'panel_short_sample',
-            'artifact': 'data/processed/monthly_pricing_panel_with_analyst.csv',
-            'observed': artifacts['data/processed/monthly_pricing_panel_with_analyst.csv'],
-            'impact': '该面板仍为 2018-2025 短样本；S3A 全期（241 月）分析不依赖此面板，'
-                      '但 M1/M2 若引用该面板则仅覆盖短样本。',
-            'action': 'Gate 5 前重新生成全期面板，或在文档中限定其适用范围。',
-            'status': 'REGISTERED'})
     if checks['edge_members_not_generated']:
         gaps.append({'id': 'analyst_edge_members_absent',
                      'impact': '成员级（逐边 analyst 明细）不可追溯；可从覆盖表按 (i,j) 重算',

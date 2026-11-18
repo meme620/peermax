@@ -94,7 +94,7 @@ def scan_scripts():
     if not file_texts:
         raise SystemExit('provenance 审计：未找到 analyst_* 脚本，扫描面无意义')
 
-    # 产生方检测覆盖 scripts/ 全树（产生方可能不在 analyst_ 前缀脚本内，如 peermax_panel_pilot.py）；
+    # 产生方检测覆盖 scripts/ 全树（产生方可能不在 analyst_ 前缀脚本内，如 peermax_max_build.py）；
     # 读取方检测仍只针对 S3A 脚本。
     produced_paths = set()
     produced_basenames = set()

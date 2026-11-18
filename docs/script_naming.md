@@ -30,7 +30,6 @@
 | `analyst_` | S3A 分析师覆盖网络 |
 | `peermax_` | MAX / PeerMAX 面板 |
 | `shadow_` | Phase2/3/3B shadow 对照 |
-| `panel_` | 面板 metadata 重写 |
 | `fetch_` / `build_` / `extract_` | 外部取数与基础构建 |
 | `audit_` / `*_check` / `*_smoketest` | 一次性审计与复核 |
 
@@ -59,7 +58,7 @@
 
 ## 5. 现状
 
-- `scripts/` 平铺 203 个 `.py` + 1 个 `.sh`；4 个共享模块 `fileio.py`、`fmt.py`、`dates.py`、`statsutil.py` 与脚本同层。
-- `tests/` 平铺 39 个测试模块 + `conftest.py`。
-- 199 个原快照脚本全部有 `former_name`；4 个共享模块由 `scripts/lib/` 上移（`io.py`→`fileio.py`，`stats.py`→`statsutil.py`）。
+- `scripts/` 平铺 192 个 `.py` + 1 个 `.sh`；4 个共享模块 `fileio.py`、`fmt.py`、`dates.py`、`statsutil.py` 与脚本同层。
+- `tests/` 平铺 45 个测试模块 + `conftest.py`（含 6 个数据门单测）。
+- 188 个原快照脚本全部有 `former_name`；4 个共享模块由 `scripts/lib/` 上移（`io.py`→`fileio.py`，`stats.py`→`statsutil.py`）。
 - 原先按 `m1/`、`prospectus/`、`diag/`、`shadow/` 拆出去的 29 个模块已按 AST 逐节点核对后合回 15 个宿主脚本。

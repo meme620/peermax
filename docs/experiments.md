@@ -231,7 +231,6 @@ M1 数据门报告。阶段：M1/S5；脚本：`scripts/pricing_gate_report.py`�
 
 ### 已知坑
 
-- `network_pilot_build.py` 是 SUPERSEDED pilot，产出 `network/`（Top-200 截断），不得作为分析输入。
 - `network_ma_teacher_idf/` 是 IDF 变体的诊断产物，主口径不读它。
 
 ## network-mda-text
@@ -321,8 +320,7 @@ MAX / PeerMAX 定价面板。阶段：S4；脚本：`peermax_max_build.py` → `
 
 ### 已知坑
 
-- `peermax_panel_pilot.py` 是 SUPERSEDED pilot，读 `network/` 旧口径并缺源收益填 0，不得作为分析输入。
-- `analyst_panel_merge.py` 依赖 pilot 产出的 `monthly_pricing_panel_partial.csv`，属旧口径，不能与本实验的 v4 面板混用。
+- 缺 `configs/parameter_registry.yaml` 时导入即 `SystemExit(2)`；未登记的 `--net-dir` 会被输出路径护栏拦下（见 `tests/test_peermax_net_dir_guard.py`）。
 
 ## portfolio-sorts
 

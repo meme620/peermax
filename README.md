@@ -8,8 +8,8 @@ A 股产品市场同侪的彩票型收益（MAX）溢出研究：计算链代码
 
 | 路径 | 内容 |
 |---|---|
-| `scripts/` | 计算链：203 个 `.py` + 1 个 `.sh`，平铺；命名家族见 `docs/script_naming.md`，逐文件角色见 `docs/script_inventory.csv` |
-| `tests/` | 39 个测试模块（33 个契约、5 个 peerlab 单测、1 个共享模块单测）+ `conftest.py` |
+| `scripts/` | 计算链：192 个 `.py` + 1 个 `.sh`，平铺；命名家族见 `docs/script_naming.md`，逐文件角色见 `docs/script_inventory.csv` |
+| `tests/` | 45 个测试模块（33 个契约、5 个 peerlab 单测、1 个共享模块单测、6 个数据门单测）+ `conftest.py` |
 | `ref/` | 权威源头文档：立项文档 5、老师材料与参考论文 3、组内论文 2 |
 | `docs/` | 项目文档 8 篇：计算链、材料来源、环境、数据布局、结果链路、脚本命名、分叉记录、脚本清单 |
 | `docs/experiments.md` | 10 个实验的规范文档：每个 id 一节，八小节（目的/参数/Baseline/实现细节/输入与前置/产物与验收/耗时与资源/已知坑） |
@@ -23,13 +23,14 @@ A 股产品市场同侪的彩票型收益（MAX）溢出研究：计算链代码
 ```bash
 make env          # 建 .venv（Python 3.13）并装 requirements.txt
 make doctor       # 解释器 / 依赖 / configs / 数据 四块自检
-make imports      # 逐个导入 scripts/ 下 203 个脚本
+make imports      # 逐个导入 scripts/ 下 192 个脚本
 make smoke        # L0 冒烟：10 个实验逐个判就绪
 make lint         # 命名与结构规范检查
 make status       # 每个实验缺什么
 make run-all      # 全部实验 × SEEDS=(0,1,2,3,4)，当前全部 blocked
 make report       # 重算 result/tables 与 summary.md
-make selftest     # peerlab 与共享模块单测
+make gate         # 数据不变量门：pass / fail / blocked，缺产物记 blocked
+make selftest     # peerlab、共享模块与数据门单测
 ```
 
 ## 当前状态
@@ -37,11 +38,11 @@ make selftest     # peerlab 与共享模块单测
 | 项 | 状态 |
 |---|---|
 | 环境 | 就绪：Python 3.13.12，14 个直接依赖与传递依赖全部固定版本 |
-| 脚本导入 | 203 个：192 ok / 0 缺配置 / 11 缺数据目录 / 0 依赖问题 / 0 其它 |
+| 脚本导入 | 192 个：182 ok / 0 缺配置 / 10 缺数据目录 / 0 依赖问题 / 0 其它 |
 | 教师数据 | 就绪：42 个文件在 `data/raw/` 与 `data/external/`（4.1 GB，不入 Git） |
 | `configs/` | 六个 YAML 已按新基线重建（`configs/README.md`）；M1 输入与 S3A 输入的 sha256 锚待数据生成后补 |
 | `data/processed/` | 空：需要跑链生成，而跑链又依赖 `configs/` |
-| 全量 `pytest tests` | 收集不再中断；309 passed / 123 failed / 149 errors，全部因 `data/processed/` 与 `reports/` 为空 |
+| 全量 `pytest tests` | 收集期中断：1 error（缺 `data/processed/analyst/edges`），与改动前同形态 |
 
 ## 文档
 

@@ -1,4 +1,4 @@
-"""python -m peerlab：status / smoke / doctor / lint / run / run-all / report。"""
+"""python -m peerlab：status / smoke / doctor / lint / gate / run / run-all / report。"""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import json
 import sys
 from pathlib import Path
 
-from . import collect, doctor, imports, lint, registry, runner
+from . import collect, doctor, gates, imports, lint, registry, runner
 
 ROOT = Path(__file__).resolve().parents[1]
 RESULT_DIR = ROOT / 'result'
@@ -152,6 +152,35 @@ def cmd_lint(args) -> int:
     return code
 
 
+def cmd_gate(args) -> int:
+    only = [x.strip() for x in args.only.split(',')] if args.only else None
+    if only:
+        known = {gate.id for gate in gates.GATES}
+        unknown = [x for x in only if x not in known]
+        if unknown:
+            print('未知门：' + ', '.join(unknown) + '；可选：' + ', '.join(sorted(known)))
+            return 2
+    results = gates.run_gates(ROOT, only=only)
+    if args.json:
+        print(json.dumps(results, ensure_ascii=False, indent=2))
+    else:
+        counts = {s: sum(1 for r in results if r['status'] == s) for s in ('pass', 'fail', 'blocked')}
+        print('数据门 ' + str(len(results)) + ' 个：pass ' + str(counts['pass']) +
+              '，fail ' + str(counts['fail']) + '，blocked ' + str(counts['blocked']))
+        for item in results:
+            print('  ' + item['status'].ljust(8) + item['gate'].ljust(24) + item['title'])
+            if item['blocked']:
+                print('            ' + item['blocked'])
+            for problem in item['problems']:
+                print('            ' + problem)
+    statuses = {r['status'] for r in results}
+    if 'fail' in statuses:
+        return 1
+    if 'blocked' in statuses:
+        return 2
+    return 0
+
+
 def cmd_report(args) -> int:
     written = collect.aggregate(RESULT_DIR)
     if not written:
@@ -196,6 +225,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_all.add_argument('--continue-on-error', action='store_true')
     p_all.add_argument('--dry-run', action='store_true')
     p_all.set_defaults(func=cmd_run_all)
+
+    p_gate = sub.add_parser('gate', help='数据不变量门（pass / fail / blocked）')
+    p_gate.add_argument('--only', default=None, help='逗号分隔的门 id')
+    p_gate.add_argument('--json', action='store_true')
+    p_gate.set_defaults(func=cmd_gate)
 
     p_report = sub.add_parser('report', help='重算 result/tables 与 summary')
     p_report.set_defaults(func=cmd_report)

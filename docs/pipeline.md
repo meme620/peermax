@@ -8,14 +8,12 @@ PeerMAX 项目的计算链代码：原始数据抓取 → 清洗与面板构建 
 
 **只收代码。** 不含数据（`data/`）、配置（`configs/`）、报告与审计产物（`reports/`）、汇报成品（`deliverables/`）、审计工作记录（`artifacts/`）。这些都在主仓库原路径。
 
-其中 2 个是 SUPERSEDED pilot 脚本——`scripts/network_pilot_build.py`、`scripts/peermax_panel_pilot.py`，仅为 pilot 链完整性与历史留档而纳入，docstring 均明令「请勿使用」，**不得作为分析输入**；正式结果一律来自 `peermax_panel_build.py` 等 active 脚本（见 §10）。
-
-规模：**203 个 `.py` + 1 个 `.sh`**、**3,387,843 字节**、**64,183 行**（`.py` 部分），全部在 `scripts/` 一层。
+规模：**192 个 `.py` + 1 个 `.sh`**、**3,298,375 字节**、**62,294 行**（`.py` 部分），全部在 `scripts/` 一层。
 
 | 目录 | 内容 |
 |---|---|
-| `scripts/` | 计算链全部脚本：阶段入口、链上分析、共享库、一次性审计、抓数与 builder，平铺 203 个 `.py` |
-| `tests/` | 39 个测试模块：33 个契约测试 + 5 个 peerlab 单测 + 1 个共享模块单测 |
+| `scripts/` | 计算链全部脚本：阶段入口、链上分析、共享库、一次性审计、抓数与 builder，平铺 192 个 `.py` |
+| `tests/` | 45 个测试模块：33 个契约测试 + 5 个 peerlab 单测 + 1 个共享模块单测 + 6 个数据门单测 |
 | `peerlab/` | 执行 CLI 与注册表 |
 
 与仓库其它部分的分工：`ref/proposals/` 是立项/研究计划文档（PDF、TeX）；老师提供的原始数据包（分析师预测、CFND、WSVI、老师 MD&A、申万分类、Google Drive 共享）在 `data/raw/{analyst,cfnd,wsvi,teacher,drive}` 与 `data/external/`，代码读的正是这些路径；落盘位置见 `docs/materials.md`。
@@ -28,8 +26,8 @@ PeerMAX 项目的计算链代码：原始数据抓取 → 清洗与面板构建 
 ├── ref/                         外部输入文档：立项文档、老师材料、组内论文
 ├── data/                        教师数据（raw/）与派生产物（processed/）
 ├── configs/                     冻结参数与版本锚（新基线重建，见 configs/README.md）
-├── scripts/                     203 个 .py + ocr_tesseract_chunk.sh（平铺）
-├── tests/                       39 个测试模块 + conftest.py
+├── scripts/                     192 个 .py + ocr_tesseract_chunk.sh（平铺）
+├── tests/                       45 个测试模块 + conftest.py
 ├── peerlab/                     执行 CLI
 ├── docs/experiments.md          10 个实验的规范文档（单文件）
 └── result/                      结果层
@@ -56,7 +54,7 @@ PeerMAX 项目的计算链代码：原始数据抓取 → 清洗与面板构建 
 | S3 M-A | 年报业务章节提取 → 聚类参数网格 → 逐年 K 冻结 → 正式构边 | `text_business_extract_v7` → `network_business_cluster_grid` → `network_business_cluster_freeze` → `network_business_edges_build` | `business_texts_v7.csv`；`{net_dir}/clusters/{year}_clusters.csv`；`{net_dir}/{year}_{similarity,support}.csv`；`G0/s3_b3_ma_cluster_grid*.json`、`s3_b3_ma_param_freeze*.json` |
 | S3 M-B | 老师 MD&A 语料 TF-IDF 余弦全期矩阵 → τ 校准 → 正式构边 | `text_mda_extract_v2`、`network_mda_full_matrix`、`network_tau_calibrate`、`network_mda_edges_build` | `G0/s3_mb_full_matrix.json`、`s3_b1_tau_calibration.json`；`network_mb/`、`network_mb_teacher/` 下年度边表 |
 | S3 审计 | 边精度抽样+审计、文本完整性、跨源归因、密度零模型、下游一致性、权重交叉、主链审计、九项验收 | `network_edge_precision_sample` → `network_edge_precision_audit`、`data_integrity_audit`、`text_layer_audit`、`network_cross_audit_attribution`、`network_cross_audit`、`network_business_acceptance_check`、`network_business_downstream_consistency`、`network_business_weighting_cross_audit`、`network_report_acceptance_check`、`network_mainline_audit`、`code_design_audit` | `G0/s3_*.json` / `*.md` |
-| S3A | CNRDS 分析师预测 → 覆盖快照 → 12 月窗口投影为公司网络 → 派生变量 → 面板合并 → CF/NPM 复刻 → 9A–9M → Gate1/2/5 | `run_analyst_pipeline.py`（13 步）；9A–9M 与 step11 在 runner 外 | `data/raw/analyst/`、`data/processed/analyst/`、`monthly_pricing_panel_with_analyst.csv`、`G0/s3a_*.json` |
+| S3A | CNRDS 分析师预测 → 覆盖快照 → 12 月窗口投影为公司网络 → 派生变量 → CF/NPM 复刻 → 9A–9M → Gate1/2/5 | `run_analyst_pipeline.py`（12 步）；9A–9M 与 step11 在 runner 外 | `data/raw/analyst/`、`data/processed/analyst/`、`G0/s3a_*.json` |
 | S4 | source-month MAX/argmax/完整月 gate → PeerMAXraw / OwnMAXraw / PeerReturn → C1 三轮验收 | `peermax_max_build` → `peermax_panel_build` → `peermax_panel_acceptance` | `source_month_argmax_panel.csv`；`monthly_pricing_panel_{ma,mb,ma_teacher,mb_teacher}_v4.csv`；`G0/s4_step2_{corpus}_v4_report.json`、`s4_c1_acceptance_{corpus}_v4.json` |
 | M1/S5 | A1–A5 输入合同 + 下月 outcome + 控制变量 + 样本冻结 → FM 主表与 horse race → 组合/形状 → 稳健性 → 篇幅与行业 → gate | `pricing_sample_build` → `pricing_fm_main` → `pricing_portfolio_sorts` → `pricing_robustness_placebo` → `pricing_length_industry_control` → `pricing_gate_report` | `m1_common_sample_{ma,mb}_v3.parquet`、`m1_s5_v3_sample_summary.json`、`s3_m1_sample_report_v3.json`；`G0/s3_m1_{pricing_table,horse_race,portfolio_deciles,diagnostics,robustness_placebo,length_control,industry_absorb,gate_report}` |
 | Phase2/3/3B | shadow 对照：月收益/状态、MAX、复权 MAX、换手率、REV、shadow M1；as-of 分类、校准、原文规则、推断层、行业吸收、shadow 网络 M1；断点分段、共同窗口、VW 权重矩阵、A9 族多重比较 | `shadow_monthly_status` … `shadow_pricing_compare`、`shadow_asof_industry` … `shadow_network_pricing`、`shadow_segment_break` 等 | `phase2_shadow/`、`phase3_shadow/`、`artifacts/phase2/`、`artifacts/phase3/`、**仅** `artifacts/phase3b/3b_*` |
@@ -103,7 +101,7 @@ python scripts/network_tau_calibrate.py
 python scripts/network_mda_edges_build.py --year 2021 --tau 0.25
 
 # S3A（runner 内部 subprocess 固定 cwd=ROOT；全流程重跑 step1-4 约 10-20 分钟，日常从 5 起）
-python scripts/run_analyst_pipeline.py          # 1-13 步
+python scripts/run_analyst_pipeline.py          # 1-12 步
 python scripts/run_analyst_pipeline.py 5        # 从 snapshot 起
 python scripts/analyst_chars_merge.py           # runner 之外：AnalystCoverage 接入 firm_chars_clean
 python scripts/analyst_gate1_entry_audit.py
@@ -140,9 +138,9 @@ python scripts/shadow_asof_industry.py
 python scripts/shadow_weight_matrix.py
 ```
 
-### 3.3 S3A runner 的 13 步与 9A–9M
+### 3.3 S3A runner 的 12 步与 9A–9M
 
-runner 的 `STEPS`：1 ingest → 2 audit → 3 clean → 4 dedup → 5 snapshot → 6 edges（`analyst_edges_build.py`）→ 7 diag（`analyst_network_diagnostic.py`）→ 8 derived（`analyst_derived_build.py`）→ 9 panel（`analyst_panel_merge.py`）→ 10 sens（`analyst_sensitivity_specs.py`）→ 11 cf_mom（4 变体）→ 12 alpha → 13 identity。
+runner 的 `STEPS`：1 ingest → 2 audit → 3 clean → 4 dedup → 5 snapshot → 6 edges（`analyst_edges_build.py`）→ 7 diag（`analyst_network_diagnostic.py`）→ 8 derived（`analyst_derived_build.py`）→ 9 sens（`analyst_sensitivity_specs.py`）→ 10 cf_mom（4 变体）→ 11 alpha → 12 identity。
 
 9A–9M 在 runner 之外（`analyst_gate2_path_registry.py` 记为 `OUTSIDE_RUNNER`）；Gate1 元数据审计覆盖其中 9 个：
 
@@ -309,16 +307,11 @@ python -m pytest tests/ -q        # 必须显式写 tests/
 
 ## 10. 标注 [非主线] 的纳入项
 
-纳入了归档、但**不是当前主线计算链一环**的 6 个文件，引用时必须带标注：
+纳入了归档、但**不是当前主线计算链一环**的 1 个文件，引用时必须带标注：
 
 | 文件 | 标注 | 理由 |
 |---|---|---|
-| `extract_ar_product_tables.py` | [非主线] 原型 | docstring 自称「原型」 |
-| `text_business_extract.py` | [非主线] 历史 v1 | 被 `text_business_extract_v7.py` 取代（v6 缺陷：900 字硬截断） |
-| `text_mda_extract.py` | [非主线] 历史 v1 | 被 `text_mda_extract_v2.py` 取代（STOP 半句误切、30k 硬截断、无来源身份列） |
 | `make_analyst_network_brief_pptx.py` | [非主线] 仅汇报 | Gate5 读其源码，故必须纳入 |
-| `network_pilot_build.py` | [非主线][SUPERSEDED] pilot 构图 | docstring 明令「请勿使用」；它是 `peermax_panel_pilot.py` 的上游 |
-| `peermax_panel_pilot.py` | [非主线][SUPERSEDED] pilot S4 面板 | 读旧 `network/`、缺源收益填 0；它是 `analyst_panel_merge.py` 读取的 `monthly_pricing_panel_partial.csv` 的生成者 |
 
 `text_mda_extract_v2.py` 是**主线**（M-B 自建语料侧），不在此列。
 
@@ -327,7 +320,7 @@ python -m pytest tests/ -q        # 必须显式写 tests/
 ```bash
 python3 -m py_compile $(git ls-files '*.py')     # 全部 .py 语法通过
 bash -n scripts/ocr_tesseract_chunk.sh           # shell 语法通过
-python -m peerlab smoke --imports --clean        # 203 个脚本逐个导入
+python -m peerlab smoke --imports --clean        # 192 个脚本逐个导入
 python -m peerlab lint                           # 命名与结构规范
 ```
 

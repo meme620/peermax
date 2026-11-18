@@ -11,7 +11,7 @@
      递延所得税"等合法 MD&A 词，实测假阳性 38.2% vs 结构判据 0.33%）→ 改为 **§8.10.5 结构判据**：
      独占一行、去空白后为章节标记（第X节/第X章）或 `STOP_NAMES` 具名标题，且同一标题全文出现
      < 3 次（>= 3 次判为页眉，不计）。字段：`stop_heading_hits` / `out_of_scope`。
-  ② 截断 flag：旧 `len >= 29900` 阈值来自**已废弃的 v1 提取器**（`text_mda_extract.py`，MAX_LEN=3e4），
+  ② 截断 flag：旧 `len >= 29900` 阈值来自**v1 提取器的 MAX_LEN=3e4**，
      v2 提取器已提到 3e5 → flag 失效。改为**读当前提取器的 MAX_LEN**：
        self 语料：M-A = `text_business_extract_v7.SAFE_MAX`（3e4）、M-B = `text_mda_extract_v2.MAX_LEN`（3e5）；
        teacher 语料：老师导出面板无本仓库提取器 → 实测存在 **Excel 单元格上限 32767**
