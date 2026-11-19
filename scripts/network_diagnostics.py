@@ -1,4 +1,4 @@
-"""S3 Step 3：网络诊断（设计规格 required output，2026-09-14）。
+"""network Step 3：网络诊断（设计规格 required output，2026-09-14）。
 
 设计真源（execution_plan §5.6 Step 3）：
     NetworkMass_{i,d}       = sum_j Similarity_{ij,d-}
@@ -10,7 +10,7 @@
 
 产物：
   data/processed/network_{ma,mb}/{text_year}_diagnostics.csv
-  reports/data_gates/G0/s3_diagnostics_{ma,mb}_report.json
+  reports/data_gates/G0/network_diagnostics_{ma,mb}_report.json
 用法：python scripts/network_diagnostics.py [--use-case ma|mb|both]
 """
 import argparse
@@ -106,8 +106,8 @@ def main():
         m = [r['effective_peer_count']['median'] for r in rep['by_use_case'][uc]]
         ns = [r['no_network_support_share'] for r in rep['by_use_case'][uc]]
         print(f'{uc}: EPC 中位 {m} | no-support 占比 {ns}', flush=True)
-    (REPD / 's3_diagnostics_report.json').write_text(json.dumps(rep, ensure_ascii=False, indent=2), encoding='utf-8')
-    print('->', REPD / 's3_diagnostics_report.json')
+    (REPD / 'network_diagnostics_report.json').write_text(json.dumps(rep, ensure_ascii=False, indent=2), encoding='utf-8')
+    print('->', REPD / 'network_diagnostics_report.json')
 
 
 if __name__ == '__main__':

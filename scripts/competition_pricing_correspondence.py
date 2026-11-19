@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""S3 对表（correspondence）：刘亚辉等（2021）核心结论 × 我方 S3 主口径网络 PC。
+"""network 对表（correspondence）：刘亚辉等（2021）核心结论 × 我方 network 主口径网络 PC。
 
 对表靶子（原文，`ref/teacher-materials/A股产品市场竞争.pdf`；PDF 页 = 印刷页 − 2060）：
   假设 4 = 产品市场竞争越激烈（PC 越大）→ 股票预期收益率越高。
@@ -36,7 +36,7 @@
      （36 个月滚动市场贝塔，附录附表 1）与 IA/Roe/Lev/Disp/Ivol、无证监会二级行业 HHI
      （PC 文件中的 `hhi` = 同团 −PC，与 PC 定义性共线，不可作原文「传统行业 HHI」的替代）→ 登记为限制。
   6. NW 滞后：主读数用 registry `nw_lag = 6`（我方冻结值）；并报 lag = 12 列以对应原文口径。
-  7. 样本：主读数 = 已登记 M1 样本 `m1_s5_v2_2015_2023`（`m1_in_fm_sample`，含 microcap q10 / 次新股 /
+  7. 样本：主读数 = 已登记 pricing_gate 样本 `pricing_sample_v2_2015_2023`（`pricing_in_fm_sample`，含 microcap q10 / 次新股 /
      控制可得三处筛除）；并报「原文口径最近似样本」（PC 与所报变量可得、不施加额外筛除）——两样本同判据并报，
      **不择一**。收益 = 面板既有 `R_next`（raw，月度截面 [0.01,0.99] winsorize，registry 冻结规则）；
      PC 天然有界 [−1, 0]，未施加额外 winsorize。
@@ -53,7 +53,7 @@ competition_pricing_correspondence.{json,md}`、默认进度 = `artifacts/tmp/pc
 
 用法：python scripts/competition_pricing_correspondence.py
       python scripts/competition_pricing_correspondence.py --pc-dir data/processed/network_ma_fulltext \
-          --out-prefix s3_pc_pricing_correspondence_fulltext --corpus-label 年报全文 --step-tag FT-4
+          --out-prefix competition_pricing_correspondence_fulltext --corpus-label 年报全文 --step-tag FT-4
 产出：reports/data_gates/G0/{out-prefix}.{json,md}（缺省 competition_pricing_correspondence.{json,md}）
 """
 from __future__ import annotations
@@ -67,21 +67,21 @@ import numpy as np
 import pandas as pd
 
 from pricing_lib import (
-    OUT_DIR, ROOT, ROWS_NOT_APPLICABLE, assert_m1_contract, contract_from_frame, fm_regression,
+    OUT_DIR, ROOT, ROWS_NOT_APPLICABLE, assert_pricing_contract, contract_from_frame, fm_regression,
     file_shape, load_input_contracts, manifest_input_key, newey_west, param_value,
     rank_average_groups, require, write_json,
 )
 
-# 2026-10-27（Phase 0.2 / V-P1-2 + N-2）：对手集合口径不同 → 对表判定统一为「不可比/未复现」。
+# 2026-10-27（Phase 0.2 口径复核）：对手集合口径不同 → 对表判定统一为「不可比/未复现」。
 # 原文第四步 = 「任何与其相似度超过团内最小相似度的公司」（字面含团外）；我方 = 同团全部成员
 # （已登记偏离：methodology_execution_plan:2290，主仓库原文）。PC 不是原文变量的严格复现。
 NOT_COMPARABLE_LABEL = '不可比/未复现（对手集合口径不同）'
 COMPARABLE_TO_PAPER = False
 
 PROGRESS = ROOT / 'artifacts/tmp/pc_correspondence_progress.md'
-PANEL_SAMPLE = ROOT / 'data/processed/m1_common_sample_ma_teacher_v2.parquet'
-M1_SAMPLE_REPORT = ROOT / 'reports/data_gates/G0/s3_m1_sample_report.json'
-V2_SAMPLE_REPORT = ROOT / 'reports/data_gates/G0/s3_m1_sample_report_v2.json'
+PANEL_SAMPLE = ROOT / 'data/processed/pricing_sample_ma_teacher_v2.parquet'
+PRICING_SAMPLE_REPORT = ROOT / 'reports/data_gates/G0/pricing_sample_report.json'
+V2_SAMPLE_REPORT = ROOT / 'reports/data_gates/G0/pricing_sample_report_v2.json'
 PC_DIR = ROOT / 'data/processed/network_ma_teacher'
 OUT_PREFIX = 'competition_pricing_correspondence'
 STEP_TAG = 'PC'
@@ -90,15 +90,15 @@ CORPUS_DIFF_NOTE = '语料：原文 = 年报全文；我方主口径 = 老师 MD
 CORPUS_MD_CELL = '**老师 MD&A 章节**（`pm_ma_ewcos_teacher_v1_{y}`）'
 CORPUS_LIMITATION = '老师 MD&A 语料（2021 年存在已知结构性断点，见 methodology 与 workplan 登记）'
 CORPUS_LABEL_DETAIL = 'pm_ma_ewcos_teacher_v1_{y}'    # 版本串（随 --pc-dir 切换；缺省 = 主口径）
-MD_TITLE = '# S3 对表：刘亚辉等（2021）核心结论 × 我方主口径网络 PC'
+MD_TITLE = '# network 对表：刘亚辉等（2021）核心结论 × 我方主口径网络 PC'
 GENERATED_AT = '2026-10-16'
 PC_DIR_LABEL = 'data/processed/network_ma_teacher'
 _V1_PROGRESS = PROGRESS
 FACTORS = ROOT / 'data/processed/factor_returns_daily.csv'
 REV_PKL = ROOT / 'data/raw/drive/operating_revenue_annual.pkl'
 NP_PKL = ROOT / 'data/raw/drive/net_profit_parent_company_annual.pkl'
-JSON_OUT = OUT_DIR / 's3_pc_pricing_correspondence.json'
-MD_OUT = OUT_DIR / 's3_pc_pricing_correspondence.md'
+JSON_OUT = OUT_DIR / 'competition_pricing_correspondence.json'
+MD_OUT = OUT_DIR / 'competition_pricing_correspondence.md'
 
 PC_YEARS = list(range(2017, 2023))          # 老师 MD&A 语料 6 年（2014–2016 缺营收 → PC 不可得）
 CONTROLS = ['size', 'bm', 'mom', 'rev', 'illiq']
@@ -143,7 +143,7 @@ def assert_sample_bytes(sample_report: dict, key: str = 'ma_teacher') -> dict:
     entry = contracts.get(file_key) or {}
     reg_rows = entry.get('rows')
     require(reg_rows is None or int(reg_rows) == rows,
-            f's3_pc: 样本行数不匹配（file={file_key}）期望={reg_rows} 实际={rows}')
+            f'competition: 样本行数不匹配（file={file_key}）期望={reg_rows} 实际={rows}')
     return {'file': file_key, 'path': str(PANEL_SAMPLE), 'rows': rows,
             'rows_registered': reg_rows, 'columns': columns, 'match': True}
 
@@ -263,10 +263,10 @@ def main() -> int:
     # **缺省路径**（不传任何新参数）在 `JSON_OUT = OUT_DIR / ...` 处 UnboundLocalError（v1 默认行为未保住）。
     # 加入 global 后：不传 `--out-dir` 时 `OUT_DIR` 保持 pricing_lib 模块级缺省（reports/data_gates/G0）
     # → 缺省输出路径与 v1 逐字面量一致。
-    ap = argparse.ArgumentParser(description='S3 对表（correspondence）；v2 参数化，缺省 = 主口径行为')
+    ap = argparse.ArgumentParser(description='network 对表（correspondence）；v2 参数化，缺省 = 主口径行为')
     ap.add_argument('--pc-dir', default=None, help='PC 目录（缺省 data/processed/network_ma_teacher）')
     ap.add_argument('--pc-years', type=int, nargs='*', default=None, help='PC 文本年（缺省 2017-2022）')
-    ap.add_argument('--panel', default=None, help='登记样本面板（缺省 m1_common_sample_ma_teacher_v2.parquet）')
+    ap.add_argument('--panel', default=None, help='登记样本面板（缺省 pricing_sample_ma_teacher_v2.parquet）')
     ap.add_argument('--out-dir', default=None, help='报告目录（缺省 reports/data_gates/G0）')
     ap.add_argument('--out-prefix', default=None, help='输出文件名前缀（缺省 competition_pricing_correspondence）')
     ap.add_argument('--progress', default=None, help='进度文件（缺省 artifacts/tmp/pc_correspondence_progress.md）')
@@ -279,8 +279,8 @@ def main() -> int:
     ap.add_argument('--generated-at', default=None, help='JSON generated_at（缺省 2026-10-16）')
     args = ap.parse_args()
     # Phase 1 I-2：启动即核验登记样本 build report 的四条硬门；失败退出，不写任何新结果。
-    sample_report = json.loads(M1_SAMPLE_REPORT.read_text(encoding='utf-8'))
-    assert_m1_contract(sample_report, where='s3_pc:build_report')
+    sample_report = json.loads(PRICING_SAMPLE_REPORT.read_text(encoding='utf-8'))
+    assert_pricing_contract(sample_report, where='competition:build_report')
     custom_panel = args.panel is not None
     if args.pc_dir:
         PC_DIR = Path(args.pc_dir) if Path(args.pc_dir).is_absolute() else ROOT / args.pc_dir
@@ -323,7 +323,7 @@ def main() -> int:
     psay('0', f'运行参数 = pc-dir `{PC_DIR_LABEL}` / PC 文本年 {PC_YEARS} / 输出 `{_rel(JSON_OUT)}` / '
               f'语料标签「{CORPUS_LABEL}」/ 版本串 `{CORPUS_LABEL_DETAIL}` / step-tag {STEP_TAG}')
     nw_lag = int(param_value('nw_lag'))
-    min_n = int(param_value('m1_sample_and_spec_registry')['min_focal_count_per_month'])
+    min_n = int(param_value('sample_and_spec_registry')['min_focal_count_per_month'])
     psay('0', f'registry 冻结读数：nw_lag = {nw_lag}、min_n/月 = {min_n}（主读数）；另报 lag = 12 对应原文')
 
     # ---------------- PC-1 装载与 PIT 合并
@@ -334,14 +334,14 @@ def main() -> int:
         for gate in ('pit_violations_strict_lt', 'duplicate_focal_month_keys',
                      'missing_filled_with_zero'):
             require(c_panel.get(gate) == 0,
-                    f's3_pc:custom_panel {gate}={c_panel.get(gate)} != 0（{_rel(PANEL_SAMPLE)}）')
+                    f'competition:custom_panel {gate}={c_panel.get(gate)} != 0（{_rel(PANEL_SAMPLE)}）')
         psay('0', f'自定义面板 {_rel(PANEL_SAMPLE)}：rows_match_registered 不适用'
                   f'（rows={c_panel["rows"]}），PIT/重复键/缺失不填 0 = 0')
     else:
         expected_rows = int(sample_report['samples']['ma_teacher']['rows_total'])
-        c_panel = assert_m1_contract(
+        c_panel = assert_pricing_contract(
             panel, expected_rows=expected_rows, kind='sample',
-            where='s3_pc:registered_panel')['contracts']['<frame>']
+            where='competition:registered_panel')['contracts']['<frame>']
     contract_status = {
         'panel': _rel(PANEL_SAMPLE),
         'panel_mode': 'custom' if custom_panel else 'registered',
@@ -353,7 +353,7 @@ def main() -> int:
         'pit_violations_strict_lt': c_panel.get('pit_violations_strict_lt'),
         'duplicate_focal_month_keys': c_panel.get('duplicate_focal_month_keys'),
         'missing_filled_with_zero': c_panel.get('missing_filled_with_zero'),
-        'source': ('s3_m1_sample_report.json:samples.ma_teacher.rows_total + 面板 parquet 现算'
+        'source': ('pricing_sample_report.json:samples.ma_teacher.rows_total + 面板 parquet 现算'
                    if not custom_panel else
                    '自定义 --panel：无登记行数；只强制 PIT/重复键/缺失不填 0'),
         'note': ('自定义 --panel 无登记行数：行数门显式不适用'
@@ -379,14 +379,14 @@ def main() -> int:
     # 样本定义（四组，全部并报，不择一）
     pc_ok = merged['PC'].notna() & merged['R_next'].notna()
     ctrl_ok = merged[CONTROLS].notna().all(axis=1)
-    reg = merged['m1_in_fm_sample'].astype(bool)
-    S1_paper = merged[pc_ok].copy()
-    S1_reg = merged[pc_ok & reg].copy()
-    S2_paper = merged[pc_ok & ctrl_ok].copy()
-    S2_reg = merged[pc_ok & reg & ctrl_ok].copy()
-    psay('1', f'样本量状态：S1 原文最近似 = {len(S1_paper):,} 行 / {S1_paper["month"].nunique()} 月；'
-              f'S1 登记样本 = {len(S1_reg):,} 行 / {S1_reg["month"].nunique()} 月；'
-              f'S2 原文最近似 = {len(S2_paper):,}；S2 登记样本 = {len(S2_reg):,}')
+    reg = merged['pricing_in_fm_sample'].astype(bool)
+    sample_paper_like = merged[pc_ok].copy()
+    sample_registered = merged[pc_ok & reg].copy()
+    sample_with_controls_paper_like = merged[pc_ok & ctrl_ok].copy()
+    sample_with_controls_registered = merged[pc_ok & reg & ctrl_ok].copy()
+    psay('1', f'样本量状态：原文最近似样本 = {len(sample_paper_like):,} 行 / {sample_paper_like["month"].nunique()} 月；'
+              f'登记样本 = {len(sample_registered):,} 行 / {sample_registered["month"].nunique()} 月；'
+              f'加控制原文最近似 = {len(sample_with_controls_paper_like):,}；加控制登记样本 = {len(sample_with_controls_registered):,}')
 
     # ---------------- PC-2 描述统计（表 2 对应）
     pc_firm_year = pc['PC']
@@ -397,8 +397,8 @@ def main() -> int:
             'median': r4(pc_firm_year.median()), 'p75': r4(pc_firm_year.quantile(.75)),
         },
         'pc_in_fm_sample_monthly': {
-            'n': int(S1_reg['PC'].notna().sum()), 'mean': r4(S1_reg['PC'].mean()),
-            'sd': r4(S1_reg['PC'].std()), 'median': r4(S1_reg['PC'].median()),
+            'n': int(sample_registered['PC'].notna().sum()), 'mean': r4(sample_registered['PC'].mean()),
+            'sd': r4(sample_registered['PC'].std()), 'median': r4(sample_registered['PC'].median()),
         },
         'target': TARGETS['table2_pc_mean'], 'target_median': TARGETS['table2_pc_median'],
         'verdict_mean': ('符号一致（同为负；描述性，不构成复现）' if pc_firm_year.mean() < 0
@@ -410,7 +410,7 @@ def main() -> int:
 
     # ---------------- PC-3 表 4 列(1) 对应：单变量 FM
     fm1 = {}
-    for tag, samp in (('paper_like', S1_paper), ('registered', S1_reg)):
+    for tag, samp in (('paper_like', sample_paper_like), ('registered', sample_registered)):
         for lag in (nw_lag, 12):
             for wtag, wcol in (('EW', None), ('VW', 'market_equity')):
                 blk, _ = fm_regression(samp, 'R_next', ['PC'], weight_col=wcol, min_n=min_n, nw_lag=lag)
@@ -423,7 +423,7 @@ def main() -> int:
 
     # ---------------- PC-4 表 4 列(2) 对应：加控制 FM
     fm2 = {}
-    for tag, samp in (('paper_like', S2_paper), ('registered', S2_reg)):
+    for tag, samp in (('paper_like', sample_with_controls_paper_like), ('registered', sample_with_controls_registered)):
         for lag in (nw_lag, 12):
             for wtag, wcol in (('EW', None), ('VW', 'market_equity')):
                 blk, _ = fm_regression(samp, 'R_next', ['PC'] + CONTROLS, weight_col=wcol,
@@ -482,7 +482,7 @@ def main() -> int:
         return out
 
     ports = {}
-    for tag, samp in (('paper_like', S1_paper), ('registered', S1_reg)):
+    for tag, samp in (('paper_like', sample_paper_like), ('registered', sample_registered)):
         for gtag, n_groups in (('quintile', 5), ('decile', 10)):
             for wtag, wcol in (('EW', None), ('VW', 'market_equity')):
                 ports[f'{tag}_{gtag}_{wtag}'] = portfolio(tag, samp, n_groups, wtag, wcol, nw_lag)
@@ -629,7 +629,7 @@ def main() -> int:
             '因子：我方 FF4_SELF_BUILT_v1（MKT/SMB/HML/MOM）→ α3/α4 可得；RMW/CMA/LIQ 无 → 原文 α5/α6/α7 不可得',
             '控制：我方 = size/bm/mom/rev/illiq（5 项）；无 firm-level β_MKT、无 IA/Roe/Lev/Disp/Ivol、无证监会二级行业 HHI',
             'NW 滞后：主读数 lag 6（registry nw_lag 冻结值）；并报 lag 12 对应原文',
-            '样本：主读数 = 已登记 M1 样本 m1_s5_v2_2015_2023；并报「原文最近似样本」（仅变量可得性）',
+            '样本：主读数 = 已登记 pricing_gate 样本 pricing_sample_v2_2015_2023；并报「原文最近似样本」（仅变量可得性）',
             '收益：面板既有 R_next（raw、月度截面 [0.01,0.99] winsorize）；PC 有界 [−1,0] 未额外 winsorize'],
         'pc_inputs': {'dir': PC_DIR_LABEL, 'years': PC_YEARS,
                       'definition': 'PC = −HHI(同团成员销售收入，含 focal 自身；营收取文本年 −1 年)',
@@ -664,18 +664,18 @@ def main() -> int:
             'power_at_paper_effect': 0.0715,
             'n_months': int(fm1['registered_EW_lag6']['n_months_used']),
             'diagnostic_sample': 'main_caption',
-            'source': 'reports/audits/s3_pc_sign_diagnostics_20261021.md §8R(f)'
+            'source': 'reports/audits/competition_sign_diagnostics_20261021.md §8R(f)'
                       '（CI/功效为既有**主口径**诊断读数，本脚本不重算）',
             'reading': ('主口径诊断读数，非全文列；全文列点估计为负但不显著'
                         if ('fulltext' in OUT_PREFIX or '全文' in CORPUS_LABEL)
                         else 'CI 同时覆盖 0 与 +0.152 → 本样本无法判定；'
                              '不是符号相反，也不是对原文的证伪')},
         'sample_sizes': {
-            'S1_paper_like': {'rows': int(len(S1_paper)), 'months': int(S1_paper['month'].nunique()),
-                              'first_month': S1_paper['month'].min(), 'last_month': S1_paper['month'].max()},
-            'S1_registered': {'rows': int(len(S1_reg)), 'months': int(S1_reg['month'].nunique())},
-            'S2_paper_like': {'rows': int(len(S2_paper)), 'months': int(S2_paper['month'].nunique())},
-            'S2_registered': {'rows': int(len(S2_reg)), 'months': int(S2_reg['month'].nunique())}},
+            'paper_like': {'rows': int(len(sample_paper_like)), 'months': int(sample_paper_like['month'].nunique()),
+                              'first_month': sample_paper_like['month'].min(), 'last_month': sample_paper_like['month'].max()},
+            'registered': {'rows': int(len(sample_registered)), 'months': int(sample_registered['month'].nunique())},
+            'with_controls_paper_like': {'rows': int(len(sample_with_controls_paper_like)), 'months': int(sample_with_controls_paper_like['month'].nunique())},
+            'with_controls_registered': {'rows': int(len(sample_with_controls_registered)), 'months': int(sample_with_controls_registered['month'].nunique())}},
         # Phase 1 I-2：面板契约状态（自定义 --panel 的行数门显式记 not_applicable_custom_panel）
         'contract_status': contract_status,
         'targets': TARGETS,
@@ -721,11 +721,11 @@ def main() -> int:
             '（既有面板无对应字段；β_MKT 或行业 HHI 如需对齐须先登记构造口径再跑）',
             'PC 的 `hhi_excl_self`（剔除自身的 HHI）变体 —— 未执行（PC 文件已有该列，可作后续敏感性）',
             '假设 3（团体排序高/低竞争分组 + 跨组预测）—— 不在本轮范围（本轮只对表假设 4 / 表 2 / 表 3 / 假设 1）',
-            '原文样本筛除（S1–S7：金融/综合类剔除、上市不足两年、词条数 <10）—— 未逐条复刻（我方用登记样本与'
+            '原文样本筛除（原文样本筛除：金融/综合类剔除、上市不足两年、词条数 <10）—— 未逐条复刻（我方用登记样本与'
             '「原文最近似样本」两口径并报，未做额外的行业/金融剔除）',
             '多重检验 / 子期间 bootstrap —— 未执行（判据为符号 + 显著性，不含推断校正）'],
     }
-    # P1 断言：numerical_readings 的 lag6/lag12 必须逐值等于同文件 L2 读数（主/全文均适用）
+    # 断言：numerical_readings 的 lag6/lag12 必须逐值等于同文件 L2 读数（主/全文均适用）
     for _lag in ('lag6', 'lag12'):
         _nr = out['numerical_readings'][f'registered_EW_{_lag}_univariate']
         _pc = out['L2_fm_univariate'][f'registered_EW_{_lag}']['PC']
@@ -746,7 +746,7 @@ def main() -> int:
     md = []
     md.append(MD_TITLE + '\n')
     md.append('> **性质**：对表分析产物（只读既有产物；未覆盖任何既有文件、未改任何 headline_value / 冻结值）。'
-              '**2026-10-27 口径更正（V-P1-2 / N-2）**：对手集合口径不同 → 判定统一为「不可比/未复现」。')
+              '**2026-10-27 口径更正（口径复核）**：对手集合口径不同 → 判定统一为「不可比/未复现」。')
     md.append('> **判据（先登记）**：原判据 = 符号一致 + 显著性同向（t 同号且 |t| > 1.96）→「复现成功」；'
               '符号一致不显著 →「部分」；反号 →「不成功」。**该判据自 2026-10-27 起不适用于对外结论**：'
               '项目对手集合 = 同团成员，原文 = 「任何与其相似度超过团内最小相似度的公司」（字面含团外），'
@@ -762,7 +762,7 @@ def main() -> int:
     md.append('| 因子 | α3/α4/α5/α6/α7（FF5+UMD+LIQ） | **α3/α4 可得**（`FF4_SELF_BUILT_v1`）；无 RMW/CMA/LIQ | 原文 α5–α7 不可得 |')
     md.append('| 控制 | HHI/β_MKT/Size/BM/Mom/Rev/Illiq/IA/Roe/Lev/Disp/Ivol（12） | size/bm/mom/rev/illiq（5） | 无 β_MKT / 行业 HHI / 会计类控制 |')
     md.append('| NW 滞后 | 12 | 主读数 6（registry `nw_lag`）+ 并报 12 | 双报 |')
-    md.append('| 样本 | 全 A 股（S1–S7 筛选后） | 主读数 = 登记样本 `m1_s5_v2_2015_2023`；并报「原文最近似样本」 | 两样本同判据并报 |\n')
+    md.append('| 样本 | 全 A 股（原文样本筛除 筛选后） | 主读数 = 登记样本 `pricing_sample_v2_2015_2023`；并报「原文最近似样本」 | 两样本同判据并报 |\n')
     md.append(f"> **面板契约（I-2）**：`{contract_status['panel']}`；rows={contract_status['rows']} / "
               f"rows_registered={contract_status['rows_registered']}；"
               f"rows_match_registered=`{contract_status['rows_match_registered']}`；"

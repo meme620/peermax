@@ -1,4 +1,4 @@
-"""S3A Gate 2.3：C 线审计重算器。
+"""analyst-network Gate 2.3：C 线审计重算器。
 
 只读中间产物与基础数据，逐层重算 coverage、边集合、common count、权重行和与唯一键，
 用于验证「生产脚本写出的文件」本身自洽且可被第三方独立验证。
@@ -10,7 +10,7 @@
 
 不读取原始预测数据、不调用生产投影函数。
 
-输出：artifacts/s3a_crosscheck_C.json（241 月逐月 + 抽查月明细）
+输出：artifacts/analyst_crosscheck_c.json（241 月逐月 + 抽查月明细）
 
 用法：
   python scripts/analyst_crosscheck_auditor.py [--months N] [--spot-only]
@@ -24,12 +24,13 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import yaml
+from fileio import file_size
 
 ROOT = Path(__file__).resolve().parents[1]
-SPEC = ROOT / 'configs/s3a_final_spec.yaml'
+SPEC = ROOT / 'configs/analyst_spec.yaml'
 _SPEC_BYTES = SPEC.read_bytes()
 SPEC_DATA = yaml.safe_load(_SPEC_BYTES.decode('utf-8'))
-SPEC_HASH = file_size(_SPEC_BYTES)
+SPEC_HASH = len(_SPEC_BYTES)
 
 COV = ROOT / 'data/processed/analyst/firm_analyst_coverage.csv'
 EDGED = ROOT / 'data/processed/analyst/edges'
@@ -177,9 +178,9 @@ def main():
             'total_duplicate_keys': int(sum(r.get('duplicate_keys', 0) for r in monthly)),
         },
     }
-    p = ROOT / 'artifacts/s3a_crosscheck_C.json'
+    p = ROOT / 'artifacts/analyst_crosscheck_c.json'
     p.write_text(json.dumps(out, ensure_ascii=False, indent=1), encoding='utf-8')
-    (ROOT / 'artifacts/s3a_crosscheck_C_detail.json').write_text(
+    (ROOT / 'artifacts/analyst_crosscheck_c_detail.json').write_text(
         json.dumps(details, ensure_ascii=False, indent=1), encoding='utf-8')
     print(json.dumps(out['totals'], ensure_ascii=False))
     print('->', p.relative_to(ROOT))

@@ -1,4 +1,4 @@
-"""S3-B3.2：M-A 聚类参数网格对比 v2（linkage × K 规则；不读收益）。
+"""network-B3.2：M-A 聚类参数网格对比 v2（linkage × K 规则；不读收益）。
 
 v3（2026-09-28，Phase B″2）：加 `--corpus {self,teacher}` / `--lexicon` / `--out-report` /
 `--years` 参数化（语料路径、id 列名、年份默认、报告路径随语料切换）。**算法与阈值一字未改**：
@@ -48,7 +48,7 @@ v2 在 K 网格上直接评估三类指标：
 用法：
   python scripts/network_business_cluster_grid.py --years 2019 2021 2023 --kmax 60
   python scripts/network_business_cluster_grid.py --corpus teacher --years 2016 2018 2020 2022 \
-      --out-report reports/data_gates/G0/s3_b3_ma_cluster_grid_teacher.json
+      --out-report reports/data_gates/G0/network_business_cluster_grid_teacher.json
 """
 import argparse
 import json
@@ -71,7 +71,6 @@ REPD = ROOT / 'reports/data_gates/G0'
 # 语料真源 = 下面的 CORPORA（B″2 起）；此前的模块级单值 CORPUS=business_texts.csv 已并入
 # CORPORA['self']['path']，避免第二份真源（无外部脚本 import 该常量）。
 IDMAP = ROOT / 'data/processed/firm_id_map.csv'
-IND = ROOT / 'data/raw/baostock/industry/all_current.csv'
 SW2L = ROOT / 'data/processed/sw2_industry_latest.csv'
 MIN_TERMS = 10
 IPO_MIN_YEARS = 2
@@ -92,7 +91,7 @@ CORPORA = {
         'years': list(range(2017, 2026)),
         # grid_years 同时是该语料下 `--years` 的**默认值**（self 保持历史默认 [2019,2021,2023] 不变）
         'grid_years': [2019, 2021, 2023],
-        'report': REPD / 's3_b3_ma_cluster_grid.json',
+        'report': REPD / 'network_business_cluster_grid.json',
         'weighting': 'ew',
         'sim_adjust': 'none',
     },
@@ -105,7 +104,7 @@ CORPORA = {
         'lexicon': ROOT / 'data/processed/product_lexicon_v2_teacher.csv',
         'years': list(range(2014, 2023)),
         'grid_years': [2016, 2018, 2020, 2022],
-        'report': REPD / 's3_b3_ma_cluster_grid_teacher.json',
+        'report': REPD / 'network_business_cluster_grid_teacher.json',
         'weighting': 'ew',
         'sim_adjust': 'none',
     },
@@ -120,7 +119,7 @@ CORPORA = {
         'lexicon': ROOT / 'data/processed/product_lexicon_v2_teacher.csv',
         'years': list(range(2014, 2023)),
         'grid_years': [2016, 2018, 2020, 2022],
-        'report': REPD / 's3_b3_ma_cluster_grid_teacher_idf.json',
+        'report': REPD / 'network_business_cluster_grid_teacher_idf.json',
         'weighting': 'idf',
         'idf_by_year': ROOT / 'data/processed/product_lexicon_v2_teacher_df_by_year.csv',
         'sim_adjust': 'none',
@@ -137,7 +136,7 @@ CORPORA = {
         'lexicon': ROOT / 'data/processed/product_lexicon_v2_teacher.csv',
         'years': list(range(2014, 2023)),
         'grid_years': [2016, 2018, 2020, 2022],
-        'report': REPD / 's3_b3_ma_cluster_grid_teacher_medadj.json',
+        'report': REPD / 'network_business_cluster_grid_teacher_medadj.json',
         'weighting': 'ew',
         'sim_adjust': 'median',
     },
@@ -158,7 +157,7 @@ CORPORA = {
         'lexicon': ROOT / 'data/processed/product_lexicon_v2_fulltext.csv',
         'years': list(range(2017, 2023)),
         'grid_years': [2017, 2019, 2021, 2022],
-        'report': REPD / 's3_b3_ma_cluster_grid_ma_fulltext.json',
+        'report': REPD / 'network_business_cluster_grid_ma_fulltext.json',
         'weighting': 'ew',
         'sim_adjust': 'none',
     },
@@ -244,12 +243,14 @@ def adjust_stats(C, C_adj, m):
 def load_refs():
     m = pd.read_csv(IDMAP, dtype={'code6': str})
     m['ipo'] = pd.to_datetime(m['ipo_date'], errors='coerce')
-    ind = pd.read_csv(IND, dtype=str)
-    ind['code6'] = ind['code'].str.replace('.', '', regex=False).str[2:]
-    ind['menlei'] = ind['industry'].astype(str).str[:1]
-    m = m.merge(ind[['code6', 'menlei']], on='code6', how='left')
-    lat = pd.read_csv(SW2L, dtype={'code6': str, 'l2_code': str})
-    m = m.merge(lat[['code6', 'l2_code']], on='code6', how='left')
+    # CSRC 门类源 data/raw/baostock/industry/all_current.csv 已不在盘上且 baostock 登录不可达；
+    # J/S 判定由申万一级行业等价推导：银行(480000)+非银金融(490000)→J（金融业）、综合(510000)→S。
+    # 主线消费只有「menlei in ('J','S') 剔除」两处，非 J/S 的具体字母不参与任何判定。
+    lat = pd.read_csv(SW2L, dtype={'code6': str, 'l1_code': str, 'l2_code': str})
+    lat = lat[lat['is_current_version'] == True].drop_duplicates('code6')  # noqa: E712
+    m = m.merge(lat[['code6', 'l1_code', 'l2_code']], on='code6', how='left')
+    m['menlei'] = np.where(m['l1_code'].isin(('480000', '490000')), 'J',
+                           np.where(m['l1_code'] == '510000', 'S', 'NA'))
     return m.set_index('firm_id')
 
 
@@ -427,7 +428,7 @@ def eval_K(C, labels, l2, base_rate):
     sizes = []
     for k in np.unique(labels):
         idx = np.where(labels == k)[0]
-        file_size(len(idx))
+        sizes.append(len(idx))
         if len(idx) > 1:
             sub = C[np.ix_(idx, idx)].copy()
             np.fill_diagonal(sub, 2.0)
@@ -443,7 +444,7 @@ def eval_K(C, labels, l2, base_rate):
     sizes = np.array(sizes)
     return {
         'n_clusters': int(len(sizes)),
-        'size_median': float(np.median(sizes)), 'size_max': int(file_size()),
+        'size_median': float(np.median(sizes)), 'size_max': int(sizes.max()),
         'singleton_share': round(float((sizes == 1).mean()), 4),
         'peer_median': float(np.median(peers)), 'peer_mean': round(float(peers.mean()), 1),
         'peer_p90': float(np.quantile(peers, .9)),
@@ -556,12 +557,12 @@ def main():
                'sw2_lift_rule': '同申万二级有向边占比 / 同样本边际基线'
                                 '（same_sw2_edge_share / base_same_sw2_rate）',
                'sw2_lift_fields': ['same_sw2_edge_share', 'sw2_lift'],
-               'not_comparable_to': 's3_b3_ma_param_freeze_teacher.json 的同名字段'
+               'not_comparable_to': 'network_business_param_freeze_teacher.json 的同名字段'
                                     '（同团成员法：peer = 团规模−1；sw2_lift = 同团同申万二级无序对数占比 / '
                                     '同样本边际基线）',
                'official_evidence_note': '本报告（kmax=60；文本年 2016/2018/2020/2022）不是 K 规则冻结的官方证据；'
-                                         '官方证据 = s3_b3_ma_param_freeze_teacher.json 的 decision.elbow_rule + '
-                                         's3_ma_K_explore.json（2021，K=400）',
+                                         '官方证据 = network_business_param_freeze_teacher.json 的 decision.elbow_rule + '
+                                         'network_business_k_explore.json（2021，K=400）',
                'phase0_3_note': '2026-10-27 Phase 0.3 口径注记；未改任何数值、未重跑网络',
            },
            'lexicon': lmeta,

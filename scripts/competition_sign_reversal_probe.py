@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""S3 对表反号成因排查 —— 第一批检验 T1–T6（2026-10-20，只读既有产物）。
+"""network 对表反号成因排查 —— 第一批检验 T1–T6（2026-10-20，只读既有产物）。
 
-靶子：`reports/audits/s3_sign_reversal_hypotheses_20261020.md`（普查表 H06/H06B/H10/H14/H01/H09）
+靶子：`reports/audits/competition_sign_reversal_hypotheses_20261020.md`（普查表 H06/H06B/H10/H14/H01/H09）
       现行读数：`reports/data_gates/G0/competition_pricing_correspondence.{json,md}`（MD&A 版）
-                `reports/data_gates/G0/s3_pc_pricing_correspondence_fulltext.{json,md}`（全文版）
+                `reports/data_gates/G0/competition_pricing_correspondence_fulltext.{json,md}`（全文版）
 
 == 判据（先登记后跑；抄自普查表 §统一判据）==
   基准读数（主口径 MD&A 登记样本 EW lag6 单变量 FM）：PC = −0.5068%（t = −1.4365）；
@@ -29,13 +29,13 @@
   T6 秩相关/IC（H06）：逐月 Spearman rank IC 时序均值 + t（NW 与 iid）；十组均值/中位数两张表 +
      单调性诊断（相邻组符号反转数、组序 Spearman）。
 
-统一口径：主用**登记样本**（`m1_common_sample_ma_teacher_v2.parquet` + `m1_in_fm_sample`），
+统一口径：主用**登记样本**（`pricing_sample_ma_teacher_v2.parquet` + `pricing_in_fm_sample`），
   每项并报**原文最近似样本**（PC 与 R_next 可得，无额外筛选）；PC 时点 = 面板 `network_version`
   （PIT `max{available_at < month}`，available_at = (y+1)-04-30）；收益 = `R_next`（raw 小数，
   面板构造期已按 registry `winsorization_pct` 月度截面 winsorize）。
 
 纪律：只读既有产物（面板 / PC / 因子）；不覆盖任何既有文件；不改任何 headline_value / 冻结值；
-  产物 = 本脚本 + `reports/data_gates/G0/s3_sign_reversal_batch1.{json,md}` 两件。
+  产物 = 本脚本 + `reports/data_gates/G0/sign_reversal_batch1.{json,md}` 两件。
 
 用法：python scripts/competition_sign_reversal_probe.py
       python scripts/competition_sign_reversal_probe.py --tests T1 T6 --out-prefix /tmp/probe
@@ -54,16 +54,16 @@ from pricing_lib import (
     OUT_DIR, ROOT, fm_regression, newey_west, param_value, rank_average_groups, write_json,
 )
 
-PANEL_SAMPLE = ROOT / 'data/processed/m1_common_sample_ma_teacher_v2.parquet'
+PANEL_SAMPLE = ROOT / 'data/processed/pricing_sample_ma_teacher_v2.parquet'
 PC_DIR = ROOT / 'data/processed/network_ma_teacher'
 CLUSTER_DIR = ROOT / 'data/processed/network_ma_teacher/clusters'
 PC_YEARS = list(range(2017, 2023))
 CONTROLS = ['size', 'bm', 'mom', 'rev', 'illiq']
 PROGRESS = ROOT / 'artifacts/tmp/sign_reversal_progress.md'
-OUT_PREFIX = 's3_sign_reversal_batch1'
+OUT_PREFIX = 'sign_reversal_batch1'
 STEP_TAG = 'B1'
 
-# 登记基准（MD&A 版对表读数，抄自 s3_pc_pricing_correspondence.json）
+# 登记基准（MD&A 版对表读数，抄自 competition_pricing_correspondence.json）
 BASELINE = {
     'registered_EW_lag6_univariate': {'beta_pct': -0.5068, 't_nw': -1.4365},
     'registered_EW_lag6_controls': {'beta_pct': -0.4116, 't_nw': -1.1902},
@@ -147,7 +147,7 @@ def load_merged() -> pd.DataFrame:
 
 def samples(m: pd.DataFrame) -> dict:
     pc_ok = m['PC'].notna() & m['R_next'].notna()
-    reg = m['m1_in_fm_sample'].astype(bool)
+    reg = m['pricing_in_fm_sample'].astype(bool)
     ctrl = m[CONTROLS].notna().all(axis=1)
     out = {
         'paper_like': m[pc_ok].copy(),
@@ -349,13 +349,13 @@ def build_md(o: dict) -> str:
     t6 = o.get('T6_rank_ic', {})
     tv = o.get('test_verdicts', {})
     L = []
-    L.append('# S3 项目自建 PC 负号成因排查 · 第一批检验 T1–T6（2026-10-20；2026-10-27 口径更正）\n')
+    L.append('# network 项目自建 PC 负号成因排查 · 第一批检验 T1–T6（2026-10-20；2026-10-27 口径更正）\n')
     L.append('> **性质**：只读既有产物的成因排查产物（不重建网络；未覆盖任何既有文件、未改任何 '
              'headline_value / 冻结值 / 门槛）。')
     L.append('> **判据（先登记后跑）**：元凶（充分）= 主读数层 PC 系数 ≥ 0 且 4 子层（EW/VW × 五分位/十分位 '
              'H−L、单变量/加控制 FM）≥3 层同向翻转；部分贡献 = 向 0 移动 ≥50% 但仍为负；'
              '排除 = 移动 < 25% 或同号且 |t| 不降。')
-    L.append('> **靶子**：`reports/audits/s3_sign_reversal_hypotheses_20261020.md`（普查表 H01/H06/H06B/H09/H10/H14）；'
+    L.append('> **靶子**：`reports/audits/competition_sign_reversal_hypotheses_20261020.md`（普查表 H01/H06/H06B/H09/H10/H14）；'
              '现行读数 = `reports/data_gates/G0/competition_pricing_correspondence.{json,md}`（MD&A 主口径）。\n')
     L.append('## 0. 输入、样本与基准复现\n')
     L.append('| 项 | 值 |')
@@ -618,7 +618,7 @@ def build_md(o: dict) -> str:
 
 def main() -> int:
     global NW_LAG, MIN_N, PROGRESS, OUT_PREFIX, STEP_TAG
-    ap = argparse.ArgumentParser(description='S3 反号成因排查 T1–T6（只读）')
+    ap = argparse.ArgumentParser(description='network 反号成因排查 T1–T6（只读）')
     ap.add_argument('--tests', nargs='*', default=['T1', 'T2', 'T3', 'T4', 'T5', 'T5B', 'T6'])
     ap.add_argument('--out-prefix', default=None)
     ap.add_argument('--out-dir', default=None)
@@ -640,7 +640,7 @@ def main() -> int:
     md_out = out_dir / f'{OUT_PREFIX}.md'
 
     NW_LAG = int(param_value('nw_lag'))
-    MIN_N = int(param_value('m1_sample_and_spec_registry')['min_focal_count_per_month'])
+    MIN_N = int(param_value('sample_and_spec_registry')['min_focal_count_per_month'])
     psay('0', f'状态 = 开始；检验集 = {tests}；registry nw_lag = {NW_LAG}、min_n/月 = {MIN_N}；'
               f'输出 = {_rel(json_out)}')
 
@@ -679,7 +679,7 @@ def main() -> int:
                         '单变量/加控制 FM）≥3 层同向翻转；部分贡献 = 向 0 移动 ≥50% 但仍为负；'
                         '排除 = 移动 <25% 或同号且 |t| 不降'),
                'attribution': '构造/实现 bug（我们的错）／口径差异（论文 vs 我们）／真实经济差异'},
-           'inputs': {'panel': 'data/processed/m1_common_sample_ma_teacher_v2.parquet',
+           'inputs': {'panel': 'data/processed/pricing_sample_ma_teacher_v2.parquet',
                       'pc_dir': 'data/processed/network_ma_teacher',
                       'pc_years': PC_YEARS,
                       'ycol': 'R_next（raw 小数，面板构造期已月度截面 [0.01,0.99] winsorize）',
@@ -700,7 +700,7 @@ def main() -> int:
                 s10 = hl_summary(t, 10)
                 s10m = hl_summary(tm, 10)
                 t5 = group_table(samp, 5, wcol=wcol)
-                s5 = hl_summary(t5, 5)
+                spec_no_turnover = hl_summary(t5, 5)
                 res[f'{tag}_decile_{wtag}'] = {
                     'group_mean_pct': s10['group_mean_pct'],
                     'group_median_of_monthly_median_pct': s10m.get('group_mean_pct'),
@@ -708,7 +708,7 @@ def main() -> int:
                     'HL_median_pct': s10m['HL_pct'], 'HL_median_t_nw': s10m['HL_t_nw'],
                     'n_months': s10['n_months'],
                     'monotonicity_mean': monotonicity(t, 10),
-                    'quintile_HL_mean_pct': s5['HL_pct'], 'quintile_HL_mean_t_nw': s5['HL_t_nw'],
+                    'quintile_HL_mean_pct': spec_no_turnover['HL_pct'], 'quintile_HL_mean_t_nw': spec_no_turnover['HL_t_nw'],
                 }
             # 组规模与 PC 极值分布（平衡性诊断）
             d = samp[['month', 'PC', 'R_next']].dropna()
@@ -902,7 +902,7 @@ def main() -> int:
         pc_all = m[['focal_id', 'text_year', 'PC']].dropna(subset=['PC']).copy()
         pc_all['text_year'] = pc_all['text_year'].astype('int64')
         pc_all = pc_all.drop_duplicates(['focal_id', 'text_year'])
-        base_cols = ['focal_id', 'month', 'R_next', 'market_equity', 'm1_in_fm_sample',
+        base_cols = ['focal_id', 'month', 'R_next', 'market_equity', 'pricing_in_fm_sample',
                      'size', 'bm', 'mom', 'rev', 'illiq']
         panel = m[base_cols].copy()
         for extra in (0, 12, 24):
@@ -912,7 +912,7 @@ def main() -> int:
                 pc_all.rename(columns={'text_year': 'ty_eff', 'PC': 'PC_lag'}),
                 on=['focal_id', 'ty_eff'], how='left').rename(columns={'PC_lag': 'PC'})
             pc_ok = lg['PC'].notna() & lg['R_next'].notna()
-            s_reg = lg[pc_ok & lg['m1_in_fm_sample'].astype(bool)]
+            s_reg = lg[pc_ok & lg['pricing_in_fm_sample'].astype(bool)]
             s_pl = lg[pc_ok]
             lag = NW_LAG
             res[f'extra_{extra}'] = {
@@ -1020,16 +1020,16 @@ def main() -> int:
             c['text_year'] = y
             cl_frames.append(c)
         cl = pd.concat(cl_frames, ignore_index=True).drop_duplicates(['focal_id', 'text_year'])
-        m2 = m.merge(cl, on=['focal_id', 'text_year'], how='left')
-        chk = m2.dropna(subset=['PC', 'cluster_id']).groupby(['text_year', 'cluster_id'])['PC'].nunique()
+        merged_clusters = m.merge(cl, on=['focal_id', 'text_year'], how='left')
+        chk = merged_clusters.dropna(subset=['PC', 'cluster_id']).groupby(['text_year', 'cluster_id'])['PC'].nunique()
         res = {'proxy_check': {
                    'n_cluster_years': int(len(chk)), 'n_with_multiple_PC': int((chk > 1).sum()),
                    'note': 'PC 值代理（同月同一 PC 值 = 同团）核验：团内 PC 唯一性'},
                'n_distinct_clusters_per_month_mean': None}
         for tag in ('registered', 'paper_like'):
-            samp = m2[m2['PC'].notna() & m2['R_next'].notna()]
+            samp = merged_clusters[merged_clusters['PC'].notna() & merged_clusters['R_next'].notna()]
             if tag == 'registered':
-                samp = samp[samp['m1_in_fm_sample'].astype(bool)]
+                samp = samp[samp['pricing_in_fm_sample'].astype(bool)]
             samp = samp.dropna(subset=['cluster_id'])
             agg = samp.groupby(['month', 'cluster_id'], sort=True).agg(
                 y=('R_next', 'mean'), PC=('PC', 'mean'), n=('R_next', 'size'),

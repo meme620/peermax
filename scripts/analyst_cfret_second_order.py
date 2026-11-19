@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""S3A 9M：CFRET2 二阶网络动量的正式规格（对标 AH Table 8 完整版；review R20，2026-09-01）。
+"""analyst-network 9M：CFRET2 二阶网络动量的正式规格（对标 AH Table 8 完整版；review R20，2026-09-01）。
 
 旧版只有 hi-lo 中位分组诊断（cf_mom_replication.py 内嵌）；AH Table 8 的完整规格=
 逐月横截面 FM：r_{t+1} ~ CFRET2 + CF + controls，要求**控制 CF 后 CFRET2 仍显著**
@@ -69,9 +69,9 @@ def main():
         den = m.groupby('focal_id')['weight'].sum()
         cf = (num / den).rename('cf').reset_index().rename(columns={'focal_id': 'firm_id'})
         # CFRET2 = Σ_j w_ij·CF_j
-        m2 = e.merge(cf.rename(columns={'firm_id': 'source_id', 'cf': 'cf_j'}), on='source_id', how='inner')
-        n2 = m2.assign(wr=m2['weight'] * m2['cf_j']).groupby('focal_id')['wr'].sum()
-        den2 = m2.groupby('focal_id')['weight'].sum()
+        merged = e.merge(cf.rename(columns={'firm_id': 'source_id', 'cf': 'cf_j'}), on='source_id', how='inner')
+        n2 = merged.assign(wr=merged['weight'] * merged['cf_j']).groupby('focal_id')['wr'].sum()
+        den2 = merged.groupby('focal_id')['weight'].sum()
         cfret2 = (n2 / den2).rename('cfret2').reset_index().rename(columns={'focal_id': 'firm_id'})
         coverage2 = (den2 / den).rename('second_order_weight_coverage').reset_index().rename(columns={'focal_id': 'firm_id'})
         share_total = den2.rename('second_order_share_of_total').reset_index().rename(columns={'focal_id': 'firm_id'})

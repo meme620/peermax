@@ -5,7 +5,7 @@
 **同团成员即对手集合**，K 直接控制粒度。本脚本评估该解读下的网络指标，
 并找出使公司层面中位 peer 数≈SW2 目标(56) 的 K，供参数冻结决策。
 
-产物：reports/data_gates/G0/s3_ma_K_explore2.json
+产物：reports/data_gates/G0/network_business_k_explore_cluster_only.json
 """
 import json
 import sys
@@ -53,7 +53,7 @@ def eval_cluster_only(labels, l2, base_rate):
             pair_same += int((vc * (vc - 1) // 2).sum())
     return {
         'n_clusters': int(len(ks)),
-        'size_median': float(np.median(sizes)), 'size_max': int(file_size()),
+        'size_median': float(np.median(sizes)), 'size_max': int(sizes.max()),
         'cluster_size_p90': float(np.quantile(sizes, .9)),
         'peer_median': float(np.median(peers)), 'peer_mean': round(float(peers.mean()), 1),
         'peer_p90': float(np.quantile(peers, .9)),
@@ -90,8 +90,8 @@ def main():
             out['results'][lk][str(K)] = r
             print(f"  [{lk}] K={K:>5} size_med={r['size_median']:.0f} peer_med={r['peer_median']:.0f} "
                   f"peer_p90={r['peer_p90']:.0f} iso={r['isolated_share']:.3f} lift={r['sw2_lift']}", flush=True)
-    (REPD / 's3_ma_K_explore2.json').write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding='utf-8')
-    print('->', REPD / 's3_ma_K_explore2.json')
+    (REPD / 'network_business_k_explore_cluster_only.json').write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding='utf-8')
+    print('->', REPD / 'network_business_k_explore_cluster_only.json')
 
 
 if __name__ == '__main__':

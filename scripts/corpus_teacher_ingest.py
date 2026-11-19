@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""S3 Phase B′0：老师 MD&A 语料接入（M-B 新主输入，2026-09-22 决策）。
+"""network Phase B′0：老师 MD&A 语料接入（M-B 新主输入，2026-09-22 决策）。
 
 输入：data/raw/teacher/mda_data_2023.csv（老师提供；bytes 364b1dc5…；字段 f_id/f_stock_id/f_year/f_chapter_content）
-输出：data/processed/teacher_mda_panel.csv + reports/data_gates/G0/s3_bp0_corpus_ingest.json
+输出：data/processed/teacher_mda_panel.csv + reports/data_gates/G0/corpus_teacher_ingest.json
 
-处理门（对应 execution_plan §3 S3「语料来源与版本」块）：
+处理门（对应 execution_plan §3 network「语料来源与版本」块）：
   1. 年份门     f_year ∈ [2014, 2022]
   2. universe 门 剔除北交所（代码以 8/4 开头）与不在 firm_id_map 的代码；code6 → 项目 firm_id
   3. 长度门     len(text) >= 500
@@ -93,7 +93,7 @@ def main() -> None:
 
     firms = {r[0] for r in rows_out}
     rep = {
-        "step": "S3 Phase B′0 语料接入",
+        "step": "network Phase B′0 语料接入",
         "source": str(SRC.relative_to(ROOT)),
         "output": str(OUT.relative_to(ROOT)),
         "run_at": datetime.now(timezone.utc).isoformat(),
@@ -111,7 +111,7 @@ def main() -> None:
         "status": "PASS" if stats["kept"] > 30_000 and stats["drop_dup_pair"] == 0 else "CHECK",
     }
     REPD.mkdir(parents=True, exist_ok=True)
-    (REPD / "s3_bp0_corpus_ingest.json").write_text(
+    (REPD / "corpus_teacher_ingest.json").write_text(
         json.dumps(rep, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps({k: rep[k] for k in
                       ("status", "n_rows_kept", "n_firms", "stats", "per_year_kept")},

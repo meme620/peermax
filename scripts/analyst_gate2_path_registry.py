@@ -1,13 +1,13 @@
-"""S3A Gate 2.6：下游路径与依赖登记核对。
+"""analyst-network Gate 2.6：下游路径与依赖登记核对。
 
 核对：
   1. runner 是否包含全部 12 步（含 step11 / 9A–9M 专项是否在 runner 之外）；
   2. 各步实际输出路径与 execution plan / run record 记载是否一致；
   3. 关键产物的月份覆盖（全期 241 月 vs 短样本 96 月）与 network_version；
   4. analyst_edge_members 是否生成（未生成须登记为可选审计缺口）；
-  5. build_firm_chars -> step11 -> M1/M2 依赖是否成立。
+  5. build_firm_chars -> step11 -> 定价 gate 依赖是否成立。
 
-产出：reports/data_gates/G0/s3a_gate2_path_registry.json
+产出：reports/data_gates/G0/analyst_gate2_path_registry.json
 """
 import json
 import sys
@@ -16,10 +16,11 @@ from pathlib import Path
 
 import pandas as pd
 import yaml
+from fileio import file_size
 
 ROOT = Path(__file__).resolve().parents[1]
-SPEC = ROOT / 'configs/s3a_final_spec.yaml'
-SPEC_HASH = file_size(SPEC.read_bytes()).hexdigest()
+SPEC = ROOT / 'configs/analyst_spec.yaml'
+SPEC_HASH = file_size(SPEC)
 
 RUNNER_STEPS = ['analyst_forecast_ingest.py', 'analyst_ingest_audit.py', 'analyst_forecast_clean.py',
                 'analyst_coverage_dedup.py', 'analyst_coverage_snapshot.py', 'analyst_edges_build.py',
@@ -110,7 +111,7 @@ def main():
         checks['runner_has_13_steps'], checks['runner_covers_base_chain'],
         checks['derived_full_period'], checks['firm_chars_has_analyst_cov'],
         checks['step11_writes_firm_chars']]) else 'FAIL'
-    out = ROOT / 'reports/data_gates/G0/s3a_gate2_path_registry.json'
+    out = ROOT / 'reports/data_gates/G0/analyst_gate2_path_registry.json'
     out.write_text(json.dumps(result, ensure_ascii=False, indent=1), encoding='utf-8')
     print(json.dumps(checks, ensure_ascii=False, indent=1))
     print('gaps:', [g['id'] for g in gaps])

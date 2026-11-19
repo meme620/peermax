@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Phase 3B / N-4：2021 语料断点分段诊断（headline M1 固定样本，只读）。
+"""Phase 3B / N-4：2021 语料断点分段诊断（headline pricing_gate 固定样本，只读）。
 
 目的
 ----
-判断 headline M1（S5/M1）在 PeerMAX 上的 null 是否由 2021 语料断点后的短样本
+判断 headline pricing_gate（spec_no_turnover/pricing_gate）在 PeerMAX 上的 null 是否由 2021 语料断点后的短样本
 （network_version >= 2021，事件月 2022-05..2023-12，20 个月）驱动。
 
 做法
 ----
-- 只读 `data/processed/m1_common_sample_ma_teacher_v2.parquet`（FM 181,178 行 / 104 月）
-  与 `scripts/pricing_lib.py`；不重建样本、不重跑 PC/网络、不跑官方 M1。
-- 分段（均在 `m1_in_fm_sample == True` 的固定 FM 样本内）：
+- 只读 `data/processed/pricing_sample_ma_teacher_v2.parquet`（FM 181,178 行 / 104 月）
+  与 `scripts/pricing_lib.py`；不重建样本、不重跑 PC/网络、不跑官方 pricing_gate。
+- 分段（均在 `pricing_in_fm_sample == True` 的固定 FM 样本内）：
     nv_pre   : network_version <= 2020（文本年 2014–2020；事件月 2015-05..2022-04，84 月）
     nv_post  : network_version >= 2021（文本年 2021–2022；事件月 2022-05..2023-12，20 月）
     cal_pre  : month <= 2020-12（68 月）
     cal_post : month >= 2021-01（36 月）
-- 每段 × 规格 S1（登记全控制）/ S5（无 turnover）/ S6（无 rev + 无 turnover）× EW/VW
+- 每段 × 规格 spec_full_controls（登记全控制）/ spec_no_turnover（无 turnover）/ spec_no_rev_no_turnover（无 rev + 无 turnover）× EW/VW
   跑 `pricing_lib.fm_regression`（min_n=100、NW lag=6，均从 registry 读取）。
 - 报 PeerMAX / OwnMAX / PeerReturn 的 β/se/t/p/CI/T/n，并与 `artifacts/phase3/3.6_counts.json`
   中的 headline 全样本行（同一固定样本的 FM 登记读数，本脚本不重跑）对比。
@@ -28,7 +28,7 @@
 ----
 - 只写 `artifacts/phase3b/3b_n4_*`；路径守卫拒绝其它写出。
 - 不改 headline 样本/系数/gate/configs/G0/reports。
-- 9 个 M1 输入 sha 在运行前后各快照一次；样本与 3.6 参考件 sha 同样前后核对。
+- 9 个 pricing_gate 输入 sha 在运行前后各快照一次；样本与 3.6 参考件 sha 同样前后核对。
 
 用法
 ----
@@ -50,17 +50,17 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 
 from pricing_lib import (  # noqa: E402
-    assert_m1_inputs, fm_regression, param_value, require, file_size,
-    two_sided_p,
+    assert_pricing_inputs, fm_regression, param_value, require, file_size,
+    shadow_sample_path, two_sided_p,
 )
 
 ART = ROOT / 'artifacts/phase3b'
-SAMPLE_PATH = ROOT / 'data/processed/m1_common_sample_ma_teacher_v2.parquet'
+SAMPLE_PATH = shadow_sample_path('ma_teacher')
 REF_3_6 = ROOT / 'artifacts/phase3/3.6_counts.json'
 CSV_PATH = ART / '3b_n4_segment.csv'
 JSON_PATH = ART / '3b_n4_counts.json'
 
-VERSION_TAG = 'p3b_n4_corpus_break_segment_v1'
+VERSION_TAG = 'corpus_break_segment_v1'
 EXPECTED_FM_ROWS = 181178
 EXPECTED_FM_MONTHS = 104
 EXPECTED_FM_START = '2015-05'
@@ -71,19 +71,19 @@ CAL_BREAK = '2021-01'
 CONTROLS = ['size', 'bm', 'mom', 'rev', 'turnover', 'illiq',
             'AnalystCoverage', 'NetworkDegree']
 SPECS = [
-    ('S1', '登记全控制（8 controls）',
+    ('spec_full_controls', '登记全控制（8 controls）',
      ['PeerMAXraw', 'OwnMAXraw', 'PeerReturn'] + CONTROLS),
-    ('S5', '无 turnover',
+    ('spec_no_turnover', '无 turnover',
      ['PeerMAXraw', 'OwnMAXraw', 'PeerReturn'] + [c for c in CONTROLS if c != 'turnover']),
-    ('S6', '无 rev + 无 turnover',
+    ('spec_no_rev_no_turnover', '无 rev + 无 turnover',
      ['PeerMAXraw', 'OwnMAXraw', 'PeerReturn']
      + [c for c in CONTROLS if c not in ('rev', 'turnover')]),
 ]
 WEIGHTS = [('EW', None), ('VW', 'market_equity')]
 TERMS = [('PeerMAXraw', 'peermax'), ('OwnMAXraw', 'ownmax'), ('PeerReturn', 'peerreturn')]
 
-MIN_N = int(param_value('m1_sample_and_spec_registry')['min_focal_count_per_month'])
-MIN_EFFECTIVE_MONTHS = int(param_value('m1_sample_and_spec_registry')['min_effective_month_count'])
+MIN_N = int(param_value('sample_and_spec_registry')['min_focal_count_per_month'])
+MIN_EFFECTIVE_MONTHS = int(param_value('sample_and_spec_registry')['min_effective_month_count'])
 NW_LAG = int(param_value('nw_lag'))
 WINSOR = param_value('winsorization_pct')
 
@@ -143,13 +143,13 @@ def _clean(v):
 
 # ------------------------------------------------------------------ sha 台账
 def snapshot_anchors(tag: str) -> dict:
-    ledger = assert_m1_inputs()
+    ledger = assert_pricing_inputs()
     return {
         'tag': tag,
         'run_at': datetime.now(timezone.utc).isoformat(),
-        'm1_inputs': {r['input']: {'path': r['path'], 'rows': r['rows']}
+        'pricing_inputs': {r['input']: {'path': r['path'], 'rows': r['rows']}
                       for r in ledger},
-        'm1_ledger': ledger,
+        'pricing_ledger': ledger,
         'headline_sample': {
             'path': str(SAMPLE_PATH.relative_to(ROOT)).replace('\\', '/'),
             'bytes': file_size(SAMPLE_PATH),
@@ -167,22 +167,22 @@ def snapshot_anchors(tag: str) -> dict:
 
 def compare_anchors(pre: dict, post: dict) -> dict:
     diffs = []
-    for name in sorted(set(pre['m1_inputs']) | set(post['m1_inputs'])):
-        a = pre['m1_inputs'].get(name, {}).get('bytes')
-        b = post['m1_inputs'].get(name, {}).get('bytes')
+    for name in sorted(set(pre['pricing_inputs']) | set(post['pricing_inputs'])):
+        a = pre['pricing_inputs'].get(name, {}).get('bytes')
+        b = post['pricing_inputs'].get(name, {}).get('bytes')
         if a != b:
-            diffs.append(f'm1_inputs:{name}')
+            diffs.append(f'pricing_inputs:{name}')
     for key in ('headline_sample', 'reference_3_6'):
         if pre[key]['bytes'] != post[key]['bytes']:
             diffs.append(key)
-    require(len(pre['m1_inputs']) == 9, f'9 输入台账长度={len(pre["m1_inputs"])} != 9')
-    require(len(post['m1_inputs']) == 9, f'9 输入台账长度={len(post["m1_inputs"])} != 9')
+    require(len(pre['pricing_inputs']) == 9, f'9 输入台账长度={len(pre["pricing_inputs"])} != 9')
+    require(len(post['pricing_inputs']) == 9, f'9 输入台账长度={len(post["pricing_inputs"])} != 9')
     return {
         'status': 'MATCH' if not diffs else 'DIFFERENT',
-        'n_m1_inputs': len(pre['m1_inputs']),
+        'n_pricing_inputs': len(pre['pricing_inputs']),
         'n_diff': len(diffs),
         'diff': diffs,
-        'm1_inputs_match': pre['m1_inputs'] == post['m1_inputs'],
+        'pricing_inputs_match': pre['pricing_inputs'] == post['pricing_inputs'],
         'headline_sample_match': pre['headline_sample']['bytes']
         == post['headline_sample']['bytes'],
         'reference_3_6_match': pre['reference_3_6']['bytes']
@@ -194,9 +194,9 @@ def compare_anchors(pre: dict, post: dict) -> dict:
 # ------------------------------------------------------------------ 数据与分段
 def load_fm_sample() -> pd.DataFrame:
     sample = pd.read_parquet(SAMPLE_PATH)
-    require('m1_in_fm_sample' in sample.columns, '样本缺 m1_in_fm_sample')
+    require('pricing_in_fm_sample' in sample.columns, '样本缺 pricing_in_fm_sample')
     require('network_version' in sample.columns, '样本缺 network_version')
-    fm = sample.loc[sample['m1_in_fm_sample'].astype(bool)].copy()
+    fm = sample.loc[sample['pricing_in_fm_sample'].astype(bool)].copy()
     fm['month'] = fm['month'].astype(str)
     fm['network_version'] = pd.to_numeric(fm['network_version'], errors='coerce')
     months = sorted(fm['month'].unique().tolist())
@@ -276,7 +276,7 @@ def load_headline_reference() -> tuple:
             'beta_peermax': _clean(r['beta_peermax']),
             't_peermax': _clean(r['t_peermax']),
             'se_peermax': _clean(r['se_peermax']),
-            'p2_peermax': _clean(r['p2_peermax']),
+            'shadow_peermax': _clean(r['shadow_peermax']),
             'beta_ownmax': _clean(r['beta_ownmax']),
             't_ownmax': _clean(r['t_ownmax']),
             'beta_peerreturn': _clean(r['beta_peerreturn']),
@@ -289,19 +289,19 @@ def load_headline_reference() -> tuple:
 
 # ------------------------------------------------------------------ NW 虚拟变量回归
 def nw_dummy_diff(betas: np.ndarray, post: np.ndarray, lag: int = NW_LAG) -> dict:
-    """y = a + b*post + e；NW(lag, Bartlett) HAC。返回 b/se/t/p2。"""
+    """y = a + b*post + e；NW(lag, Bartlett) HAC。返回 b/se/t/p。"""
     y = np.asarray(betas, dtype=float)
     d = np.asarray(post, dtype=float)
     ok = np.isfinite(y) & np.isfinite(d)
     y, d = y[ok], d[ok]
     T = len(y)
     if T < 3 or d.min() == d.max():
-        return {'diff_beta': None, 'se_nw': None, 't_nw': None, 'p2': None,
+        return {'diff_beta': None, 'se_nw': None, 't_nw': None, 'shadow': None,
                 'T': int(T), 'status': 'NOT_COMPUTABLE'}
     X = np.column_stack([np.ones(T), d])
     XtX = X.T @ X
     if np.linalg.matrix_rank(XtX) < 2:
-        return {'diff_beta': None, 'se_nw': None, 't_nw': None, 'p2': None,
+        return {'diff_beta': None, 'se_nw': None, 't_nw': None, 'shadow': None,
                 'T': int(T), 'status': 'RANK_DEFICIENT'}
     bread = np.linalg.inv(XtX)
     b = bread @ (X.T @ y)
@@ -317,11 +317,11 @@ def nw_dummy_diff(betas: np.ndarray, post: np.ndarray, lag: int = NW_LAG) -> dic
     se = float(np.sqrt(max(cov[1, 1], 0.0)))
     diff = float(b[1])
     if not np.isfinite(se) or se <= 0:
-        return {'diff_beta': diff, 'se_nw': None, 't_nw': None, 'p2': None,
+        return {'diff_beta': diff, 'se_nw': None, 't_nw': None, 'shadow': None,
                 'T': int(T), 'status': 'ZERO_OR_INVALID_SE'}
     t = diff / se
     return {'diff_beta': diff, 'se_nw': se, 't_nw': t,
-            'p2': two_sided_p(t), 'T': int(T), 'status': 'OK'}
+            'shadow': two_sided_p(t), 'T': int(T), 'status': 'OK'}
 
 
 # ------------------------------------------------------------------ FM
@@ -331,7 +331,7 @@ def _coef(res: dict, term: str) -> dict:
         'beta': _clean(s.get('beta')),
         'se': _clean(s.get('se_nw')),
         't': _clean(s.get('t_nw')),
-        'p2': _clean(s.get('p_two_sided')),
+        'shadow': _clean(s.get('p_two_sided')),
         'ci_low': _clean(s.get('ci95_low')),
         'ci_high': _clean(s.get('ci95_high')),
         'T': int(s.get('n_months', 0) or 0),
@@ -356,7 +356,7 @@ def run_segment_fm(seg: dict) -> list:
             if T < MIN_EFFECTIVE_MONTHS:
                 gate_note = (f'T={T} < registry min_effective_month_count='
                              f'{MIN_EFFECTIVE_MONTHS}；仅作诊断读数，'
-                             '不满足 M1 gate 的有效月数门槛')
+                             '不满足 pricing_gate gate 的有效月数门槛')
             rec = {
                 'row_type': 'segment',
                 'family': seg['family'],
@@ -387,7 +387,7 @@ def run_segment_fm(seg: dict) -> list:
                 rec[f'beta_{key}'] = c['beta']
                 rec[f'se_{key}'] = c['se']
                 rec[f't_{key}'] = c['t']
-                rec[f'p2_{key}'] = c['p2']
+                rec[f'shadow_{key}'] = c['shadow']
                 rec[f'ci_low_{key}'] = c['ci_low']
                 rec[f'ci_high_{key}'] = c['ci_high']
             rec['_monthly_betas'] = {
@@ -405,7 +405,7 @@ def main() -> int:
     print(f'[{time.strftime("%H:%M:%S")}] N-4 分段诊断开始；输出目录 {ART}', flush=True)
 
     pre_anchor = snapshot_anchors('pre')
-    print(f'[{time.strftime("%H:%M:%S")}] pre 锚：M1 输入 {len(pre_anchor["m1_inputs"])}/9，'
+    print(f'[{time.strftime("%H:%M:%S")}] pre 锚：pricing_gate 输入 {len(pre_anchor["pricing_inputs"])}/9，'
           f'样本 sha={pre_anchor["headline_sample"]["bytes"][:16]}…', flush=True)
 
     fm = load_fm_sample()
@@ -509,7 +509,7 @@ def main() -> int:
                     'diff_post_minus_pre_peermax': block['PeerMAXraw']['diff_beta'],
                     'diff_se_nw_peermax': block['PeerMAXraw']['se_nw'],
                     'diff_t_nw_peermax': block['PeerMAXraw']['t_nw'],
-                    'diff_p2_peermax': block['PeerMAXraw']['p2'],
+                    'diff_shadow_peermax': block['PeerMAXraw']['shadow'],
                     'diff_post_minus_pre_ownmax': block['OwnMAXraw']['diff_beta'],
                     'diff_t_nw_ownmax': block['OwnMAXraw']['t_nw'],
                     'diff_post_minus_pre_peerreturn': block['PeerReturn']['diff_beta'],
@@ -524,7 +524,7 @@ def main() -> int:
                         'diff_post_minus_pre_peermax': d['diff_beta'],
                         'diff_se_nw_peermax': d['se_nw'],
                         'diff_t_nw_peermax': d['t_nw'],
-                        'diff_p2_peermax': d['p2'],
+                        'diff_shadow_peermax': d['shadow'],
                         'diff_post_minus_pre_ownmax': block['OwnMAXraw']['diff_beta'],
                         'diff_t_nw_ownmax': block['OwnMAXraw']['t_nw'],
                         'diff_post_minus_pre_peerreturn': block['PeerReturn']['diff_beta'],
@@ -539,9 +539,9 @@ def main() -> int:
             rf = ref[(spec_id, wname)]
             ref_rows.append({
                 'row_type': 'reference', 'family': 'full', 'segment': 'full_headline',
-                'segment_label': 'headline 全样本（104 月）', 'definition': 'm1_in_fm_sample == True',
+                'segment_label': 'headline 全样本（104 月）', 'definition': 'pricing_in_fm_sample == True',
                 'spec': spec_id, 'spec_label': spec_label, 'weight': wname,
-                'status': 'REFERENCE', 'gate_note': '读取 artifacts/phase3/3.6_counts.json；本脚本未重跑官方 M1',
+                'status': 'REFERENCE', 'gate_note': '读取 artifacts/phase3/3.6_counts.json；本脚本未重跑官方 pricing_gate',
                 'T': rf['T'], 'n': rf['n'],
                 'n_months_in_segment': rf['T'], 'n_months_skipped': 0,
                 'n_rows_dropped': 0,
@@ -552,14 +552,14 @@ def main() -> int:
                 'market_equity_share': 1.0,
                 'below_min_effective_months': False,
                 'beta_peermax': rf['beta_peermax'], 't_peermax': rf['t_peermax'],
-                'se_peermax': rf['se_peermax'], 'p2_peermax': rf['p2_peermax'],
+                'se_peermax': rf['se_peermax'], 'shadow_peermax': rf['shadow_peermax'],
                 'ci_low_peermax': None, 'ci_high_peermax': None,
                 'beta_ownmax': rf['beta_ownmax'], 't_ownmax': rf['t_ownmax'],
-                'se_ownmax': None, 'p2_ownmax': None,
+                'se_ownmax': None, 'p_two_sided_ownmax': None,
                 'ci_low_ownmax': None, 'ci_high_ownmax': None,
                 'beta_peerreturn': rf['beta_peerreturn'],
                 't_peerreturn': rf['t_peerreturn'],
-                'se_peerreturn': None, 'p2_peerreturn': None,
+                'se_peerreturn': None, 'p_two_sided_peerreturn': None,
                 'ci_low_peerreturn': None, 'ci_high_peerreturn': None,
                 'ref_T': rf['T'], 'ref_n': rf['n'],
                 'ref_beta_peermax': rf['beta_peermax'], 'ref_t_peermax': rf['t_peermax'],
@@ -572,7 +572,7 @@ def main() -> int:
                 'delta_t_peerreturn_vs_full': 0.0,
                 'counterpart_segment': None,
                 'diff_post_minus_pre_peermax': None, 'diff_se_nw_peermax': None,
-                'diff_t_nw_peermax': None, 'diff_p2_peermax': None,
+                'diff_t_nw_peermax': None, 'diff_shadow_peermax': None,
                 'diff_post_minus_pre_ownmax': None, 'diff_t_nw_ownmax': None,
                 'diff_post_minus_pre_peerreturn': None, 'diff_t_nw_peerreturn': None,
                 'source': 'artifacts/phase3/3.6_counts.json:fm_rows[variant=headline]',
@@ -587,7 +587,7 @@ def main() -> int:
              'below_min_effective_months', 'gate_note']
     coef_cols = []
     for _, key in TERMS:
-        for prefix in ('beta_', 'se_', 't_', 'p2_', 'ci_low_', 'ci_high_'):
+        for prefix in ('beta_', 'se_', 't_', 'p_two_sided_', 'ci_low_', 'ci_high_'):
             coef_cols.append(prefix + key)
     ref_cols = ['ref_T', 'ref_n', 'ref_beta_peermax', 'ref_t_peermax',
                 'ref_beta_ownmax', 'ref_t_ownmax',
@@ -596,7 +596,7 @@ def main() -> int:
                   'delta_beta_ownmax_vs_full', 'delta_t_ownmax_vs_full',
                   'delta_beta_peerreturn_vs_full', 'delta_t_peerreturn_vs_full']
     diff_cols = ['counterpart_segment', 'diff_post_minus_pre_peermax',
-                 'diff_se_nw_peermax', 'diff_t_nw_peermax', 'diff_p2_peermax',
+                 'diff_se_nw_peermax', 'diff_t_nw_peermax', 'diff_shadow_peermax',
                  'diff_post_minus_pre_ownmax', 'diff_t_nw_ownmax',
                  'diff_post_minus_pre_peerreturn', 'diff_t_nw_peerreturn']
     all_rows = ref_rows + seg_rows
@@ -653,12 +653,12 @@ def main() -> int:
     all_post_null = all(c['post_null_5pct'] for c in cells)
     all_pre_null = all(c['pre_null_5pct'] for c in cells)
     all_full_null = all(c['full_null_5pct'] for c in cells)
-    s1_ew = next(c for c in cells if c['spec'] == 'S1' and c['weight'] == 'EW')
-    s1_vw = next(c for c in cells if c['spec'] == 'S1' and c['weight'] == 'VW')
+    baseline_ew = next(c for c in cells if c['spec'] == 'spec_full_controls' and c['weight'] == 'EW')
+    baseline_vw = next(c for c in cells if c['spec'] == 'spec_full_controls' and c['weight'] == 'VW')
     nv_post_seg = next(s for s in segs if s['id'] == 'nv_post')
     nv_pre_seg = next(s for s in segs if s['id'] == 'nv_pre')
     verdict = {
-        'question': 'headline M1 的 PeerMAX null 是否由 2021 语料断点后的 20 个月驱动？',
+        'question': 'headline pricing_gate 的 PeerMAX null 是否由 2021 语料断点后的 20 个月驱动？',
         'answer': ('NO' if n_post_drives == 0 else 'YES/PARTIAL'),
         'n_cells': len(cells),
         'n_cells_post_drives_null': n_post_drives,
@@ -676,8 +676,8 @@ def main() -> int:
         'post_market_equity_share': nv_post_seg['market_equity_share'],
         'pre_rows': nv_pre_seg['n'],
         'pre_share_of_fm_rows': nv_pre_seg['share_of_fm_rows'],
-        's1_ew': s1_ew,
-        's1_vw': s1_vw,
+        'baseline_ew': baseline_ew,
+        'baseline_vw': baseline_vw,
         'cells': cells,
         'diff_tests_nv': {k: v for k, v in diff_tests.items()
                           if v['family'] == 'network_version'},
@@ -690,10 +690,10 @@ def main() -> int:
             'pre 84 个月同样全部不显著（max|t|='
             f'{max(pre_abs_t) if pre_abs_t else float("nan"):.2f}）。'
             '因此 headline null 不是由断点后 20 个月制造出来的；'
-            '去掉 post 只留 pre，S1 EW t='
-            f'{s1_ew["pre_t_peermax"]:.2f}、VW t={s1_vw["pre_t_peermax"]:.2f}，仍是 null。'
-            'post S1 VW β='
-            f'{s1_vw["post_beta_peermax"]:.4f} 接近 0（pre {s1_vw["pre_beta_peermax"]:.4f}），'
+            '去掉 post 只留 pre，spec_full_controls EW t='
+            f'{baseline_ew["pre_t_peermax"]:.2f}、VW t={baseline_vw["pre_t_peermax"]:.2f}，仍是 null。'
+            'post spec_full_controls VW β='
+            f'{baseline_vw["post_beta_peermax"]:.4f} 接近 0（pre {baseline_vw["pre_beta_peermax"]:.4f}），'
             '说明 post 反而把 pre 阶段温和的 VW 负值稀释掉，而不是产生 null。'),
     }
 
@@ -722,7 +722,7 @@ def main() -> int:
             'weights': [w for w, _ in WEIGHTS],
             'estimability_rule': ('T >= nw_lag + 2 且月内 n >= min_n；min_n=100 是月度 focal 数下限，'
                                   '不是月数下限。post T=20 可估，但低于 registry '
-                                  'min_effective_month_count=60，故只作诊断、不构成 M1 gate。'),
+                                  'min_effective_month_count=60，故只作诊断、不构成 pricing_gate gate。'),
             'treatment_timing': ('network_version = 该事件月使用的文本年网络；'
                                  'version<=2020 -> 事件月 2015-05..2022-04（84 月）；'
                                  'version>=2021 -> 事件月 2022-05..2023-12（20 月）。'),
@@ -736,7 +736,7 @@ def main() -> int:
             'source_run_at': ref_run_at,
             'source_version_tag': ref_version_tag,
             'rows': [ref[k] for k in sorted(ref)],
-            'note': '全样本 headline 读数直接引用 3.6_counts.fm_rows[variant=headline]；本脚本未重跑官方 M1。',
+            'note': '全样本 headline 读数直接引用 3.6_counts.fm_rows[variant=headline]；本脚本未重跑官方 pricing_gate。',
         },
         'full_sample_monthly_n': (
             fm.groupby('month', sort=True).size().rename('n').reset_index()

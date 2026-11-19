@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""S4 Step 1：source-month MAX / argmax / 完整月 gate（execution_plan §5.6 Step 1；P1.1-01）。
+"""panel Step 1：source-month MAX / argmax / 完整月 gate（execution_plan §5.6 Step 1；口径更正）。
 
 输入：data/processed/daily_panel/{year}.csv（2006-2025）
 构造：
-  n_valid_days_{j,t} = volume>0 的有效交易日数（P1-01 标准；完整月唯一依据）
+  n_valid_days_{j,t} = volume>0 的有效交易日数（口径更正 标准；完整月唯一依据）
   n_rraw_days_{j,t}  = rraw 非空日数（旧口径，仅审计）
   n_max_days_{j,t}   = valid_trade=1 & rraw 非空日数（日面板无 valid_trade → 按 rraw 非空派生）
   MAXraw_{j,t} = max rraw over rraw 非空日；d* = argmax（tie rule 由 registry `tie_rule` 解析）
@@ -13,17 +13,17 @@
   limit_hit 派生（草案口径，登记）：|rraw| >= 0.095（主板）/0.195（创业板/科创板）→ 1；
     ST 5% 无数据 → limit_status_unknown 分层（ST 数据到位后精确）
 输出：data/processed/source_month_argmax_panel.csv
-      reports/data_gates/G0/s4_step1_report.json
+      reports/data_gates/G0/peermax_max_build_report.json
 用法: python scripts/peermax_max_build.py [--min-valid-days N]
 
-P1.1-01（2026-11-17，W1 bundle；D-01=A / D-02=A / D-11=A）：
+口径更正（2026-11-17，W1 bundle；D-01=A / D-02=A / D-11=A）：
   - `min_valid_days` 唯一来源 = `configs/parameter_registry.yaml` 顶层参数（15）；缺失/重复/非正整数
     → SystemExit(2)，不回退 0。
   - D-02=A：`n_valid_days < 15` 但 `MAXraw` 已观测时**保留** `MAXraw/argmax_date`，
     写 `complete_month=0`、`max_status='incomplete'`，由下游按 `complete_month` 过滤；保留审计行。
   - D-11=A：主表行集保持 734,232（只含至少 1 个 rraw 非空日的 source-month），不新增零交易日行；
     2006–2013 日面板 `volume` 全空白 → 这些已有审计行 `n_valid_days=0`、`complete_month=0`。
-  - 新列一律**追加表尾**；既有 11 列顺序不变。schema 见 07 P1.1-01 卡。
+  - 新列一律**追加表尾**；既有 11 列顺序不变。schema 见 07 口径更正 卡。
 """
 import argparse
 import csv
@@ -37,7 +37,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PANEL = ROOT / "data/processed/daily_panel"
 OUT = ROOT / "data/processed/source_month_argmax_panel.csv"
-OUT_JSON = ROOT / "reports/data_gates/G0/s4_step1_report.json"
+OUT_JSON = ROOT / "reports/data_gates/G0/peermax_max_build_report.json"
 ST_FLAG = ROOT / "data/raw/drive/stock_st_flag_20260630.pkl"
 REGISTRY = ROOT / "configs/parameter_registry.yaml"
 # limit_hit 阈值唯一来源 = registry 顶层 limit_thresholds（原为模块常量，2026-11-19 审核收口）
@@ -50,12 +50,13 @@ SOURCE_MONTH_VERSION = "src_month_v2_20261116"
 SOURCE_VERSION = "tencent_daily_panel_20260630"
 FORMULA_ID = "MAXRAW_v1"
 
-# 新列（追加表尾；顺序即 schema，见 07 P1.1-01 卡）
+# 新列（追加表尾；顺序即 schema，见 07 口径更正 卡）
 NEW_COLS = [
     "source_month_version", "n_rraw_days", "n_max_days", "complete_month",
     "max_status", "return_status", "source_month_status", "limit_hit_status",
     "headline_max_eligible", "coverage_flag", "missing_reason", "available_at",
     "source_version", "MAXraw_incl_all", "n_excluded_limit", "n_excluded_resume",
+    "MAXraw_la", "n_excluded_listing",
 ]
 OLD_COLS = [
     "source_id", "month", "MAXraw", "argmax_date", "n_valid_days", "R",
@@ -108,7 +109,7 @@ def _read_registry_doc(registry_path=None):
 def resolve_min_valid_days(registry_path=None):
     """registry 顶层 `min_valid_days` -> int（唯一来源；fail-closed，不回退 0/15）。
 
-    规则（P1.1-01 D-01=A）：参数必须恰好 1 条、`headline_value` 为 int（bool 不算）、>=1。
+    规则（口径更正 D-01=A）：参数必须恰好 1 条、`headline_value` 为 int（bool 不算）、>=1。
     缺失 / 重复 / 非正整数 → SystemExit(2)。
     """
     doc = _read_registry_doc(registry_path)
@@ -281,7 +282,12 @@ def _input_anchors(panel_dir, registry_path=None):
     return entries
 
 
-def select_eligible_days(days, policy):
+def select_eligible_days(days, policy, exclude_dates=frozenset()):
+    """policy 过滤后的 (date, rraw)；exclude_dates 为额外剔除的交易日集合。
+
+    MAXraw（headline）只剔涨跌停与复牌首日（exclude_dates 为空）；MAXraw_la 另剔上市后前
+    listing_grace_days 个交易日（新股上市初期无涨跌幅限制，44%/108% 这类单日收益直接决定月内 MAX）。
+    """
     out = []
     for d, r, resume, limit in days:
         if r is None:
@@ -289,6 +295,8 @@ def select_eligible_days(days, policy):
         if policy.get("limit_hit") == "exclude" and limit:
             continue
         if policy.get("resume") == "exclude" and resume:
+            continue
+        if d in exclude_dates:
             continue
         out.append((d, r))
     return out
@@ -309,13 +317,18 @@ def resolve_max_day_policy(registry_path=None) -> dict:
         if v not in ("exclude", "include"):
             _tie_rule_fail(f"registry.max_day_policy.{k} 非法: {v!r}")
         out[k] = v
+    grace = hv.get("listing_grace_days")
+    if isinstance(grace, bool) or not isinstance(grace, int) or grace < 0:
+        _tie_rule_fail(f"registry.max_day_policy.listing_grace_days 非法（须非负整数）: {grace!r}")
+    out["listing_grace_days"] = grace
     return out
 
 
-def build_monthly(panel_dir):
+def build_monthly(panel_dir, grace_days=0):
     """(code, month) -> [(date, rraw|None, volume|None)]（保留全部日频行）。
 
-    同时返回全市场交易日历 month -> max(date)。
+    同时返回全市场交易日历 month -> max(date)，以及上市宽限窗口内的 (code, date) 集合：
+    每只股票在面板中最早出现的 grace_days 个有行情交易日（新股无涨跌幅限制期）。
     行集（D-11=A）：只保留至少 1 个 rraw 非空日的 (code, month)；不新增零交易日 skeleton 行。
     """
     recs = defaultdict(list)
@@ -332,8 +345,11 @@ def build_monthly(panel_dir):
     all_dates = sorted(dates)
     prev_of = {d: (all_dates[i - 1] if i else None) for i, d in enumerate(all_dates)}
     monthly = defaultdict(list)
+    listing_days = set()
     for code, rows in recs.items():
         rows.sort(key=lambda x: x[0])
+        if grace_days:
+            listing_days.update((code, d) for d, _, _ in rows[:grace_days])
         last = None
         for d, rraw, vol in rows:
             resume = last is not None and prev_of[d] != last
@@ -344,7 +360,7 @@ def build_monthly(panel_dir):
         m = d[:7]
         if m not in calendar or d > calendar[m]:
             calendar[m] = d
-    return monthly, calendar, volume_months
+    return monthly, calendar, volume_months, listing_days
 
 
 def _return_status(n_valid):
@@ -359,8 +375,8 @@ def _return_status(n_valid):
 def _source_month_row(*, code, month, n_valid, n_rraw, n_max, R, maxv, argmax_d,
                       tie_rule, limit_hit, limit_status, st_val, min_valid_days,
                       available_at, incl_all=None, n_excl_limit=0,
-                      n_excl_resume=0):
-    """固定 schema 的 source-month 行（旧 11 列 + 追加 13 列；见 07 P1.1-01 卡）。"""
+                      n_excl_resume=0, maxv_la=None, n_excl_listing=0):
+    """固定 schema 的 source-month 行（旧 11 列 + 追加 13 列；见 07 口径更正 卡）。"""
     complete = int(n_valid >= min_valid_days)
     if complete == 1 and n_max > 0:
         max_status = "complete"
@@ -412,6 +428,8 @@ def _source_month_row(*, code, month, n_valid, n_rraw, n_max, R, maxv, argmax_d,
         "MAXraw_incl_all": round(incl_all, 8) if incl_all is not None else "",
         "n_excluded_limit": int(n_excl_limit),
         "n_excluded_resume": int(n_excl_resume),
+        "MAXraw_la": round(maxv_la, 8) if maxv_la is not None else "",
+        "n_excluded_listing": int(n_excl_listing),
     }
 
 
@@ -431,7 +449,8 @@ def run(panel_dir=PANEL, out=OUT, out_json=OUT_JSON, st_flag=ST_FLAG,
     print(f"tie_rule: {tie_rule} (source={tie['source']}); "
           f"min_valid_days={min_valid_days}", flush=True)
 
-    monthly, calendar, volume_months = build_monthly(panel_dir)
+    monthly, calendar, volume_months, listing_days = build_monthly(
+        panel_dir, grace_days=int(policy["listing_grace_days"]))
     unobservable = sorted(m for m in calendar if m not in volume_months)
     pre2014 = [m for m in unobservable if m < "2014-01"]
     if pre2014:
@@ -459,7 +478,8 @@ def run(panel_dir=PANEL, out=OUT, out_json=OUT_JSON, st_flag=ST_FLAG,
         v = df.at[d, colmap[code6]]
         return None if v != v else bool(v)
 
-    def _day_limit(code, d):
+    def _day_limit(code, d, rraw):
+        """当天是否涨跌停：供应商 flag 优先；无覆盖时按 registry 阈值 |rraw| >= thr 回退。"""
         code6 = code[2:]
         up = _flag(lf_df, lf_cols, code6, d)
         dn = _flag(lf_dn, lf_dn_cols, code6, d)
@@ -470,9 +490,12 @@ def run(panel_dir=PANEL, out=OUT, out_json=OUT_JSON, st_flag=ST_FLAG,
             v = st_df.at[d, st_cols[code6]]
             if v == v:
                 st_val = bool(v)
-        thr = limits["chinext_star"] if board_of(code) in ("chinext", "star") else (
-            limits["main_st"] if st_val else limits["main"])
-        return False
+        board = board_of(code)
+        if board in ("chinext", "star"):
+            thr = limits["chinext_star"]
+        else:
+            thr = limits["main_st"] if st_val else limits["main"]
+        return rraw is not None and abs(rraw) >= thr
     print(f"涨跌停 flag 面板: {'已载入' if lf_df is not None else '缺失（回退阈值口径）'} "
           f"({0 if lf_df is None else lf_df.shape[0]} 日 × {0 if lf_df is None else lf_df.shape[1]} 股)", flush=True)
     rows = []
@@ -484,8 +507,10 @@ def run(panel_dir=PANEL, out=OUT, out_json=OUT_JSON, st_flag=ST_FLAG,
         days = sorted(monthly[(code, month)], key=lambda x: x[0])
         rraw_days = [(d, r) for d, r, _, _ in days if r is not None]
         n_valid = sum(1 for _, _, v, _ in days if v is not None and v > 0)
-        flagged = [(d, r, resume, _day_limit(code, d)) for d, r, _, resume in days]
+        flagged = [(d, r, resume, _day_limit(code, d, r)) for d, r, _, resume in days]
         eligible = select_eligible_days(flagged, policy)
+        la_excluded = {d for c, d in listing_days if c == code}
+        eligible_la = select_eligible_days(flagged, policy, la_excluded)
         n_rraw = len(rraw_days)
         n_max = len(eligible)
         n_excl_limit = sum(1 for _, r, _, lim in flagged if r is not None and lim)
@@ -495,6 +520,13 @@ def run(panel_dir=PANEL, out=OUT, out_json=OUT_JSON, st_flag=ST_FLAG,
             prod *= 1 + r
         R = prod - 1
         maxv = max(r for _, r in eligible) if eligible else None
+        maxv_la = max(r for _, r in eligible_la) if eligible_la else None
+        # 只计「本来可进候选、仅因上市宽限被剔」的天：涨跌停/复牌首日已剔的不重复计入
+        n_excl_listing = sum(
+            1 for d, r, resume, lim in flagged
+            if r is not None and d in la_excluded
+            and not (policy.get('limit_hit') == 'exclude' and lim)
+            and not (policy.get('resume') == 'exclude' and resume))
         argmax_d = pick_argmax(eligible, tie_rule) if eligible else ""
         incl_all = max(r for _, r in rraw_days) if rraw_days else None
         rows.append(_source_month_row(
@@ -504,7 +536,8 @@ def run(panel_dir=PANEL, out=OUT, out_json=OUT_JSON, st_flag=ST_FLAG,
             min_valid_days=min_valid_days,
             available_at=calendar.get(month, max(d for d, _, _, _ in days)),
             incl_all=incl_all, n_excl_limit=n_excl_limit,
-            n_excl_resume=n_excl_resume))
+            n_excl_resume=n_excl_resume, maxv_la=maxv_la,
+            n_excl_listing=n_excl_listing))
         firms.add(code)
 
     # 第二遍：按 argmax 日期批量取 ST 状态与涨跌停 flag（flag 优先，无覆盖才回退阈值口径）
@@ -579,7 +612,9 @@ def run(panel_dir=PANEL, out=OUT, out_json=OUT_JSON, st_flag=ST_FLAG,
             min_valid_days=min_valid_days, available_at=r["available_at"],
             incl_all=(float(r["MAXraw_incl_all"]) if r["MAXraw_incl_all"] != "" else None),
             n_excl_limit=int(r["n_excluded_limit"]),
-            n_excl_resume=int(r["n_excluded_resume"])))
+            n_excl_resume=int(r["n_excluded_resume"]),
+            maxv_la=(float(r["MAXraw_la"]) if r["MAXraw_la"] != "" else None),
+            n_excl_listing=int(r["n_excluded_listing"])))
         r["st_flag_at_argmax"] = st_out
         stats["limit_hit"] += lh
 
@@ -593,6 +628,9 @@ def run(panel_dir=PANEL, out=OUT, out_json=OUT_JSON, st_flag=ST_FLAG,
     def _count(pred):
         return int(sum(1 for r in rows if pred(r)))
 
+    def _count_sum_listing(rs):
+        return int(sum(int(r["n_excluded_listing"]) for r in rs))
+
     win = [r for r in rows if "2015-01" <= r["month"] <= "2023-12"]
     old_incomplete_with_max = int(sum(
         1 for r in win if r["n_rraw_days"] < 15 and r["MAXraw"] != ""))
@@ -603,7 +641,7 @@ def run(panel_dir=PANEL, out=OUT, out_json=OUT_JSON, st_flag=ST_FLAG,
     nv0_rows = _count(lambda r: r["n_valid_days"] == 0)
     pre2014_nv0 = _count(lambda r: r["n_valid_days"] == 0 and r["month"] < "2014-01")
     report = {
-        "report_id": "s4_step1_source_month_max",
+        "report_id": "source_month_max_build",
         "run_at": datetime.now(timezone.utc).isoformat(),
         "script": _rel(Path(__file__)),
         "script_bytes": _file_size(Path(__file__)),
@@ -618,6 +656,11 @@ def run(panel_dir=PANEL, out=OUT, out_json=OUT_JSON, st_flag=ST_FLAG,
         },
         "limit_thresholds": limits,
         "limit_thresholds_source": "configs/parameter_registry.yaml:parameters[name=limit_thresholds].headline_value",
+        "max_day_policy": policy,
+        "listing_grace_days": int(policy["listing_grace_days"]),
+        "n_excluded_listing_total": _count_sum_listing(rows),
+        "rows_where_la_differs": _count(lambda r: r["MAXraw"] != r["MAXraw_la"]),
+        "rows_la_missing": _count(lambda r: r["MAXraw_la"] == ""),
         "unobservable_volume_months": unobservable[:12],
         "limit_status_unknown": stats["limit_unknown_zone"],
         "st_at_argmax_true": stats["st_at_argmax"],

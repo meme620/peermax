@@ -1,6 +1,6 @@
-"""S3 M-A Step：竞争强度 PC = −HHI（设计规格 required output，2026-09-14）。
+"""network M-A Step：竞争强度 PC = −HHI（设计规格 required output，2026-09-14）。
 
-设计真源（execution_plan S3 M-A 链条）：
+设计真源（execution_plan network M-A 链条）：
     PC_{i,y} = −HHI(竞争对手集合内销售收入)
   口径：竞争对手集合 = M-A 聚类同团成员（含 focal 自身，标准 HHI 定义）；
         销售收入取 **y−1 年**（operating_revenue_annual.pkl，索引为年报期末日）；
@@ -10,9 +10,9 @@
 v2（2026-09-28，Phase B″2/B″4）：加 `--corpus {self,teacher}` / `--net-dir` / `--cluster-dir` /
 `--years` / `--out-report` 参数化。**公式与口径一字未改**：默认 `--corpus self` 重跑任一历史年份
 与既有 `network_ma/{y}_pc.csv` 逐字节一致。teacher 侧落 `network_ma_teacher/{y}_pc.csv` +
-`s3_ma_pc_report_teacher.json`（不覆盖历史）。
+`network_business_pc_report_teacher.json`（不覆盖历史）。
 
-产物：{net_dir}/{text_year}_pc.csv + reports/data_gates/G0/s3_ma_pc_report{,_teacher}.json
+产物：{net_dir}/{text_year}_pc.csv + reports/data_gates/G0/network_business_pc_report{,_teacher}.json
 用法：
   python scripts/network_business_competition_hhi.py
   python scripts/network_business_competition_hhi.py --corpus teacher
@@ -22,11 +22,11 @@ v3（2026-09-28，Phase B″4 施工期加固）：报告里 `net_dir` / `cluste
 
 v4（2026-10-05，Phase B″10）：`SPECS` / CLI 加 `teacher_idf`（同语料 IDF 加权对照变体，
 `ver_prefix=pm_ma_idf_teacher_v1`、网络目录 `data/processed/network_ma_teacher_idf/`、
-报告 `s3_ma_pc_report_teacher_idf.json`）。**PC 公式、营收口径与列不变**；`self` / `teacher` 不变。
+报告 `network_business_pc_report_teacher_idf.json`）。**PC 公式、营收口径与列不变**；`self` / `teacher` 不变。
 
 v5（2026-10-19，全文语料对表轮）：`SPECS` / CLI 加 `ma_fulltext`（**中文法 × 年报全文**，对表语料敏感性列、
 不升主口径；registry `ma_fulltext_text_corpus`）——`ver_prefix=pm_ma_ewcos_fulltext_v1`、网络目录
-`data/processed/network_ma_fulltext/`、报告 `s3_ma_pc_report_ma_fulltext.json`、文本年 FY2017–FY2022。
+`data/processed/network_ma_fulltext/`、报告 `network_business_pc_report_ma_fulltext.json`、文本年 FY2017–FY2022。
 **PC 公式（PC = −HHI(同团成员 y−1 年销售收入)，含 focal 自身）、营收口径（`operating_revenue_annual.pkl`
 的 y−1 年，缺营收不计入分母、覆盖 0 记 missing）与产物列一字未改**；其余语料默认路径不变。
 """
@@ -47,23 +47,23 @@ SPECS = {
     'self': {'net_dir': ROOT / 'data/processed/network_ma',
              'years': list(range(2017, 2026)),
              'ver_prefix': 'pm_ma_ewcos_v1',
-             'report': REPD / 's3_ma_pc_report.json'},
+             'report': REPD / 'network_business_pc_report.json'},
     'teacher': {'net_dir': ROOT / 'data/processed/network_ma_teacher',
                 'years': list(range(2014, 2023)),
                 'ver_prefix': 'pm_ma_ewcos_teacher_v1',
-                'report': REPD / 's3_ma_pc_report_teacher.json'},
+                'report': REPD / 'network_business_pc_report_teacher.json'},
     # Phase B″10：同语料 IDF 加权对照变体（不升主口径）；PC 公式与营收口径一字未改
     'teacher_idf': {'net_dir': ROOT / 'data/processed/network_ma_teacher_idf',
                     'years': list(range(2014, 2023)),
                     'ver_prefix': 'pm_ma_idf_teacher_v1',
-                    'report': REPD / 's3_ma_pc_report_teacher_idf.json'},
+                    'report': REPD / 'network_business_pc_report_teacher_idf.json'},
     # 2026-10-19 全文语料对表轮（registry `ma_fulltext_text_corpus`，不升主口径）：
     # 文本年 FY2017–FY2022（= 对表可用年：PC_{i,y} 需 y−1 年营收，营收面板 FY2016–2024）。
     # **PC 公式、营收口径与列一字未改**（PC = −HHI(同团成员 y−1 年销售收入)，含 focal 自身）。
     'ma_fulltext': {'net_dir': ROOT / 'data/processed/network_ma_fulltext',
                     'years': list(range(2017, 2023)),
                     'ver_prefix': 'pm_ma_ewcos_fulltext_v1',
-                    'report': REPD / 's3_ma_pc_report_ma_fulltext.json'},
+                    'report': REPD / 'network_business_pc_report_ma_fulltext.json'},
 }
 COLS = ['focal_id', 'text_year', 'network_version', 'available_at', 'revenue_year',
         'n_competitors', 'n_rev_covered', 'revenue_coverage', 'hhi', 'pc', 'hhi_excl_self',

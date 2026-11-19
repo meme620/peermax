@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""S3 第一梯队 ③：同密度零模型（`s3_network_density_null.json`）。
+"""network 第一梯队 ③：同密度零模型（`network_density_null.json`）。
 
 **只读复算**：不重建网络、不碰面板/回归、不改任何 headline_value / 冻结参数；只新建
-`reports/data_gates/G0/s3_network_density_null.json`。
+`reports/data_gates/G0/network_density_null.json`。
 
 口径真源：
-  - `reports/audits/s3_remaining_workplan_20261011.md` 第一梯队 3
+  - `reports/audits/network_remaining_workplan_20261011.md` 第一梯队 3
   - 主仓库 methodology_execution_plan §8 B″11-2
-  - `reports/audits/s3_network_open_items_plan_20261006.md` §3-②(a)（判据三件套 (a)）
+  - `reports/audits/network_open_items_plan_20261006.md` §3-②(a)（判据三件套 (a)）
   - registry：`rewiring_reps`（R = 1000，借用）、`random_seed`（20260727）
 
 零模型：R = `rewiring_reps` 个「同 N 同 E 随机简单图」（seed = `random_seed`）——在当年网络节点上
@@ -26,7 +26,7 @@
 
 **证据力与参数借用声明（必须随产物）**：本检验只排除「同密度随机图」，**证据力弱**；R 借用
 `rewiring_reps`，其 scope 原属 degree/industry-preserving 重连——如项目要求严格须**另登记独立 rep 数**。
-本零模型与 proposal p7/p12 的 degree- and industry-preserving rewiring（M1 安慰剂）是**两个不同对象**。
+本零模型与 proposal p7/p12 的 degree- and industry-preserving rewiring（pricing_gate 安慰剂）是**两个不同对象**。
 
 验收：realized lift > null p95；null 均值 ≈ 1（内部一致性）。
 停机：null 均值偏离 1 超 5% → 先修零模型再报（不得改判据）。
@@ -59,7 +59,7 @@ PARAM_BORROW_NOTE = (
     '**证据力与参数借用声明**：本检验只排除「同密度随机图」，**证据力弱**（不保 degree、不保行业、'
     '不保团结构）；R 借用 registry `rewiring_reps`（= 1000），其 scope 原属 degree- and '
     'industry-preserving 重连——**如项目要求严格须另登记独立 rep 数**。本零模型与 proposal p7/p12 的 '
-    'degree- and industry-preserving rewiring（M1 安慰剂）是**两个不同对象**，不得混写。'
+    'degree- and industry-preserving rewiring（pricing_gate 安慰剂）是**两个不同对象**，不得混写。'
 )
 # 解析等价实现说明（含复核建议的两条注记，2026-10-11）：Hypergeom 精确分布 + rng.hypergeometric 抽样
 # + 200-replicate 真实图抽查三件套；**复制级数值不可与图抽样实现逐值对齐（RNG 流不同）**；
@@ -145,7 +145,7 @@ def main() -> None:
     ap.add_argument('--graph-check-reps', type=int, default=200,
                     help='逐 replicate 真实抽样的抽查次数（0 = 跳过）')
     ap.add_argument('--graph-check-year', type=int, default=None, help='抽查年份（缺省 = 首个有数据年）')
-    ap.add_argument('--out-json', default=str(REPD / 's3_network_density_null.json'))
+    ap.add_argument('--out-json', default=str(REPD / 'network_density_null.json'))
     args = ap.parse_args()
 
     reps = args.reps
@@ -281,7 +281,7 @@ def main() -> None:
         stops.append('存在年份 realized lift ≤ null p95')
 
     rep = {
-        'step': 'S3 第一梯队 ③ 同密度零模型（只排除「同密度随机图」）',
+        'step': 'network 第一梯队 ③ 同密度零模型（只排除「同密度随机图」）',
         'run_at': datetime.now(timezone.utc).isoformat(),
         'net_dir': str(net_dir.relative_to(ROOT)).replace('\\', '/'),
         'nature': '只读复算：不重建网络、不碰面板/回归、不改任何 headline_value / 冻结参数；产物为新建文件',

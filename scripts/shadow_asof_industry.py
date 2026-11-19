@@ -2,7 +2,7 @@
 
 范围（`artifacts/phase3/3.0_plan.md` §2.1 + 项目已定决策）：
   - 只写 shadow：`data/processed/phase3_shadow/*`、`data/processed/network_ma_teacher_p3asof/*`、
-    `artifacts/phase3/3.1_*`。**不改** headline 边表/样本/M1/PC/gate/configs；不重跑 headline M1/PC。
+    `artifacts/phase3/3.1_*`。**不改** headline 边表/样本/pricing_gate/PC/gate/configs；不重跑 headline pricing_gate/PC。
   - 本脚本不重建窄词表（3.3 决策）、不建 M-B shadow（留 Phase 4）、不做逐年 latest 目标变体（N5 → 3.2）。
 
 as-of 定义（**口径限定，不得写成严格 PIT**）：
@@ -16,8 +16,8 @@ as-of 定义（**口径限定，不得写成严格 PIT**）：
   两版码表拼接不做事后映射（不做无据的跨版本码表映射）。
 
 步骤（`--steps`，缺省 all = map,baselines,targets,network,accept）：
-  preflight   9 个 M1 输入锚 + 额外只读输入 + headline 网络全文件 sha 台账（`3.1_anchor_pre.json`）
-  map         as-of 映射（`phase3_shadow/sw2_asof_map_p3shadow.parquet`）+ 边界/缺失/2021 切换审计
+  preflight   9 个 pricing_gate 输入锚 + 额外只读输入 + headline 网络全文件 sha 台账（`3.1_anchor_pre.json`）
+  map         as-of 映射（`phase3_shadow/sw2_asof_map_shadow.parquet`）+ 边界/缺失/2021 切换审计
   baselines   8 个行业基线（LOO 同算法，仅换连接键）+ 与 headline 对比
               （`phase3_shadow/ind_baselines_p3asof.parquet`、`3.1_baseline_diff*.csv`）
   targets     as-of 与 latest 两套池化/逐年 K 目标（`3.1_k_targets.json`）
@@ -48,8 +48,8 @@ from datetime import datetime, timezone
 import numpy as np
 import pandas as pd
 from pricing_lib import (
-    SAMPLE_WINDOW_END, SAMPLE_WINDOW_START, assert_m1_inputs, load_me, load_sw2,
-    months_between, require, file_size,
+    SAMPLE_WINDOW_END, SAMPLE_WINDOW_START, assert_pricing_inputs, load_me, load_sw2,
+    months_between, require, file_size, shadow_sample_path,
 )
 from peermax_panel_build import (
     NETWORK_AVAILABLE_AT_RULE, load_versions, select_version,
@@ -74,15 +74,15 @@ TEACHER_PANEL = ROOT / 'data/processed/teacher_mda_panel.csv'
 
 TEACHER_LEXICON = ROOT / 'data/processed/product_lexicon_v2_teacher.csv'
 
-SAMPLE_PARQUET = ROOT / 'data/processed/m1_common_sample_ma_teacher_v2.parquet'
+SAMPLE_PARQUET = shadow_sample_path('ma_teacher')
 
-HEADLINE_IND_CACHE = ROOT / 'artifacts/tmp/m1_cache_industry.parquet'
+HEADLINE_IND_CACHE = ROOT / 'artifacts/tmp/pricing_cache_industry.parquet'
 
-ASOF_MAP = SHADOW_DIR / 'sw2_asof_map_p3shadow.parquet'
+ASOF_MAP = SHADOW_DIR / 'sw2_asof_map_shadow.parquet'
 
 ASOF_BASELINES = SHADOW_DIR / 'ind_baselines_p3asof.parquet'
 
-SAMPLE_ASOF_BASELINES = SHADOW_DIR / 'm1_common_sample_ma_teacher_p3asof_baselines.parquet'
+SAMPLE_ASOF_BASELINES = SHADOW_DIR / 'pricing_sample_ma_teacher_p3asof_baselines.parquet'
 
 K_TARGETS_JSON = ART / '3.1_k_targets.json'
 
@@ -106,7 +106,7 @@ SHADOW_VERSION_PREFIX = 'pm_ma_ewcos_teacher_p3asof_v1'
 
 HEADLINE_VERSION_PREFIX = 'pm_ma_ewcos_teacher_v1'
 
-SHADOW_VERSION_TAG = 'p3shadow_v1_p3asof'
+SHADOW_VERSION_TAG = 'shadow_asof_industry_v1'
 
 YEARS = list(range(2014, 2023))                 # 文本年 → 网络年 y+1
 
@@ -200,13 +200,13 @@ def sha_ledger_headline_net() -> dict:
     return out
 
 def anchors_snapshot(tag: str) -> dict:
-    ledger = assert_m1_inputs()
+    ledger = assert_pricing_inputs()
     extra = {k: {'file': str(v.relative_to(ROOT)).replace('\\', '/'), 'bytes': file_size(v)}
              for k, v in EXTRA_INPUTS.items()}
     snap = {
         'tag': tag, 'run_at': datetime.now(timezone.utc).isoformat(),
-        'm1_inputs_9': {r['input']: r['rows'] for r in ledger},
-        'm1_inputs_ledger': ledger,
+        'pricing_inputs_9': {r['input']: r['rows'] for r in ledger},
+        'pricing_inputs_ledger': ledger,
         'extra_inputs': extra,
         'headline_network_bytes': sha_ledger_headline_net(),
     }
@@ -215,7 +215,7 @@ def anchors_snapshot(tag: str) -> dict:
 
 def compare_anchors(pre: dict, post: dict) -> dict:
     diffs = []
-    for sect in ('m1_inputs_9', 'extra_inputs', 'headline_network_bytes'):
+    for sect in ('pricing_inputs_9', 'extra_inputs', 'headline_network_bytes'):
         a, b = pre.get(sect) or {}, post.get(sect) or {}
         if isinstance(a, dict) and a and isinstance(list(a.values())[0], dict):
             a = {k: v.get('bytes') for k, v in a.items()}
@@ -375,7 +375,7 @@ def sw2_k_target(m: pd.DataFrame, panel: pd.DataFrame, years, mode: str) -> dict
                          'firms': int(len(g)), 'sw2_groups': int(sizes.size),
                          'median_peer': float(peers.median()),
                          'mean_peer': round(float(peers.mean()), 4),
-                         'group_size_median': float(file_size()),
+                         'group_size_median': float(sizes.median()),
                          'isolated_share': round(float((peers == 0).mean()), 4)})
         pooled.append(peers.to_numpy())
     pooled_peers = np.concatenate(pooled)
@@ -479,7 +479,7 @@ def cluster_lift(clusters: pd.DataFrame, labels: dict) -> dict:
             'sw2_lift': round(share / max(1e-9, base), 2),
             'peer_median': float(np.median(sizes[inv] - 1)),
             'isolated_share': round(float(((sizes[inv] - 1) == 0).mean()), 4),
-            'n_clusters': int(len(ks)), 'size_max': int(file_size())}
+            'n_clusters': int(len(ks)), 'size_max': int(sizes.max())}
 
 def jaccard(a: pd.DataFrame, b: pd.DataFrame) -> dict:
     sa = set(zip(a['focal_id'], a['source_id']))
@@ -584,7 +584,7 @@ def step_map(months, panel_srcm) -> dict:
             'n_l2_groups': int(sub['l2_code'].nunique()),
             'median_eff': str(sub['effective_from'].median())[:10] if sub['effective_from'].notna().any() else None,
         }
-    # 标签不一致率（M1 样本 307,503 行；月首日口径 + (y+1)-04-30 口径）
+    # 标签不一致率（pricing_gate 样本 307,503 行；月首日口径 + (y+1)-04-30 口径）
     smp = pd.read_parquet(SAMPLE_PARQUET, columns=['focal_id', 'month'])
     smp['code6'] = smp['focal_id'].str[2:].str.zfill(6)
     smp_key = smp.rename(columns={'focal_id': 'firm_id'}).sort_values('month', kind='stable')
@@ -609,7 +609,7 @@ def step_map(months, panel_srcm) -> dict:
     audit = {
         'run_at': datetime.now(timezone.utc).isoformat(),
         'script': 'scripts/shadow_asof_industry.py',
-        'scope': 'p3shadow_v1_p3asof',
+        'scope': 'shadow_asof_industry_v1',
         'definition': ('as-of = 分类生效日口径（effective_from <= 月首日，取 max(effective_from)）；'
                        '**非严格 PIT**：不使用 last_updated（快照批量刷新字段）作记录可得日门'),
         'map_source_rows': int(len(m)), 'map_source_codes': int(m['code6'].nunique()),
@@ -626,7 +626,7 @@ def step_map(months, panel_srcm) -> dict:
                           f'这些公司在当月按既往 vintage 归类，次月首日起才用新 vintage。'
                           f'（恰落在月首日 = {exact_first}；分类生效日早于样本首月 = {predates_window}）'),
         'vintage_switch': {'switch_date': VINTAGE_SWITCH_DATE, 'per_month': switch},
-        'mismatch_vs_latest_on_m1_sample': {
+        'mismatch_vs_latest_on_pricing_sample': {
             'n_sample_rows': int(len(smp)),
             'n_comparable': int(ok.sum()),
             'l2_mismatch_month_first_day': round(mis_l2, 6),
@@ -681,7 +681,7 @@ def step_baselines(months) -> dict:
     log(f'baselines：LOO 手算抽查 {hand["n_checked"]} 点 max|Δ| = {hand["max_abs_diff"]:.2e}')
     # 样本键（与 headline 样本列对比用；含 FM 标记）
     smp = pd.read_parquet(SAMPLE_PARQUET,
-                          columns=['focal_id', 'month', 'm1_in_fm_sample'] + IND_COLS)
+                          columns=['focal_id', 'month', 'pricing_in_fm_sample'] + IND_COLS)
     # 3.5/A12 依赖件：headline 样本副本 + 8 个 `_p3asof` 列（headline 列一字不动）
     full = pd.read_parquet(SAMPLE_PARQUET)
     full = full.merge(base.rename(columns={c: c + '_p3asof' for c in IND_COLS})
@@ -700,7 +700,7 @@ def step_baselines(months) -> dict:
     rows, yrows = [], []
     fm_vals = {}
     for scope, mask in (('ALL_307503', pd.Series(True, index=j.index)),
-                        ('FM_181178', j['m1_in_fm_sample'].astype(bool))):
+                        ('FM_181178', j['pricing_in_fm_sample'].astype(bool))):
         g0 = j[mask]
         for c in IND_COLS:
             a, b = g0[c], g0[c + '_p3asof']
@@ -902,7 +902,7 @@ def step_ladder(years) -> dict:
             sizes = np.bincount(inv)
             peers = sizes[inv] - 1          # 公司层面 peer（与 cluster_stats 同口径）
             rows.append({'text_year': y, 'K': int(K), 'median_peer': float(np.median(peers)),
-                         'mean_peer': round(float(peers.mean()), 2), 'size_max': int(file_size()),
+                         'mean_peer': round(float(peers.mean()), 2), 'size_max': int(sizes.max()),
                          'n_clusters': int(len(sizes)),
                          'is_shadow_K': bool(K == K_shadow), 'is_headline_K': bool(K == K_head)})
         log(f'ladder[{y}] n={len(firms)} K∈[{lo},{hi}] 已扫（shadow K={K_shadow}, '

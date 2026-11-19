@@ -1,10 +1,10 @@
-"""S3A Gate 5.6 收口三轮校验。
+"""analyst-network Gate 5.6 收口三轮校验。
 
 第一轮（数字与路径）：claim matrix 中的关键数字与产物逐项对账；
 第二轮（版本与状态）：manifest/registry/spec/矩阵 四方一致，无 active/superseded 语义冲突；
 第三轮（claim 与反例）：禁止表述扫描（无证据的"三人复现通过""全部机制完成""无条件超 Long"）。
 
-产出：reports/data_gates/G0/s3a_gate5_closure_check.json
+产出：reports/data_gates/G0/analyst_gate5_closure_check.json
 """
 import json
 import re
@@ -13,14 +13,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import yaml
+from fileio import file_size
 
 ROOT = Path(__file__).resolve().parents[1]
-SPEC = ROOT / 'configs/s3a_final_spec.yaml'
+SPEC = ROOT / 'configs/analyst_spec.yaml'
 REG = ROOT / 'configs/parameter_registry.yaml'
 MAN = ROOT / 'configs/version_manifest.yaml'
-MATRIX = ROOT / 'reports/execution/s3a/s3a_final_acceptance_matrix.md'
-CLAIM = ROOT / 'reports/execution/s3a/s3a_claim_evidence_matrix.md'
-REPORT = ROOT / 'reports/execution/stage0/s3a_report.md'
+MATRIX = ROOT / 'reports/execution/analyst/analyst_acceptance_matrix.md'
+CLAIM = ROOT / 'reports/execution/analyst/analyst_claim_evidence_matrix.md'
+REPORT = ROOT / 'reports/execution/analyst_report.md'
 PPTX_SCRIPT = ROOT / 'scripts/make_analyst_network_brief_pptx.py'
 
 
@@ -41,21 +42,21 @@ def round1_numbers():
         rows.append({'item': name, 'expect': expect, 'actual': cur,
                      'product': product_path, 'ok': ok})
 
-    chk('9c_npm_beta', 'reports/data_gates/G0/s3a_9c_fm_regression.json',
+    chk('9c_npm_beta', 'reports/data_gates/G0/analyst_fm_regression.json',
         ['coefs', 'npm', 'beta'], 0.12418, 1e-9)
-    chk('9c_npm_t_iid', 'reports/data_gates/G0/s3a_9c_fm_regression.json',
+    chk('9c_npm_t_iid', 'reports/data_gates/G0/analyst_fm_regression.json',
         ['coefs', 'npm', 't_iid'], 5.89, 1e-9)
-    chk('9c_npm_t_nw1', 'reports/data_gates/G0/s3a_9c_fm_regression.json',
+    chk('9c_npm_t_nw1', 'reports/data_gates/G0/analyst_fm_regression.json',
         ['coefs', 'npm', 't_nw1'], 5.94, 1e-9)
-    chk('9c_extreme_beta', 'reports/data_gates/G0/s3a_9c_fm_regression_extreme.json',
+    chk('9c_extreme_beta', 'reports/data_gates/G0/analyst_fm_regression_extreme.json',
         ['coefs', 'npm', 'beta'], 0.12767, 1e-9)
-    chk('9h_cf_only', 'reports/data_gates/G0/s3a_9h_absorb.json',
+    chk('9h_cf_only', 'reports/data_gates/G0/analyst_industry_absorb.json',
         ['col1_cf_only', 'cf', 'beta'], 0.1242, 1e-9)
-    chk('9h_ind_only', 'reports/data_gates/G0/s3a_9h_absorb.json',
+    chk('9h_ind_only', 'reports/data_gates/G0/analyst_industry_absorb.json',
         ['col2_ind_only', 'ind_ret', 'beta'], 0.0907, 1e-9)
-    chk('9h_both_cf', 'reports/data_gates/G0/s3a_9h_absorb.json',
+    chk('9h_both_cf', 'reports/data_gates/G0/analyst_industry_absorb.json',
         ['col3_cf_ind', 'cf', 'beta'], 0.1259, 1e-9)
-    chk('9h_both_ind', 'reports/data_gates/G0/s3a_9h_absorb.json',
+    chk('9h_both_ind', 'reports/data_gates/G0/analyst_industry_absorb.json',
         ['col3_cf_ind', 'ind_ret', 'beta'], 0.008, 1e-9)
 
     # 报告与 PPTX 脚本不得再出现旧值
@@ -97,7 +98,7 @@ def round2_versions():
     checks['registry_version_matches'] = \
         spec['governance'].get('registry_version') == reg.get('registry_version')
     checks['claim_matrix_registered'] = any(
-        x['file'] == 'reports/execution/s3a/s3a_claim_evidence_matrix.md'
+        x['file'] == 'reports/execution/analyst/analyst_claim_evidence_matrix.md'
         for x in man['deliverables'])
     checks['claim_matrix_exists'] = CLAIM.exists()
 
@@ -114,8 +115,8 @@ def round2_versions():
                  if st.count('active') > 1 and f.endswith('/')}
     checks['no_duplicate_active'] = len(conflict) == 0
     # v2 文档已标 superseded
-    v2 = {'reports/execution/stage0/s3a_run_record.md',
-          'reports/execution/s3a/s3a_operational_report.md'}
+    v2 = {'reports/execution/analyst_run_record.md',
+          'reports/execution/analyst/analyst_operational_report.md'}
     st = {x['file']: x.get('status') for x in man['deliverables']}
     checks['v2_docs_superseded'] = all(st.get(f) == 'superseded' for f in v2)
     return checks, conflict, dir_multi
@@ -124,7 +125,7 @@ def round2_versions():
 def round3_claims():
     """禁止表述扫描。"""
     targets = {
-        's3a_report.md': REPORT,
+        'analyst_report.md': REPORT,
         'claim_matrix': CLAIM,
         'matrix': MATRIX,
     }
@@ -159,14 +160,14 @@ def main():
         'round3_no_banned_claims': all(len(v) == 0 for v in r3.values()),
     }
     result = {
-        'spec_id': spec['spec_id'], 'spec_hash': file_size(SPEC.read_bytes()).hexdigest(),
+        'spec_id': spec['spec_id'], 'spec_hash': file_size(SPEC),
         'run_at': datetime.now(timezone.utc).isoformat(),
         'command': ' '.join(sys.argv), 'script': Path(__file__).name,
         'round1_numbers': r1, 'round2_versions': r2, 'round2_conflicts': conflict, 'round2_dir_multi_active': dir_multi,
         'round3_banned_claims': r3, 'checks': checks,
         'status': 'PASS' if all(checks.values()) else 'FAIL',
     }
-    out = ROOT / 'reports/data_gates/G0/s3a_gate5_closure_check.json'
+    out = ROOT / 'reports/data_gates/G0/analyst_gate5_closure_check.json'
     out.write_text(json.dumps(result, ensure_ascii=False, indent=1), encoding='utf-8')
     print(json.dumps(checks, ensure_ascii=False, indent=1))
     for x in r1:

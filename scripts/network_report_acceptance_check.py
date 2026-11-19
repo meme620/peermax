@@ -1,4 +1,4 @@
-"""S3-B2 正式边表验收（plan §8 Phase B2 机械化验收项，2026-09-14）。
+"""network-B2 正式边表验收（plan §8 Phase B2 机械化验收项，2026-09-14）。
 
 检查（逐文本年 2017-2025，即网络年 2018-2026）：
   1. 唯一键 (network_version, focal_id, source_id) 重复 = 0
@@ -10,7 +10,7 @@
   7. 网络年映射：文本年 y → network_version pm_mb_tfidf_v1_y、available_at y+1-04-30
   8. 与语料对账：入网公司数 = 该文本年语料 ok 数（--corpus self=mda_texts / teacher=teacher_mda_panel）
 
-产物：reports/data_gates/G0/s3_b2_acceptance.json（status PASS/FAIL + 逐项明细）
+产物：reports/data_gates/G0/network_report_acceptance.json（status PASS/FAIL + 逐项明细）
 用法：python scripts/network_report_acceptance_check.py [--dir data/processed/network_mb]
 """
 import argparse
@@ -110,14 +110,14 @@ def main():
     }
     REPD.mkdir(parents=True, exist_ok=True)
     suffix = '' if args.corpus == 'self' else '_' + args.corpus
-    (REPD / ('s3_b2_acceptance' + suffix + '.json')).write_text(
+    (REPD / ('network_report_acceptance' + suffix + '.json')).write_text(
         json.dumps(out, ensure_ascii=False, indent=2), encoding='utf-8')
     print(json.dumps({'status': out['status'], 'years': len(per_year)}, ensure_ascii=False))
     for r in per_year:
         print(f"  {r['text_year']}->{r['network_year']}: nodes={r['nodes_support']}(+{r['nodes_no_support']} ns) "
               f"edges={r['n_edges']} med_peer={r['median_peer']:.0f} tau={r['tau']} "
               f"dup={r['dup_keys']} loop={r['self_loops']} badsum={r['bad_row_sum']} pass={r['pass']}")
-    print(f"-> {REPD / 's3_b2_acceptance.json'}")
+    print(f"-> {REPD / 'network_report_acceptance.json'}")
 
 
 if __name__ == '__main__':

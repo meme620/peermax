@@ -4,8 +4,8 @@
 
 输入（只读）
 ------------
-reports/data_gates/G0/s3_m1_robustness_placebo.json
-  20 个 spec：19 COMPUTED（含 t_nw / spec_beta / n_months_used）+ 1 NOT_COMPUTABLE（m1_rob_st）。
+reports/data_gates/G0/pricing_robustness_placebo.json
+  20 个 spec：19 COMPUTED（含 t_nw / spec_beta / n_months_used）+ 1 NOT_COMPUTABLE（pricing_rob_st）。
 
 输出（仅 artifacts/phase3b/）
 -----------------------------
@@ -20,12 +20,12 @@ reports/data_gates/G0/s3_m1_robustness_placebo.json
   step-up 的拒绝集 = 满足 p_(i) <= i*alpha/m 的最大 i 及其之前全部。
 - Bonferroni：alpha / m。
 - 主族 m = 19（全部 COMPUTED）；敏感性族 m = 18（剔除 T = n_months_used = 2 的退化规格
-  m1_rob_limit_all_limit；阈值 60 = registry min_effective_month_count）。
+  pricing_rob_limit_all_limit；阈值 60 = registry min_effective_month_count）。
 - NOT_COMPUTABLE 规格不进入任何族（不按 p=1 计入）。
 - 输入 bytes 必须等于 version_manifest 登记值，且与既有 3b_s6_counts.json 记录一致，
   否则 SystemExit（防止输入漂移后静默产出不可比的 q 值）。
 
-不改 headline / 系数 / gate / configs / G0 / reports；不重跑 M1/PC/网络。
+不改 headline / 系数 / gate / configs / G0 / reports；不重跑 pricing_gate/PC/网络。
 """
 
 from __future__ import annotations
@@ -37,17 +37,18 @@ import math
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from fileio import file_size
 
 BASE = Path(__file__).resolve().parents[1]
-DEFAULT_INPUT = BASE / "reports" / "data_gates" / "G0" / "s3_m1_robustness_placebo.json"
+DEFAULT_INPUT = BASE / "reports" / "data_gates" / "G0" / "pricing_robustness_placebo.json"
 DEFAULT_OUT_DIR = BASE / "artifacts" / "phase3b"
 DEFAULT_ALPHA = 0.05
 MIN_EFFECTIVE_MONTHS = 60  # registry min_effective_month_count
 OUT_PREFIX = "3b_s6_"
-# configs/version_manifest.yaml 登记值（file: reports/data_gates/G0/s3_m1_robustness_placebo.json）
+# configs/version_manifest.yaml 登记值（file: reports/data_gates/G0/pricing_robustness_placebo.json）
 EXPECTED_INPUT_bytes = "06d440aad63644e7b79e7f32512cb075bee5d09ffbd36d08afa03a91c359869b"
 
-PLACEBO_SPECS = {"m1_placebo_random", "m1_placebo_timeshift"}
+PLACEBO_SPECS = {"pricing_placebo_random", "pricing_placebo_timeshift"}
 
 
 def two_sided_p_normal(t: float) -> float:
@@ -193,7 +194,7 @@ def main() -> int:
     t_by_spec = {s: float(r["t_nw"]) for s, r in computed.items()}
     p_by_spec = {s: two_sided_p_normal(t) for s, t in t_by_spec.items()}
     degenerate = {s for s, r in computed.items() if int(r["n_months_used"]) < MIN_EFFECTIVE_MONTHS}
-    if degenerate != {"m1_rob_limit_all_limit"}:
+    if degenerate != {"pricing_rob_limit_all_limit"}:
         raise SystemExit(f"退化集合异常：{sorted(degenerate)}")
 
     adj19 = bh_adjust(p_by_spec, args.alpha)
@@ -260,19 +261,19 @@ def main() -> int:
     same_hyp_nondeg = [s for s in same_hyp if s not in degenerate]
     n_rows = {s: int(r["n_rows"]) for s, r in computed.items()}
     limit_rows = {
-        "m1_rob_limit_all_limit": n_rows["m1_rob_limit_all_limit"],
-        "m1_rob_limit_mixed": n_rows["m1_rob_limit_mixed"],
-        "m1_rob_limit_all_non_limit": n_rows["m1_rob_limit_all_non_limit"],
+        "pricing_rob_limit_all_limit": n_rows["pricing_rob_limit_all_limit"],
+        "pricing_rob_limit_mixed": n_rows["pricing_rob_limit_mixed"],
+        "pricing_rob_limit_all_non_limit": n_rows["pricing_rob_limit_all_non_limit"],
     }
     limit_sum = sum(limit_rows.values())
-    full_sample = n_rows["m1_rob_raw"]
+    full_sample = n_rows["pricing_rob_raw"]
     if limit_sum != full_sample:
         raise SystemExit(
             f"limit 三层 n_rows 之和 {limit_sum} != 主样本 {full_sample}"
         )
     notes = {
         "duplicate_pair": {
-            "specs": ["m1_rob_raw", "m1_rob_col_ma_teacher"],
+            "specs": ["pricing_rob_raw", "pricing_rob_col_ma_teacher"],
             "evidence": "beta/t/T/n_rows 逐值相同（同一主规格在主表与四列并报中各出现一次）",
             "consequence": "族内重复计入同一检验；m 多计 1，BH 略保守",
         },
@@ -284,29 +285,29 @@ def main() -> int:
                 "note": "三规格构成对主样本的完全划分（互斥），p 值强负相关/互补",
             },
             "size_strata": {
-                "m1_rob_size_low": n_rows["m1_rob_size_low"],
-                "m1_rob_size_high": n_rows["m1_rob_size_high"],
+                "pricing_rob_size_low": n_rows["pricing_rob_size_low"],
+                "pricing_rob_size_high": n_rows["pricing_rob_size_high"],
                 "note": "仅低/高三分位，中三分位未入族",
             },
             "liq_strata": {
-                "m1_rob_liq_low": n_rows["m1_rob_liq_low"],
-                "m1_rob_liq_high": n_rows["m1_rob_liq_high"],
+                "pricing_rob_liq_low": n_rows["pricing_rob_liq_low"],
+                "pricing_rob_liq_high": n_rows["pricing_rob_liq_high"],
                 "note": "仅低/高三分位，中三分位未入族",
             },
             "st_strata": {
-                "m1_rob_st": "NOT_COMPUTABLE",
-                "m1_rob_non_st": n_rows["m1_rob_non_st"],
+                "pricing_rob_st": "NOT_COMPUTABLE",
+                "pricing_rob_non_st": n_rows["pricing_rob_non_st"],
                 "note": "ST 层 n_usable_months=0，non_st 约等于全样本",
             },
         },
         "nested": "全部规格共享同一 FM 引擎、同一 outcome/controls/NW(6)，仅替换一个维度；各规格 t 序列高度相关（无法从汇总结果估计相关阵）",
-        "placebo_null": "m1_placebo_random / m1_placebo_timeshift 的零假设与 treatment 系数族不同（网络被打乱/错位），严格意义上不属于同一检验族",
-        "family_not_preregistered": "registry multiple_comparison_method 的 scope 仅覆盖 gate M1-M3 与 cutoff C-1~C-4 族；A9 规格族为本次诊断按可用 spec 列表定义，非预注册族",
+        "placebo_null": "pricing_placebo_random / pricing_placebo_timeshift 的零假设与 treatment 系数族不同（网络被打乱/错位），严格意义上不属于同一检验族",
+        "family_not_preregistered": "registry multiple_comparison_method 的 scope 仅覆盖定价 gate 与经济量级门与 cutoff C-1~C-4 族；A9 规格族为本次诊断按可用 spec 列表定义，非预注册族",
         "t_approximation": {
             "primary": "normal",
             "note": "normal 与 t(T-1) 的 |Δp| 在非退化规格上很小；退化规格 T=2 时 NW(6) 本身不可识别（lag>T-1），p 无推断意义",
             "max_abs_p_diff_nondegenerate": max(nd_diffs) if nd_diffs else None,
-            "degenerate_p_t_df1": t_cross.get("m1_rob_limit_all_limit"),
+            "degenerate_p_t_df1": t_cross.get("pricing_rob_limit_all_limit"),
         },
     }
 
@@ -343,7 +344,7 @@ def main() -> int:
             "n_beta_negative": len(signs["beta_negative"]),
             "beta_negative": signs["beta_negative"],
             "n_beta_positive": len(signs["beta_positive"]),
-            "registered_direction": "beta<0（M1-1/M1-2 单侧左尾）",
+            "registered_direction": "beta<0（sign/one_sided_significance 单侧左尾）",
             "negative_same_hypothesis_nondegenerate_specs": [
                 s for s in signs["beta_negative"] if s in same_hyp_nondeg
             ],

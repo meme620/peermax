@@ -1,4 +1,4 @@
-"""S3A smoketest C7：Anndats 月度分布审计（回填/backfill 检测，2026-08-14）。
+"""analyst-network smoketest C7：Anndats 月度分布审计（回填/backfill 检测，2026-08-14）。
 
 背景：边数 2019 年出现低谷（12 万 vs 2017-12 的 34 万），需排除数据商回填假象
 （backfill：报告实际发布时间更晚，但数据商按报告日批量导入，会造成早期快照前视）。

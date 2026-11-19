@@ -1,4 +1,4 @@
-"""S3A smoketest A2：报告级去重粒度的影响验证（2026-08-14）。
+"""analyst-network smoketest A2：报告级去重粒度的影响验证（2026-08-14）。
 
 自设计：step4 按 (firm, analyst, report_date) 报告级去重后再聚合覆盖。
 外部方案：不按报告日去重，直接对行级数据做窗口聚合（同日多预测行不合并）。
@@ -13,7 +13,7 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 
-CLEAN = 'data/processed/analyst/s3a_step3_clean.csv'
+CLEAN = 'data/processed/analyst/analyst_step3_clean.csv'
 COV = 'data/processed/analyst/firm_analyst_coverage.csv'
 OUT = Path('data/processed/analyst/smoketest_a2_dedup_grain.json')
 CUTOFFS = ['2018-06-30', '2021-06-30', '2024-06-30']

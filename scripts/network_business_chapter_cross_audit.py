@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""S3 Phase B″5：换章节对照审计（文本稳健性列 network_ma ↔ 主口径 network_ma_teacher）。
+"""network Phase B″5：换章节对照审计（文本稳健性列 network_ma ↔ 主口径 network_ma_teacher）。
 
 目的：把「同方法、换章节/语料」（业务描述 vs 老师 MD&A）这件事量化为可登记的对照结论，
 并用机械判据回答「章节输入是否改变网络结构结论方向」。蓝本 = `corpus_bridge_reconcile.py`
@@ -14,7 +14,7 @@ v2（2026-09-29，判据修订，依据用户裁定）：
     text-based peers **across the pooled sample** equals N_SW2」
     （`ref/teacher-materials/Methodology Description.pdf` §2）。
   - ⓒ 边 Jaccard **降级为描述性**（不再计入 pass/fail）。理由：两章语料层的产品词集本身只重合
-    10–22%（`s3_teacher_corpus_chapter_scan.json → lexicon_comparison`，Jaccard 0.119–0.132），
+    10–22%（`corpus_teacher_chapter_scan.json → lexicon_comparison`，Jaccard 0.119–0.132），
     边不重合是预期；且 0.20 这条线是从阈值法（M-B）跨域借来的（换语料 0.600 / 换方法 0.047–0.129），
     在聚类法域内连「换方法」都只有 4.7–12.9%。实测边 Jaccard 0.1175–0.1818 属预期。
   - ⓓ 聚类一致性 **重标注为实现自检（bug detector），非稳健性证据**（不参与 pass/fail）：两侧
@@ -24,7 +24,7 @@ v2（2026-09-29，判据修订，依据用户裁定）：
     产出，经 `--downstream-report` 读入。**定性（2026-09-29 二修）**：该口径在观察到本审计 v1 结果
     （2026-09-28 停机）之后设计，2026-09-28 预先写下的替代处置口径中不含"下游方向"这一项 →
     **属探索性/事后（post hoc）判据，不构成 outcome-blind 预登记**；其作用**仅限于**描述性对照，
-    **不得**作为 M1/M2 输入合格性或"换章节稳健性通过"的证据。结论措辞为"**两网下游未反向（描述性）**"。
+    **不得**作为 定价 gate / 机制层 输入合格性或"换章节稳健性通过"的证据。结论措辞为"**两网下游未反向（描述性）**"。
   - ⓑ 同申万二级 lift（两侧均 >1 且同向）保持不变；**lift 基线口径本条唯一化**为
     「同样本边际基线」（节点全域边际分布），旧报告的 SW2 lift 用不同基线，**口径不同，勿直接比较**。
   - **本审计的闸门判据只有 ⓐ（统一口径，逐年 + 池化）与 ⓑ**；ⓒ/ⓓ/ⓔ 均为描述性或实现自检。
@@ -50,11 +50,11 @@ v2（2026-09-29，判据修订，依据用户裁定）：
   ⓓ 聚类一致性 = 1.000 —— **实现自检（bug detector），不参与 pass/fail**
   ⓔ 下游方向一致性 —— **探索性/事后（post hoc）描述性对照，不参与 pass/fail**（详见文首定性）
 
-产物：reports/data_gates/G0/s3_ma_chapter_cross_audit.json + .md
+产物：reports/data_gates/G0/network_business_chapter_cross_audit.json + .md
 用法：
   python scripts/network_business_chapter_cross_audit.py [--years 2017 ... 2022]
   python scripts/network_business_chapter_cross_audit.py \
-      --downstream-report reports/data_gates/G0/s3_ma_downstream_consistency.json
+      --downstream-report reports/data_gates/G0/network_business_downstream_consistency.json
 """
 from __future__ import annotations
 
@@ -85,7 +85,7 @@ PEER_MEDIAN_DEF = ('median_peer = 当年网络全部公司（含零对手）：�
 LIFT_DEF = ('lift = 同申万二级边占比 / 同样本边际基线：base = Σ_k n_k(n_k−1) / (N(N−1))，'
             'n_k = 当年网络节点（support 表全部 focal，含零对手）中申万二级 = k 的计数（仅计有映射者），'
             'N = Σ_k n_k；分子 = 边表中两端均可映射的边里同二级占比。'
-            '**口径不同，勿直接比较**：旧报告 s3_b3_ma_param_freeze{,teacher}.json 的 sw2_lift 用'
+            '**口径不同，勿直接比较**：旧报告 network_business_param_freeze{,teacher}.json 的 sw2_lift 用'
             '「节点全域两两配对、缺映射记为同类」的基线，network_business_chapter_cross_audit v1 用「边端点边际'
             '分布」基线 → 同一网络同年可出现 4.43 / 5.96 / 5.96+ 等不同数值。')
 csv.field_size_limit(10**9)
@@ -225,11 +225,11 @@ def main() -> None:
     ap.add_argument('--years', type=int, nargs='*', default=YEARS, help='重叠文本年（缺省 2017-2022）')
     ap.add_argument('--self-dir', default=str(SELF_DIR))
     ap.add_argument('--teacher-dir', default=str(TEACH_DIR))
-    ap.add_argument('--downstream-report', default=str(REPD / 's3_ma_downstream_consistency.json'),
-                    help='ⓔ 下游方向一致性报告（缺省 reports/data_gates/G0/s3_ma_downstream_consistency.json；'
+    ap.add_argument('--downstream-report', default=str(REPD / 'network_business_downstream_consistency.json'),
+                    help='ⓔ 下游方向一致性报告（缺省 reports/data_gates/G0/network_business_downstream_consistency.json；'
                          '不存在则 ⓔ 记 pending）')
-    ap.add_argument('--out-json', default=str(REPD / 's3_ma_chapter_cross_audit.json'))
-    ap.add_argument('--out-md', default=str(REPD / 's3_ma_chapter_cross_audit.md'))
+    ap.add_argument('--out-json', default=str(REPD / 'network_business_chapter_cross_audit.json'))
+    ap.add_argument('--out-md', default=str(REPD / 'network_business_chapter_cross_audit.md'))
     args = ap.parse_args()
 
     self_dir = Path(args.self_dir).resolve()
@@ -323,7 +323,7 @@ def main() -> None:
     e_block = {'status': 'pending', 'gating': False,
                'report': str(dp.relative_to(ROOT)).replace('\\', '/') if dp.exists() else None,
                'note': '探索性/事后（post hoc）描述性对照：不构成 outcome-blind 预登记，非闸门；'
-                       '不得作为 M1/M2 输入合格性或"换章节稳健性通过"的证据'}
+                       '不得作为 定价 gate / 机制层 输入合格性或"换章节稳健性通过"的证据'}
     e_ok = None
     if dp.exists():
         dd = json.loads(dp.read_text(encoding='utf-8'))
@@ -349,10 +349,10 @@ def main() -> None:
     gating = [a_all, b_all, pooled['criteria']['a_peer_unified']]
     status = 'PASS' if (ok and len(ok) == len(args.years) and all(gating)) else 'FAIL'
     rep = {
-        'step': 'S3 Phase B″5 换章节对照审计（自建业务描述 ↔ 老师 MD&A，同方法 M-A）',
+        'step': 'network Phase B″5 换章节对照审计（自建业务描述 ↔ 老师 MD&A，同方法 M-A）',
         'audit_version': 'v2 (2026-09-29, 判据修订)',
         'superseded_artifact': 'artifacts/repro/phase_bpp_snapshot/'
-                               's3_ma_chapter_cross_audit_superseded_20260929.{json,md}（v1，status=FAIL，保留原判据）',
+                               'network_business_chapter_cross_audit_superseded_20260929.{json,md}（v1，status=FAIL，保留原判据）',
         'run_at': datetime.now(timezone.utc).isoformat(),
         'years_text': args.years, 'years_network': [y + 1 for y in args.years],
         'self_dir': str(self_dir.relative_to(ROOT)).replace('\\', '/'),
@@ -373,15 +373,15 @@ def main() -> None:
                             'ⓒ 描述性、ⓓ 实现自检、ⓔ 探索性/事后（post hoc）描述性，均不计入 pass/fail。'
                             'ⓔ 报告状态：' + e_block['status']),
             'e_post_hoc_note': 'ⓔ 在观察到本审计 v1 结果之后设计（2026-09-29），不构成 outcome-blind '
-                               '预登记；作用限于"两网下游是否反向"的描述性对照，**不得**作为 M1/M2 '
+                               '预登记；作用限于"两网下游是否反向"的描述性对照，**不得**作为 定价 gate / 机制层 '
                                '输入合格性或"换章节稳健性通过"的证据。',
         },
         'baselines': {'same_corpus_other_chapter_reference_jaccard_mb': 0.600,
                       'change_method_jaccard_range': [0.047, 0.129],
                       'two_chapter_lexicon_jaccard_range': [0.119, 0.1322],
-                      'sources': ['reports/data_gates/G0/s3_corpus_bridge_report.json',
-                                  'reports/data_gates/G0/s3_network_cross_audit.json',
-                                  'reports/data_gates/G0/s3_teacher_corpus_chapter_scan.json'
+                      'sources': ['reports/data_gates/G0/corpus_bridge_report.json',
+                                  'reports/data_gates/G0/network_cross_audit.json',
+                                  'reports/data_gates/G0/corpus_teacher_chapter_scan.json'
                                   ' → lexicon_comparison']},
         'note': '两侧网络均在同一冻结方法参数下构建（average 链 + 逐年 K 校准 + 同团对手集合 + '
                 '行归一化权重），只差文本章节/语料；不改变任何冻结值。ⓒ/ⓓ 已按 2026-09-29 裁定'
@@ -419,7 +419,7 @@ def main() -> None:
             'industry_clustering_note': '主口径（老师 MD&A）同申万二级边占比 0.194–0.349，'
                                         '约为文本稳健性列（业务描述）0.085–0.122 的 1.7–4.1 倍 → '
                                         '行业吸收检验（CF 与行业动量同入回归，看行业系数是否塌缩）'
-                                        '已列为 M1（C2）计划项（参照 S3A 9H 模板）。',
+                                        '已列为 pricing_gate（C2）计划项（参照 analyst-network 9H 模板）。',
             'top50_jaccard_density_matched_range': [
                 min((r['density_diagnostics']['top50_jaccard_density_matched'] for r in ok), default=None),
                 max((r['density_diagnostics']['top50_jaccard_density_matched'] for r in ok), default=None)],
@@ -442,7 +442,7 @@ def main() -> None:
                        '即边不重合主要是"同义不同词"的语料层差异，不是随机噪声。',
         },
         'cross_reference_evidence': {
-            'source': 'reports/data_gates/G0/s3_teacher_corpus_chapter_scan.json → lexicon_comparison'
+            'source': 'reports/data_gates/G0/corpus_teacher_chapter_scan.json → lexicon_comparison'
                       '（同公司同年份逐对：MD&A 章 产品词命中集合 vs 业务描述章 产品词命中集合）',
             'firm_year_term_set_jaccard_mda_vs_business': {'2017': 0.119, '2018': 0.121,
                                                            '2019': 0.1242, '2020': 0.1322},
@@ -455,19 +455,19 @@ def main() -> None:
         'status': status,
         'interpretation_rule': 'ⓐ（统一口径，逐年+池化）与 ⓑ（同样本边际基线下 lift 同向）全过 → '
                                '换章节的**结构层闸门**通过；ⓒ/ⓓ/ⓔ 均非闸门（ⓔ 为探索性/事后描述性对照，'
-                               '结论措辞"两网下游未反向（描述性）"，不得作为 M1/M2 输入合格性证据）。',
+                               '结论措辞"两网下游未反向（描述性）"，不得作为 定价 gate / 机制层 输入合格性证据）。',
     }
     outp = Path(args.out_json)
     outp.parent.mkdir(parents=True, exist_ok=True)
     outp.write_text(json.dumps(rep, ensure_ascii=False, indent=2), encoding='utf-8')
 
-    md = ['# S3 换章节对照审计（Phase B″5，v2 判据修订 + 2026-09-29 二修）', '',
+    md = ['# network 换章节对照审计（Phase B″5，v2 判据修订 + 2026-09-29 二修）', '',
           f'生成时间：{rep["run_at"]}　重叠文本年：{args.years}（网络年 {[y + 1 for y in args.years]}）', '',
           '**闸门判据（只有两项）**：ⓐ peer 相对差 ≤ 0.30（**统一口径：当年网络全部公司含零对手**，逐年+池化）；'
           'ⓑ 同样本边际基线下两侧同申万二级 lift > 1 且同向。', '',
           '**非闸门**：ⓒ 边 Jaccard（描述性，参考线 0.20）；ⓓ 聚类一致性（**实现自检 / bug detector**）；'
           'ⓔ 下游方向一致性（**探索性/事后（post hoc）描述性对照**，不构成 outcome-blind 预登记，'
-          '不得作为 M1/M2 输入合格性或"换章节稳健性通过"的证据）。', '',
+          '不得作为 定价 gate / 机制层 输入合格性或"换章节稳健性通过"的证据）。', '',
           f'**ⓔ 状态：{e_block["status"]}**'
           + (f'（报告：`{e_block["report"]}`；有效配对月份 {e_block.get("effective_paired_months")}）'
              if e_block.get('report') else '（下游面板与对照报告尚未产出）'), '',
@@ -496,7 +496,7 @@ def main() -> None:
            '', f'**总闸门状态：{status}**（{rep["criteria_set"]["status_note"]}）', '',
            '## ⓔ 下游方向一致性（探索性/事后（post hoc）描述性对照，**非闸门**）', '']
     if e_ok is None:
-        md += ['待产出：`reports/data_gates/G0/s3_ma_downstream_consistency.json`（B″6 面板后运行'
+        md += ['待产出：`reports/data_gates/G0/network_business_downstream_consistency.json`（B″6 面板后运行'
                '`network_business_downstream_consistency.py`）。']
     else:
         md += [f'`{e_block["report"]}`（run_at {e_block.get("run_at")}；'
@@ -511,15 +511,15 @@ def main() -> None:
                f'- 组合层：{e_block.get("portfolio")}',
                f'- 强度：{e_block.get("strength")}',
                '', '**定性声明**：ⓔ 在观察到本审计 v1 结果之后设计，**不构成 outcome-blind 预登记**；'
-               '作用限于"两网下游是否反向"的**描述性**对照——**不得**作为 M1/M2 输入合格性或'
+               '作用限于"两网下游是否反向"的**描述性**对照——**不得**作为 定价 gate / 机制层 输入合格性或'
                '"换章节稳健性通过"的证据。']
     md += ['', '## 描述性与诊断（不参与判据）', '',
-           '判读参考基线：M-B 侧「换语料」边 Jaccard 中位 = 0.600（`s3_corpus_bridge_report.json`）；'
-           '「换方法」= 0.047–0.129（`s3_network_cross_audit.json`）；两章语料层产品词集 Jaccard = '
-           '0.119–0.132（`s3_teacher_corpus_chapter_scan.json`）→ **边 Jaccard 实测 0.1175–0.1818 '
+           '判读参考基线：M-B 侧「换语料」边 Jaccard 中位 = 0.600（`corpus_bridge_report.json`）；'
+           '「换方法」= 0.047–0.129（`network_cross_audit.json`）；两章语料层产品词集 Jaccard = '
+           '0.119–0.132（`corpus_teacher_chapter_scan.json`）→ **边 Jaccard 实测 0.1175–0.1818 '
            '属语料层只重合 10–22% 的预期结果，故降级为描述性**。', '',
            'lift 口径：本条为**同样本边际基线**（当年网络节点在申万二级上的边际分布计算期望同行业占比）。'
-           '旧报告（`s3_b3_ma_param_freeze{,teacher}.json` 的 `sw2_lift`）用不同基线，**口径不同，'
+           '旧报告（`network_business_param_freeze{,teacher}.json` 的 `sw2_lift`）用不同基线，**口径不同，'
            '勿直接比较**——同一网络同年可差出 4.43 / 5.96 这类量级。', '',
            '| 文本年 | 边密度(自建/老师) | 密度比 | 包含率(老师⊂自建) | 独立性lift | top50 Jaccard | '
            'mean_terms(自建/老师) |',
@@ -537,7 +537,7 @@ def main() -> None:
     _rr = rep['diagnostics_summary']['same_sw2_ratio_teacher_over_self_range']
     md += ['', f'行业扎堆：主口径同申万二级边占比 {_ts[0]:.3f}–{_ts[1]:.3f}'
                f'（逐年 {_ts}）vs 文本稳健性 {_ss[0]:.3f}–{_ss[1]:.3f}（逐年 {_ss}）'
-               f'（比值 {_rr}）→ 行业吸收检验列为 M1（C2）计划项。']
+               f'（比值 {_rr}）→ 行业吸收检验列为 pricing_gate（C2）计划项。']
     Path(args.out_md).write_text('\n'.join(md), encoding='utf-8')
     print(json.dumps(rep['criteria_summary'], ensure_ascii=False, indent=1))
     print('status =', status)

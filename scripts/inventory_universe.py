@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""S1 Step 1：expected universe 构造（execution_protocol §2 Step 1）。
+"""inventory Step 1：expected universe 构造（execution_protocol §2 Step 1）。
 
 输入（usecols 限定）：
   data/raw/baostock/stock_basic/a_stocks.csv        → code,ipoDate,outDate,status
   data/raw/baostock/calendar/trade_dates_2016_2026.csv → calendar_date,is_trading_day
 研究期：2018-01-01 ~ 2025-12-31（registry sample_start/sample_end）
 expected firm-day = Σ 每只股票 [max(ipoDate,sample_start), min(outDate or sample_end, sample_end)] 内的交易日数。
-产出：reports/data_gates/G0/s1_expected_universe.json（含按年/按板块/零覆盖股票计数）
+产出：reports/data_gates/G0/inventory_expected_universe.json（含按年/按板块/零覆盖股票计数）
 
 用法: python scripts/inventory_universe.py
 """
@@ -23,7 +23,7 @@ SAMPLE_END = "2025-12-31"
 
 A_STOCKS = ROOT / "data/raw/baostock/stock_basic/a_stocks.csv"
 CALENDAR = ROOT / "data/raw/baostock/calendar/trade_dates_2016_2026.csv"
-OUT = ROOT / "reports/data_gates/G0/s1_expected_universe.json"
+OUT = ROOT / "reports/data_gates/G0/inventory_expected_universe.json"
 
 
 def load_stocks():
@@ -99,7 +99,7 @@ def main():
         per_year_board.update({f"{y}:{board}": c for y, c in yr.items()})
 
     report = {
-        "report_id": "s1_expected_universe",
+        "report_id": "inventory_expected_universe",
         "sample_start": SAMPLE_START,
         "sample_end": SAMPLE_END,
         "n_stocks": len(stocks),

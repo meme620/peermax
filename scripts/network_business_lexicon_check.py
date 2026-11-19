@@ -4,7 +4,7 @@ R1 结构自洽：命中词条必须确为规范化文本的子串；未命中�
 R2 独立实现对拍：与 n-gram 交集法（独立于 AC 的另一套实现）在抽样文本上逐篇比对集合相等
 R3 对抗：编码/全半角/空白/大小写/嵌套包含/ASCII 词/空文本 等边界；并核对词库 hash 与 df 口径
 
-产物：reports/data_gates/G0/s3_ma_lexicon_check.json
+产物：reports/data_gates/G0/network_business_lexicon_check.json
 """
 import json
 import sys
@@ -16,6 +16,7 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 from network_business_lexicon import build_automaton, load_lexicon, match_terms, normalize, LEXICON  # noqa: E402
+from fileio import file_size
 
 REPD = ROOT / 'reports/data_gates/G0'
 CORPUS = ROOT / 'data/processed/business_texts.csv'
@@ -35,7 +36,7 @@ def main():
     rep = {'run_at': datetime.now(timezone.utc).isoformat()}
     terms, meta = load_lexicon()
     rep['lexicon'] = meta
-    rep['lexicon']['bytes'] = file_size(LEXICON.read_bytes()).hexdigest()
+    rep['lexicon']['bytes'] = file_size(LEXICON)
     rep['lexicon']['max_len'] = max(len(t) for t in terms)
     print(f"lexicon: {len(terms)} terms, max_len={rep['lexicon']['max_len']}, bytes={rep['lexicon']['bytes'][:16]}…")
 
@@ -110,8 +111,8 @@ def main():
 
     rep['status'] = 'PASS' if (rep['R1_structural']['pass'] and rep['R2_independent_impl']['pass']
                                and rep['R3_adversarial']['pass']) else 'FAIL'
-    (REPD / 's3_ma_lexicon_check.json').write_text(json.dumps(rep, ensure_ascii=False, indent=2), encoding='utf-8')
-    print('status =', rep['status'], '->', REPD / 's3_ma_lexicon_check.json')
+    (REPD / 'network_business_lexicon_check.json').write_text(json.dumps(rep, ensure_ascii=False, indent=2), encoding='utf-8')
+    print('status =', rep['status'], '->', REPD / 'network_business_lexicon_check.json')
 
 
 def match_terms_normalized_safe(txt, A):

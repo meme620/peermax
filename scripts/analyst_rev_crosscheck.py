@@ -1,4 +1,4 @@
-"""S3A REV 因子交叉验证（P0-3 收尾，2026-08-14）。
+"""analyst-network REV 因子交叉验证（P0-3 收尾，2026-08-14）。
 
 背景：项目 FF5 里的短期反转因子 REV 由 build_rev_factor.py 自建
 （每月按 t-1 收益分 10 组、买输家卖赢家的 EW 多空，Ken French 标准定义），

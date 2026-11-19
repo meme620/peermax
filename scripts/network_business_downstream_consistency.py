@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""S3 Phase B″6：下游方向一致性（**探索性 / 事后（post hoc）描述性检验**，2026-09-29）。
+"""network Phase B″6：下游方向一致性（**探索性 / 事后（post hoc）描述性检验**，2026-09-29）。
 
 **定性声明（2026-09-29 二修，必须随数值一并引用）**：本脚本的口径在观察到 B″5 v1 结果
 （2026-09-28 停机）之后设计；2026-09-28 预先写下的替代处置口径中**不含"下游方向"这一项**，
 故本检验**不构成 outcome-blind 预登记**。其作用**仅限于**回答"两套网络的下游结果是否反向"
-这一**描述性**问题——**不得**作为 M1/M2 输入合格性的证据，也**不得**作为"换章节稳健性通过"
+这一**描述性**问题——**不得**作为 定价 gate / 机制层 输入合格性的证据，也**不得**作为"换章节稳健性通过"
 的证据。B″5 的闸门判据仍是 out-of-sample 口径无关的 ⓐ（peer 规模，统一口径）＋ⓑ（lift 同向）；
 ⓔ 只作报告。
 
@@ -37,8 +37,8 @@
   python scripts/network_business_downstream_consistency.py \
       --main-panel data/processed/monthly_pricing_panel_ma_teacher.csv \
       --robust-panel data/processed/monthly_pricing_panel_ma.csv \
-      --out-json reports/data_gates/G0/s3_ma_downstream_consistency.json \
-      --out-md reports/data_gates/G0/s3_ma_downstream_consistency.md
+      --out-json reports/data_gates/G0/network_business_downstream_consistency.json \
+      --out-md reports/data_gates/G0/network_business_downstream_consistency.md
 
 v2（2026-10-05，Phase B″10）：
   - 新增 `--main-label` / `--robust-label`（只改报告人读文案，默认值与历史完全一致）——同语料权重对照
@@ -192,8 +192,8 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument('--main-panel', default=str(MAIN_PANEL))
     ap.add_argument('--robust-panel', default=str(ROBUST_PANEL))
-    ap.add_argument('--out-json', default=str(REPD / 's3_ma_downstream_consistency.json'))
-    ap.add_argument('--out-md', default=str(REPD / 's3_ma_downstream_consistency.md'))
+    ap.add_argument('--out-json', default=str(REPD / 'network_business_downstream_consistency.json'))
+    ap.add_argument('--out-md', default=str(REPD / 'network_business_downstream_consistency.md'))
     ap.add_argument('--main-label', default='主口径（老师 MD&A）', help='main 侧人读标签（只影响报告文案）')
     ap.add_argument('--robust-label', default='文本稳健性（业务描述）', help='robust 侧人读标签（只影响报告文案）')
     args = ap.parse_args()
@@ -323,7 +323,7 @@ def main() -> None:
     handoff = {
         'e_downstream_direction': not_reversed,
         'e_semantics': 'post hoc / 描述性：非 outcome-blind 预登记、非闸门；'
-                       '不得作为 M1/M2 输入合格性或"换章节稳健性通过"的证据',
+                       '不得作为 定价 gate / 机制层 输入合格性或"换章节稳健性通过"的证据',
         'descriptive_checks': handoff_criteria,
         'conclusion': '两网下游未反向（描述性）',
         'overlap_months': [months[0], months[-1], len(months)],
@@ -353,11 +353,11 @@ def main() -> None:
     }
 
     rep = {
-        'step': 'S3 Phase B″6 下游方向一致性（探索性 / 事后（post hoc）描述性检验）',
+        'step': 'network Phase B″6 下游方向一致性（探索性 / 事后（post hoc）描述性检验）',
         'qualitative_status': 'POST_HOC_DESCRIPTIVE_NOT_PRE_REGISTERED',
         'qualitative_note': '该口径在观察到 B″5 v1 结果（2026-09-28 停机）之后设计；2026-09-28 预先写下的'
                             '替代处置口径中不含"下游方向"这一项 → **不构成 outcome-blind 预登记**。'
-                            '作用限于"两网下游结果是否反向"的描述性对照；**不得**作为 M1/M2 输入合格性'
+                            '作用限于"两网下游结果是否反向"的描述性对照；**不得**作为 定价 gate / 机制层 输入合格性'
                             '或"换章节稳健性通过"的证据（闸门判据只有 ⓐ+ⓑ）。',
         'run_at': datetime.now(timezone.utc).isoformat(),
         'main_panel': rel(args.main_panel),
@@ -389,7 +389,7 @@ def main() -> None:
     outp.parent.mkdir(parents=True, exist_ok=True)
     outp.write_text(json.dumps(rep, ensure_ascii=False, indent=2), encoding='utf-8')
 
-    md = ['# S3 Phase B″6 下游方向一致性（判据 ⓔ）', '',
+    md = ['# network Phase B″6 下游方向一致性（判据 ⓔ）', '',
           f'生成时间：{rep["run_at"]}', '',
           f'重叠月份：{months[0]}–{months[-1]}（{len(months)} 个月；合并后公司-月 {len(j):,} 行）', '',
           '## 公司-月层相关（' + f'{args.main_label} vs {args.robust_label}）', '',
@@ -444,7 +444,7 @@ def main() -> None:
            f'- **结论：{rep["conclusion"]}**', '',
            f'强度（须与结论一并引用）：{strength.get("reading")}', '',
            '**定性声明**：本检验在观察到 B″5 v1 结果之后设计，**不构成 outcome-blind 预登记**；'
-           '其作用**仅限于**上述描述性对照——**不得**作为 M1/M2 输入合格性或"换章节稳健性通过"的证据。'
+           '其作用**仅限于**上述描述性对照——**不得**作为 定价 gate / 机制层 输入合格性或"换章节稳健性通过"的证据。'
            '（闸门判据只有 network_business_chapter_cross_audit 的 ⓐ+ⓑ。）']
     Path(args.out_md).write_text('\n'.join(md), encoding='utf-8')
     print(json.dumps(rep['descriptive_checks'], ensure_ascii=False, indent=1))

@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""S3 第一梯队 ⑥ / B″11-7 锚 2：分析师共同覆盖重叠度（`s3_network_analyst_overlap.json`）。
+"""network 第一梯队 ⑥ / B″11-7 锚 2：分析师共同覆盖重叠度（`network_analyst_overlap.json`）。
 
 **只读复算**：不重建网络、不碰面板/回归、不改任何 headline_value / 冻结参数；只新建
-`reports/data_gates/G0/s3_network_analyst_overlap.json`。
+`reports/data_gates/G0/network_analyst_overlap.json`。
 
 口径真源：
-  - `reports/audits/s3_remaining_workplan_20261011.md` 第一梯队 6
+  - `reports/audits/network_remaining_workplan_20261011.md` 第一梯队 6
   - 主仓库 methodology_execution_plan §8 B″11-7（**二修：v3**）
-  - `reports/audits/s3_network_open_items_plan_20261006.md` §3-②(c)
-  - S3A 9H：`reports/data_gates/G0/s3a_9h_absorb.json`（CF 方向参照）
+  - `reports/audits/network_open_items_plan_20261006.md` §3-②(c)
+  - analyst-network 9H：`reports/data_gates/G0/analyst_industry_absorb.json`（CF 方向参照）
 
 输入：
   - 主口径产品网络：`data/processed/network_ma_teacher/{text_year}_{similarity,support}.csv`
@@ -26,7 +26,7 @@
   - 基线 = 对方网络在同样本内的无序对密度（`analyst_pair_density` / `product_pair_density`）；
   - `lift = share / 对方网络密度`（>1 = 重叠高于同样本随机配对）。
 
-验收：两向 lift >1 且与 S3A 9H 的 CF 方向一致。停机：月份映射无法覆盖 ≥80% 的产品网络年 → 停。
+验收：两向 lift >1 且与 analyst-network 9H 的 CF 方向一致。停机：月份映射无法覆盖 ≥80% 的产品网络年 → 停。
 
 **角色定位（必须随产物，二修口径）**：本步（分析师共同覆盖重叠）**只作替代网络一致性**
 （proposal §6.3 替代网络），**不等价于 HP 式自报锚**——首选自报锚为招股书「同行业可比公司」
@@ -54,7 +54,7 @@ REPD = ROOT / 'reports/data_gates/G0'
 TEACH_DIR = ROOT / 'data/processed/network_ma_teacher'
 ANALYST_EDGES = ROOT / 'data/processed/analyst/edges'
 ANALYST_COVERAGE = ROOT / 'data/processed/analyst/firm_analyst_coverage.csv'
-S3A_9H = REPD / 's3a_9h_absorb.json'
+ANALYST_INDUSTRY_ABSORB = REPD / 'analyst_industry_absorb.json'
 TEXT_YEARS = list(range(2014, 2023))          # 文本年 → 网络年 2015–2023（主口径 9 年）
 ANALYST_VERSION = 'v3'
 COVERAGE_MIN = 0.80                           # 月份映射覆盖率停机线（≥80%）
@@ -96,7 +96,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument('--net-dir', default=str(TEACH_DIR))
     ap.add_argument('--text-years', type=int, nargs='*', default=TEXT_YEARS)
-    ap.add_argument('--out-json', default=str(REPD / 's3_network_analyst_overlap.json'))
+    ap.add_argument('--out-json', default=str(REPD / 'network_analyst_overlap.json'))
     args = ap.parse_args()
 
     net_dir = Path(args.net_dir)
@@ -183,12 +183,12 @@ def main() -> None:
               'lift_analyst_link': (s_inter / s_prod) / (s_an / s_U) if s_prod and s_an and s_U else None,
               'lift_product_link': (s_inter / s_an) / (s_prod / s_U) if s_prod and s_an and s_U else None,
               'note': '池化 = pair 层 Σ 交 / Σ 分母（逐年样本并集口径不适用，故为各年计数求和）'}
-    # S3A 9H CF 参照（方向一致性判据）
+    # analyst-network 9H CF 参照（方向一致性判据）
     ref = {}
-    if S3A_9H.exists():
-        d = json.loads(S3A_9H.read_text(encoding='utf-8'))
+    if ANALYST_INDUSTRY_ABSORB.exists():
+        d = json.loads(ANALYST_INDUSTRY_ABSORB.read_text(encoding='utf-8'))
         cf = (d.get('col3_cf_ind') or d.get('col1_cf_only') or {}).get('cf', {})
-        ref = {'source': str(S3A_9H.relative_to(ROOT)).replace('\\', '/'),
+        ref = {'source': str(ANALYST_INDUSTRY_ABSORB.relative_to(ROOT)).replace('\\', '/'),
                'spec_id': d.get('spec_id'), 'network_version': d.get('network_version'),
                'cf_beta': cf.get('beta'), 'cf_t_1way': cf.get('t_iid'),
                'cf_t_mean_monthly_ref': cf.get('t_mean_monthly_ref'), 'cf_t_nw1': cf.get('t_nw1'),
@@ -203,7 +203,7 @@ def main() -> None:
         'all_years_lift_product_link_gt_1': bool(ok) and all((r['lift_product_link'] or 0) > 1 for r in ok),
         'pooled_lift_analyst_link_gt_1': bool(pooled['lift_analyst_link'] and pooled['lift_analyst_link'] > 1),
         'pooled_lift_product_link_gt_1': bool(pooled['lift_product_link'] and pooled['lift_product_link'] > 1),
-        's3a_9h_cf_direction_consistent': bool(ref.get('cf_direction') == 'positive'
+        'industry_absorb_cf_direction_consistent': bool(ref.get('cf_direction') == 'positive'
                                               and pooled['lift_analyst_link'] and pooled['lift_analyst_link'] > 1),
     }
     stops = []
@@ -213,7 +213,7 @@ def main() -> None:
         stops.append('存在年份两向 lift ≤1 → 记入 observations（不得据此宣称一致性成立）')
 
     rep = {
-        'step': 'S3 第一梯队 ⑥ / B″11-7 锚 2：分析师共同覆盖重叠度（替代网络一致性）',
+        'step': 'network 第一梯队 ⑥ / B″11-7 锚 2：分析师共同覆盖重叠度（替代网络一致性）',
         'run_at': datetime.now(timezone.utc).isoformat(),
         'nature': ('只读复算：不重建网络、不碰面板/回归、不改任何 headline_value / 冻结参数；'
                    '产物为新建文件'),
@@ -224,7 +224,7 @@ def main() -> None:
                    'analyst_version_reason': ('v2 仅 97 个月末（2017-12 起）= 产品网络年覆盖 6/9 = 67% '
                                               '< 80% 停机线 → 二修改 v3（241 个月末 2005-12–2025-12）'),
                    'coverage_table': str(ANALYST_COVERAGE.relative_to(ROOT)).replace('\\', '/'),
-                   's3a_9h_reference': str(S3A_9H.relative_to(ROOT)).replace('\\', '/')},
+                   'industry_absorb_reference': str(ANALYST_INDUSTRY_ABSORB.relative_to(ROOT)).replace('\\', '/')},
         'definitions': {
             'month_mapping': '网络年 y 的产品网络 available_at = y-04-30（构网脚本口径）→ 取分析师 y-04-30 '
                              '月末件（241 个月末内必存在）',
@@ -244,14 +244,14 @@ def main() -> None:
         'role_positioning': ROLE_NOTE,
         'per_year': per_year,
         'pooled': pooled,
-        's3a_9h_reference': ref,
+        'industry_absorb_reference': ref,
         'coverage_check': {'rule': f'月份映射覆盖率 ≥ {COVERAGE_MIN:.0%}（否则停）',
                            'n_years_total': n_years_total, 'n_years_mapped': len(ok),
                            'coverage_rate': round(coverage_rate, 4),
                            'missing_analyst_files': missing_files,
                            'pass': bool(coverage_rate >= COVERAGE_MIN)},
         'acceptance': {'two_way_lift_gt_1': 'required',
-                       'direction_consistent_with_s3a_9h_cf': 'required',
+                       'direction_consistent_with_industry_absorb_cf': 'required',
                        'checks': checks, 'stop_conditions_triggered': stops},
         'status': 'PASS' if all(checks.values()) else 'FAIL',
         'scope_note': ('本读数只给「产品网络与分析师共同覆盖网络在同样本下重叠高于随机」的一致性证据；'

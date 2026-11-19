@@ -1,7 +1,7 @@
-"""S3 边级 precision 人工判读：抽样 / 工作表 / 统计（第二梯队 #10 路线 A，B″11-9）。
+"""network 边级 precision 人工判读：抽样 / 工作表 / 统计（第二梯队 #10 路线 A，B″11-9）。
 
 **冻结口径真源**：`configs/parameter_registry.yaml` → `edge_precision_manual_annotation` 与
-`reports/audits/s3_edge_precision_protocol_20261013.md`（**先冻结后抽样**：脚本启动时校验协议冻结时间戳
+`reports/audits/network_edge_precision_protocol_20261013.md`（**先冻结后抽样**：脚本启动时校验协议冻结时间戳
 早于当前时间，否则 [STOP] 退出）。
 
 模式：
@@ -21,7 +21,7 @@ seed = registry random_seed 20260727（派生式见协议 §5）；层间优先�
 用法：
   python scripts/network_edge_precision_sample.py                       # 抽样 + 工作表 + 模板
   python scripts/network_edge_precision_sample.py --compute \
-      --annotated reports/data_gates/G0/s3_edge_precision_sample_20261013.csv  # 判读后统计
+      --annotated reports/data_gates/G0/network_edge_precision_sample_20261013.csv  # 判读后统计
 """
 from __future__ import annotations
 
@@ -45,9 +45,11 @@ from network_edge_precision_audit import (          # noqa: E402  (同目录 v2 
     build_ma_automaton, load_corpus, load_industry, load_lexicon_terms, load_names,
     match_terms_norm, mb_year_idf, normalize, _mb_tokenize,
 )
+from pricing_lib import param_value                 # noqa: E402  (registry 唯一来源)
+from fileio import file_size
 
 # ---- 冻结常量（须与 registry `edge_precision_manual_annotation` 逐字一致） ---- #
-SEED = 20260727                     # registry random_seed
+SEED = int(param_value('random_seed'))   # registry random_seed（唯一来源）
 TEXT_YEARS = [2016, 2019, 2022]
 NETWORK_YEARS = {2016: 2017, 2019: 2020, 2022: 2023}
 N_PER_STRATUM = 40
@@ -60,7 +62,7 @@ EXCERPT_HALF = 150
 MA_DF_MAX = 0.25
 Z95 = 1.959964
 CORPUS = 'teacher'
-PROTOCOL = ROOT / 'reports/audits/s3_edge_precision_protocol_20261013.md'
+PROTOCOL = ROOT / 'reports/audits/network_edge_precision_protocol_20261013.md'
 NET_DIRS = {'ma': ROOT / 'data/processed/network_ma_teacher',
             'mb': ROOT / 'data/processed/network_mb_teacher'}
 NET_PREFIX = {'ma': 'pm_ma_ewcos_teacher_v1', 'mb': 'pm_mb_tfidf_teacher_v1'}
@@ -291,7 +293,7 @@ def evidence_and_excerpt(net: str, ta: str, tb: str, automaton, df_map: dict,
 # --------------------------------------------------------------------------- #
 def build_worksheet(df: pd.DataFrame, path: Path, meta: dict) -> None:
     parts = ["""<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">
-<title>S3 边级判读工作表（V5 / B″11-9 路线 A）</title>
+<title>network 边级判读工作表（V5 / B″11-9 路线 A）</title>
 <style>
 body{font-family:"Microsoft YaHei",system-ui,sans-serif;margin:24px;background:#fafafa;color:#222}
 h1{font-size:20px}h2{font-size:17px;margin-top:28px;border-bottom:2px solid #ccd;padding-bottom:4px}
@@ -306,11 +308,11 @@ h3{font-size:15px;margin-top:20px;color:#345}
 .note{font-size:12px;color:#666}
 table{border-collapse:collapse;font-size:12px}td,th{border:1px solid #ccc;padding:3px 6px}
 </style></head><body>"""]
-    parts.append('<h1>S3 边级 precision 人工判读工作表（V5 / B″11-9 路线 A）</h1>')
+    parts.append('<h1>network 边级 precision 人工判读工作表（V5 / B″11-9 路线 A）</h1>')
     parts.append('<p class="note">本工作表由 <code>network_edge_precision_sample.py</code> 自动生成，'
                  '内容只有「公司/行业/权重/证据词/两端 MD&A 摘录」——<b>不含任何 AI 预标注、不含任何建议标签</b>。'
                  '判读标签定义、门槛与裁定规则见协议 '
-                 '<code>reports/audits/s3_edge_precision_protocol_20261013.md</code>。</p>')
+                 '<code>reports/audits/network_edge_precision_protocol_20261013.md</code>。</p>')
     parts.append('<div class="lab"><b>三标签勾选说明</b>：'
                  '<b>direct_competitor</b> = 同一产品/服务市场可相互替代（有明确共同产品线或共同客户群）；'
                  '<b>related_not_direct</b> = 同一产业链上下游 / 同集团生态 / 仅共享行业通用词但无直接替代；'
@@ -356,10 +358,10 @@ table{border-collapse:collapse;font-size:12px}td,th{border:1px solid #ccc;paddin
 
 
 # --------------------------------------------------------------------------- #
-# 三代理标签合并 + 一致性统计（M1–M3）
+# 三代理标签合并 + 一致性统计（定价 gate – 三代理合并）
 # --------------------------------------------------------------------------- #
 def read_label_file(path: Path, n_expect: int) -> tuple:
-    """读单个判读代理标签文件（row_id,label,reason）并做完整性校验（M1）。
+    """读单个判读代理标签文件（row_id,label,reason）并做完整性校验（pricing_gate）。
 
     校验：行数 == n_expect、row_id 恰为 1..n 各一次、label ∈ 三标签、reason 非空。
     任一不符 → [STOP]。返回 (labels, reasons, report)。
@@ -385,15 +387,15 @@ def read_label_file(path: Path, n_expect: int) -> tuple:
     fail = (checks['n_rows'] != n_expect or not checks['row_id_exact_1..n']
             or checks['row_id_duplicated'] or checks['unexpected_labels']
             or not checks['reason_all_nonempty'])
-    print(f'[M1] {Path(path).name}: rows={checks["n_rows"]}/{n_expect} '
+    print(f'[pricing_gate] {Path(path).name}: rows={checks["n_rows"]}/{n_expect} '
           f'row_id_1..n={checks["row_id_exact_1..n"]} dup={checks["row_id_duplicated"]} '
           f'labels_ok={checks["labels_valid"]} reason_nonempty={checks["reason_all_nonempty"]} '
           f'reason_max_len={checks["reason_max_len"]} -> {"PASS" if not fail else "FAIL"}')
     if fail:
-        raise SystemExit(f'[STOP] 标签文件完整性校验失败（M1）：{path} -> {checks}')
+        raise SystemExit(f'[STOP] 标签文件完整性校验失败（pricing_gate）：{path} -> {checks}')
     report = {
         'file': str(Path(path).as_posix()),
-        'bytes': file_size(Path(path).read_bytes()).hexdigest(),
+        'bytes': file_size(Path(path)),
         'distribution': {k: int(v) for k, v in lab.value_counts().items()},
         'reason_max_len': checks['reason_max_len'],
         'checks': checks,
@@ -417,7 +419,7 @@ def decide_final(labels: list) -> tuple:
 
 
 def merge_labels(sample_csv: Path, label_files: list) -> dict:
-    """把 N 位代理标签合并回填样本 CSV（M3）：label_1/2/3 + note_1/2 + final_label + n_agree
+    """把 N 位代理标签合并回填样本 CSV（三代理合并）：label_1/2/3 + note_1/2 + final_label + n_agree
     + disagreement。既有列名与列序不动，`label_3` / `n_agree` 追加于末尾（登记约定）。"""
     df = pd.read_csv(sample_csv, dtype=str, keep_default_na=False)
     n = len(df)
@@ -443,14 +445,14 @@ def merge_labels(sample_csv: Path, label_files: list) -> dict:
     df.to_csv(sample_csv, index=False, encoding='utf-8-sig')
     nag = Counter(k for _, k in fin)
     mode_share = Counter(f for f, _ in fin)
-    print(f'[M3] 合并回填完成：{sample_csv.name} -> {len(df)} 行 × {len(df.columns)} 列'
+    print(f'[edge-precision] 合并回填完成：{sample_csv.name} -> {len(df)} 行 × {len(df.columns)} 列'
           f'（+{",".join(MERGE_EXTRA_COLUMNS)}）')
-    print(f'[M3] n_agree 分布：3={nag[3]} 2={nag[2]} 1={nag[1]}；'
+    print(f'[edge-precision] n_agree 分布：3={nag[3]} 2={nag[2]} 1={nag[1]}；'
           f'final_label 分布：{dict(mode_share)}')
     return {'label_files': reports, 'n_rows': n, 'n_columns_after_merge': int(len(df.columns)),
             'n_agree_distribution': {str(k): int(nag[k]) for k in (3, 2, 1)},
             'final_label_distribution': {k: int(v) for k, v in mode_share.items()},
-            'merged_csv_bytes': file_size(sample_csv.read_bytes()).hexdigest(),
+            'merged_csv_bytes': file_size(sample_csv),
             '_reasons': notes}
 
 
@@ -546,7 +548,7 @@ def verdict(p: float | None) -> str:
 def compute(annotated: Path, out_dir: Path, out_prefix: str, label_files=None) -> int:
     merge_report = None
     if label_files:
-        print(f'[M3] 合并三位代理标签 → {annotated}')
+        print(f'[edge-precision] 合并三位代理标签 → {annotated}')
         merge_report = merge_labels(Path(annotated), label_files)
     df = pd.read_csv(annotated, dtype=str, keep_default_na=False).fillna('')
 
@@ -576,11 +578,11 @@ def compute(annotated: Path, out_dir: Path, out_prefix: str, label_files=None) -
     if 'n_agree' in df.columns:
         df['n_agree'] = [str(k) for k in nagree]
     scored = df[df['final_label'].isin(LABELS)].copy()
-    print(f'[M3] 裁定完成（{mode}）：scored={len(scored)}/{len(df)}，'
+    print(f'[edge-precision] 裁定完成（{mode}）：scored={len(scored)}/{len(df)}，'
           f'disagreement={int((df["disagreement"] == "1").sum())}，'
           f'n_agree 分布={dict(Counter(nagree))}')
 
-    # ---- M2 一致性统计（三代理） ---- #
+    # ---- 三代理一致性统计 ---- #
     consistency = None
     if triple:
         A, B, C = df['label_1'].tolist(), df['label_2'].tolist(), df['label_3'].tolist()
@@ -600,9 +602,9 @@ def compute(annotated: Path, out_dir: Path, out_prefix: str, label_files=None) -
                 'B': {k: int(v) for k, v in Counter(B).items()},
                 'C': {k: int(v) for k, v in Counter(C).items()}},
         }
-        print(f'[M2] 逐对一致率/kappa：'
+        print(f'[三代理] 逐对一致率/kappa：'
               + '；'.join(f'{k}={v["agreement_rate"]:.4f}/{v["kappa"]:.4f}' for k, v in pair.items()))
-        print(f'[M2] Fleiss kappa={fk["fleiss_kappa"]:.4f}（P_bar={fk["observed_agreement_p_bar"]:.4f}）'
+        print(f'[三代理] Fleiss kappa={fk["fleiss_kappa"]:.4f}（P_bar={fk["observed_agreement_p_bar"]:.4f}）'
               f'　n_agree 3/2/1 = {nag[3]}/{nag[2]}/{nag[1]}')
 
     # ---- 框计数（用于 N_h） ---- #
@@ -723,7 +725,7 @@ def compute(annotated: Path, out_dir: Path, out_prefix: str, label_files=None) -
             'stratum_counts', 'shortfall', 'stratum_rules', 'label_order']
     result = {k: shell[k] for k in keep if k in shell}
     result.update({
-        'artifact': 's3_edge_precision_result',
+        'artifact': 'edge_precision_result',
         'status': 'COMPUTED_AWAITING_REVIEW',
         'previous_status': shell.get('status', 'AWAITING_HUMAN_ANNOTATION'),
         'status_note': ('判读已完成（3 个独立 AI 判读代理 × 1,200 条）；结果为分层 precision + Wilson CI95 + '
@@ -732,7 +734,7 @@ def compute(annotated: Path, out_dir: Path, out_prefix: str, label_files=None) -
                         'pre-validated；外部锚仍未满足）。'),
         'computed_at': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
         'annotated_file': str(annotated.as_posix()),
-        'annotated_file_bytes': file_size(Path(annotated).read_bytes()).hexdigest(),
+        'annotated_file_bytes': file_size(Path(annotated)),
         'n_rows_total': int(len(df)), 'n_rows_scored': int(len(scored)),
         'n_disagreement': int((df['disagreement'] == '1').sum()),
         'agreement_rate': round(float((df['disagreement'] == '0').mean()), 6),
@@ -899,7 +901,7 @@ def sample(args) -> int:
 
     # result.json 空壳（字段结构 + AWAITING_HUMAN_ANNOTATION + 门槛/裁定规则引用）
     shell = {
-        'artifact': 's3_edge_precision_result',
+        'artifact': 'edge_precision_result',
         'status': 'AWAITING_HUMAN_ANNOTATION',
         'note': ('空壳模板：人工双人判读完成后用 `network_edge_precision_sample.py --compute '
                  '--annotated <填好的样本 CSV>` 覆盖本文件为填好的结果'),
@@ -952,14 +954,14 @@ def sample(args) -> int:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description='S3 边级 precision 判读：抽样 / 工作表 / 统计')
+    ap = argparse.ArgumentParser(description='network 边级 precision 判读：抽样 / 工作表 / 统计')
     ap.add_argument('--compute', action='store_true', help='判读后统计模式')
     ap.add_argument('--annotated', default=None, help='--compute 用：已填好的样本 CSV')
     ap.add_argument('--labels', default=None,
                     help='--compute 用：三代理标签文件（逗号分隔，顺序 A,B,C）；给出则先合并回填 '
                          '--annotated 的样本 CSV（label_1/2/3 + final_label + n_agree + disagreement）')
     ap.add_argument('--out-dir', default=str(ROOT / 'reports/data_gates/G0'))
-    ap.add_argument('--out-prefix', default='s3_edge_precision')
+    ap.add_argument('--out-prefix', default='edge_precision')
     ap.add_argument('--date', default='20261013')
     ap.add_argument('--n-per-stratum', type=int, default=N_PER_STRATUM)
     args = ap.parse_args()

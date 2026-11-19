@@ -1,13 +1,13 @@
-"""Phase 3.5：N-5 / A12 行业吸收残差化 shadow（只读 headline，不重跑 M1/PC/网络）。
+"""Phase 3.5：N-5 / A12 行业吸收残差化 shadow（只读 headline，不重跑 pricing_gate/PC/网络）。
 
 方案依据：`artifacts/phase3/3.0_plan.md` §2.5（N-5/A12 行业吸收残差化）。
 任务约束：
   - 只写 `artifacts/phase3/3.5_*`、`data/processed/phase3_shadow/*`（3.5 产物）；
-    不改 headline 样本/面板/边表/G0/configs/reports，不重跑 headline M1/PC/网络。
-  - 9 个 M1 主输入 + headline 样本/面板/G0 A12 报告 sha 前后对账；任一变化 → 停机。
+    不改 headline 样本/面板/边表/G0/configs/reports，不重跑 headline pricing_gate/PC/网络。
+  - 9 个 pricing_gate 主输入 + headline 样本/面板/G0 A12 报告 sha 前后对账；任一变化 → 停机。
 
 计算内容：
-  1. **第一阶段（残差化）**：在 M1 FM 样本上，按 month 固定效应（等价「按 month 回归 + 常数」）
+  1. **第一阶段（残差化）**：在 pricing_gate FM 样本上，按 month 固定效应（等价「按 month 回归 + 常数」）
      把 `PeerMAXraw` 对 `ind_l1_max_ew` / `ind_l2_max_ew` 回归，取残差。
      - 主口径 = month FE（pooled within；与 plan E7/E9 的 month 虚拟变量回归逐值等价）；
      - 对照口径 = 逐月单独斜率（`_permonth` 后缀），只作稳健性。
@@ -35,7 +35,7 @@
   - `artifacts/phase3/3.5_collinearity.csv`（第一阶段/共线/VIF 表）
   - `artifacts/phase3/3.5_cluster_industry_cross.csv`（团-行业交叉）
   - `artifacts/phase3/3.5_anchor_pre.json` / `3.5_anchor_post.json`
-  - `data/processed/phase3_shadow/m1_peer_resid_p3shadow.parquet`（只读派生，非 headline）
+  - `data/processed/phase3_shadow/pricing_peer_resid_shadow.parquet`（只读派生，非 headline）
 
 用法：
   python scripts/shadow_industry_absorb.py
@@ -56,8 +56,8 @@ from datetime import datetime, timezone
 import numpy as np
 import pandas as pd
 from pricing_lib import (
-    assert_m1_inputs, fm_regression, newey_west, param_value,
-    require, file_size, vif_table,
+    assert_pricing_inputs, fm_regression, newey_west, param_value,
+    require, file_size, shadow_sample_path, vif_table,
 )
 from fileio import assert_path_allowed, json_default, write_csv_rows, write_json_atomic, write_parquet_atomic
 
@@ -74,19 +74,19 @@ REPORTS = ROOT / 'reports'
 
 CONFIGS = ROOT / 'configs'
 
-SAMPLE = ROOT / 'data/processed/m1_common_sample_ma_teacher_v2.parquet'
+SAMPLE = shadow_sample_path('ma_teacher')
 
 HEADLINE_PANEL = ROOT / 'data/processed/monthly_pricing_panel_ma_teacher.csv'
 
 FIRM_CHARS = ROOT / 'data/processed/firm_chars_clean.csv'
 
-G0_A12 = ROOT / 'reports/data_gates/G0/s3_m1_industry_absorb.json'
+G0_A12 = ROOT / 'reports/data_gates/G0/pricing_industry_absorb.json'
 
-ASOF_MAP = SHADOW_DIR / 'sw2_asof_map_p3shadow.parquet'
+ASOF_MAP = SHADOW_DIR / 'sw2_asof_map_shadow.parquet'
 
 ASOF_BASELINES = SHADOW_DIR / 'ind_baselines_p3asof.parquet'
 
-SAMPLE_ASOF = SHADOW_DIR / 'm1_common_sample_ma_teacher_p3asof_baselines.parquet'
+SAMPLE_ASOF = SHADOW_DIR / 'pricing_sample_ma_teacher_p3asof_baselines.parquet'
 
 SW2_MAP = ROOT / 'data/processed/sw2_industry_map.csv'
 
@@ -104,9 +104,9 @@ ANCHOR_PRE = ART / '3.5_anchor_pre.json'
 
 ANCHOR_POST = ART / '3.5_anchor_post.json'
 
-RESID_PARQUET = SHADOW_DIR / 'm1_peer_resid_p3shadow.parquet'
+RESID_PARQUET = SHADOW_DIR / 'pricing_peer_resid_shadow.parquet'
 
-SHADOW_VERSION_TAG = 'p3shadow_v1_industry_absorb'
+SHADOW_VERSION_TAG = 'shadow_industry_absorb_v1'
 
 SAMPLE_ROWS = 307_503
 
@@ -228,7 +228,7 @@ def log(msg: str) -> None:
     print(f'[{time.strftime("%H:%M:%S")}] {msg}', flush=True)
 
 def anchors_snapshot(tag: str) -> dict:
-    ledger = assert_m1_inputs()
+    ledger = assert_pricing_inputs()
     extra = {k: {'file': str(v.relative_to(ROOT)).replace('\\', '/'), 'bytes': file_size(v)}
              for k, v in EXTRA_INPUTS.items()}
     clusters = {}
@@ -238,8 +238,8 @@ def anchors_snapshot(tag: str) -> dict:
     snap = {
         'tag': tag,
         'run_at': datetime.now(timezone.utc).isoformat(),
-        'm1_inputs_9': {r['input']: r['rows'] for r in ledger},
-        'm1_inputs_ledger': ledger,
+        'pricing_inputs_9': {r['input']: r['rows'] for r in ledger},
+        'pricing_inputs_ledger': ledger,
         'extra_inputs': extra,
         'headline_clusters_bytes': clusters,
     }
@@ -247,7 +247,7 @@ def anchors_snapshot(tag: str) -> dict:
 
 def compare_anchors(pre: dict, post: dict) -> dict:
     diffs = []
-    for sect in ('m1_inputs_9', 'headline_clusters_bytes'):
+    for sect in ('pricing_inputs_9', 'headline_clusters_bytes'):
         a, b = pre.get(sect) or {}, post.get(sect) or {}
         for k in sorted(set(a) | set(b)):
             if a.get(k) != b.get(k):
@@ -627,7 +627,7 @@ def main():
     log(f'3.5 preflight 完成：9 锚 MATCH；extra={len(pre["extra_inputs"])}；'
         f'headline clusters={len(pre["headline_clusters_bytes"])}')
 
-    reg = param_value('m1_sample_and_spec_registry')
+    reg = param_value('sample_and_spec_registry')
     min_n = int(reg['min_focal_count_per_month'])
     nw_lag = int(param_value('nw_lag'))
     log(f'registry: min_n={min_n}, nw_lag={nw_lag}')
@@ -663,7 +663,7 @@ def main():
     require(max_diff <= 1e-12, f'as-of 列与 ind_baselines_p3asof 最大差 {max_diff} > 1e-12')
     log(f'as-of 列与 3.1 基线逐值一致（max|Δ|={max_diff:.2e}）')
 
-    fm = base[base['m1_in_fm_sample'].astype(bool)].copy()
+    fm = base[base['pricing_in_fm_sample'].astype(bool)].copy()
     require(len(fm) == FM_ROWS, f'FM 行数 {len(fm)} != {FM_ROWS}')
     require(fm['month'].nunique() == FM_MONTHS, f'FM 月数 {fm["month"].nunique()} != {FM_MONTHS}')
     log(f'FM 样本：{len(fm):,} 行 / {fm["month"].nunique()} 月')
@@ -709,7 +709,7 @@ def main():
             f'R²(l1+l2)={first_stage[basis]["l1l2"]["r2_pooled_month_fe"]:.6f}')
 
     # ---- 残差化 parquet（只读派生）
-    resid_df = fm[['focal_id', 'month', 'm1_in_fm_sample', 'PeerMAXraw']].copy()
+    resid_df = fm[['focal_id', 'month', 'pricing_in_fm_sample', 'PeerMAXraw']].copy()
     for basis in ('latest', 'p3asof'):
         for lvl in ('l1', 'l2', 'l1l2'):
             resid_df[RESID[basis][lvl]] = fm[RESID[basis][lvl]].to_numpy()
@@ -756,11 +756,11 @@ def main():
     # ---- headline A12 复现门（与 G0 JSON 逐值比对）
     g0 = json.loads(G0_A12.read_text(encoding='utf-8'))
     repro = []
-    for sid, gspec in [('a12_l1_full', 'm1_industry_absorb_l1'),
-                       ('a12_l2_full', 'm1_industry_absorb_l2'),
-                       ('a12_both_full', 'm1_industry_absorb_both'),
-                       ('a12_l1_vw_full', 'm1_industry_absorb_l1_vw'),
-                       ('a12_l2_vw_full', 'm1_industry_absorb_l2_vw')]:
+    for sid, gspec in [('a12_l1_full', 'pricing_industry_absorb_l1'),
+                       ('a12_l2_full', 'pricing_industry_absorb_l2'),
+                       ('a12_both_full', 'pricing_industry_absorb_both'),
+                       ('a12_l1_vw_full', 'pricing_industry_absorb_l1_vw'),
+                       ('a12_l2_vw_full', 'pricing_industry_absorb_l2_vw')]:
         r = get_row(sid, 'latest')
         g = g0['specs'][gspec]
         items = [('beta', r['beta'], g['beta_with']['beta']),
@@ -1057,7 +1057,7 @@ def main():
     outputs = {
         '3.5_industry_absorb.csv': file_size(ABSORB_CSV),
         '3.5_collinearity.csv': file_size(COLLIN_CSV),
-        'm1_peer_resid_p3shadow.parquet': file_size(RESID_PARQUET),
+        'pricing_peer_resid_shadow.parquet': file_size(RESID_PARQUET),
         '3.5_anchor_pre.json': file_size(ANCHOR_PRE),
         '3.5_anchor_post.json': file_size(ANCHOR_POST),
     }
@@ -1072,7 +1072,7 @@ def main():
         'elapsed_sec': round(time.time() - t0, 2),
         'script': str(Path(__file__).relative_to(ROOT)).replace('\\', '/'),
         'inputs': {
-            'headline_sample': 'data/processed/m1_common_sample_ma_teacher_v2.parquet',
+            'headline_sample': 'data/processed/pricing_sample_ma_teacher_v2.parquet',
             'asof_sample_copy': str(SAMPLE_ASOF.relative_to(ROOT)).replace('\\', '/'),
             'asof_baselines': str(ASOF_BASELINES.relative_to(ROOT)).replace('\\', '/'),
             'asof_map': str(ASOF_MAP.relative_to(ROOT)).replace('\\', '/'),
@@ -1150,7 +1150,7 @@ def main():
         },
         'outputs': outputs,
         'notes': [
-            '3.5 只做只读派生 + shadow 分析；headline M1/PC/网络未重跑。',
+            '3.5 只做只读派生 + shadow 分析；headline pricing_gate/PC/网络未重跑。',
             'as-of 口径 = 申万分类生效日口径（非严格 PIT）；2021-07-30 vintage 断点适用。',
             'δ = 1 − |β_with|/|β_without| 不单独引用；A12 解释改为「残差化 β + 增量 R²」。',
             '残差化主口径 = month FE pooled within（与 plan E7/E9 逐值一致）；逐月单独斜率仅作稳健性列。',

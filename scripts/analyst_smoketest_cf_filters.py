@@ -1,6 +1,6 @@
-"""S3A smoketest：CF MOM 价格/规模过滤变体对比（2026-08-14）。
+"""analyst-network smoketest：CF MOM 价格/规模过滤变体对比（2026-08-14）。
 
-对抗审查 P1-5：当前过滤 = 样本内市值最低 10% 分位 + 上市<6 个月（fillna(False) 保留）。
+对抗审查：当前过滤 = 样本内市值最低 10% 分位 + 上市<6 个月（fillna(False) 保留）。
 A&H 原文 = 前月末股价 <$5 剔除。本脚本复刻 cf_mom_replication.py ln/h1 逻辑，
 仅替换过滤规则，对比多空收益与 t 值：
 

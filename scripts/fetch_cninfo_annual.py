@@ -99,12 +99,30 @@ def org_id(code6: str) -> tuple:
     return None, None
 
 
+_LAST_QUERY_TS = 0.0
+QUERY_MIN_INTERVAL = 1.5   # cninfo 对高频 query 直接 403 封禁（实测 >40 req/s 即触发）
+
+
 def _query(body: str):
-    req = urllib.request.Request("http://www.cninfo.com.cn/new/hisAnnouncement/query", headers=H, data=body.encode())
-    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-    with opener.open(req, timeout=25) as r:
-        d = json.loads(r.read().decode("utf-8", "ignore"))
-    return d.get("announcements") or []
+    """全局节流 + 403 退避：被限速时按 60s/120s/180s 递增等待后重试，不让失败请求空转。"""
+    global _LAST_QUERY_TS
+    wait = QUERY_MIN_INTERVAL - (time.time() - _LAST_QUERY_TS)
+    if wait > 0:
+        time.sleep(wait)
+    for attempt in (1, 2, 3):
+        _LAST_QUERY_TS = time.time()
+        try:
+            req = urllib.request.Request("http://www.cninfo.com.cn/new/hisAnnouncement/query", headers=H, data=body.encode())
+            opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+            with opener.open(req, timeout=25) as r:
+                d = json.loads(r.read().decode("utf-8", "ignore"))
+            return d.get("announcements") or []
+        except urllib.error.HTTPError as e:
+            if e.code == 403 and attempt < 3:
+                time.sleep(60 * attempt)
+                continue
+            raise
+    return []
 
 
 EM_NAMES_JSON = os.path.join(BASE, "em_former_names.json")

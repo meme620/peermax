@@ -1,6 +1,6 @@
-"""S3A Gate 2.2：B 线独立网络重实现。
+"""analyst-network Gate 2.2：B 线独立网络重实现。
 
-规则来源：`configs/s3a_final_spec.yaml`（spec_hash 见输出），据此从冻结预测输入
+规则来源：`configs/analyst_spec.yaml`（spec_hash 见输出），据此从冻结预测输入
 重建 241 个月末网络，**不读生产 edges、不调用生产核心函数**。
 
 与生产实现（A 线 run_analyst_pipeline 的 step5+step67）的有意差异：
@@ -9,8 +9,8 @@
   - 行归一化分母用 groupby.transform('sum')，而非手工 defaultdict 累加。
 
 输出（每个指标带三线对账所需的逐月粒度）：
-  artifacts/s3a_crosscheck_B.json          241 月逐月指标
-  artifacts/s3a_crosscheck_B_detail.json   3 个抽查月明细（top edges）
+  artifacts/analyst_crosscheck_b.json          241 月逐月指标
+  artifacts/analyst_crosscheck_b_detail.json   3 个抽查月明细（top edges）
 
 用法：
   python scripts/analyst_crosscheck_reimplementation.py [--months N] [--limit-firms K]
@@ -24,12 +24,13 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import yaml
+from fileio import file_size
 
 ROOT = Path(__file__).resolve().parents[1]
-SPEC = ROOT / 'configs/s3a_final_spec.yaml'
+SPEC = ROOT / 'configs/analyst_spec.yaml'
 _SPEC_BYTES = SPEC.read_bytes()
 SPEC_DATA = yaml.safe_load(_SPEC_BYTES.decode('utf-8'))
-SPEC_HASH = file_size(_SPEC_BYTES)
+SPEC_HASH = len(_SPEC_BYTES)
 
 SRC = ROOT / SPEC_DATA['inputs']['analyst_forecast']
 VERSION = SPEC_DATA['network']['primary_version']
@@ -171,9 +172,9 @@ def main():
             'covered_records_total': int(sum(r['covered_records'] for r in monthly)),
         },
     }
-    p = ROOT / 'artifacts/s3a_crosscheck_B.json'
+    p = ROOT / 'artifacts/analyst_crosscheck_b.json'
     p.write_text(json.dumps(out, ensure_ascii=False, indent=1), encoding='utf-8')
-    (ROOT / 'artifacts/s3a_crosscheck_B_detail.json').write_text(
+    (ROOT / 'artifacts/analyst_crosscheck_b_detail.json').write_text(
         json.dumps(details, ensure_ascii=False, indent=1), encoding='utf-8')
     print(json.dumps(out['totals'], ensure_ascii=False))
     print('->', p.relative_to(ROOT))

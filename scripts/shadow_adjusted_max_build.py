@@ -1,6 +1,6 @@
 """Phase 2.3：shadow MAX 侧复权/除权面板（只读 headline，只写 shadow）。
 
-背景（`artifacts/phase2/2.0_plan.md` §2.3，审计 V-P1-3）：
+背景（`artifacts/phase2/2.0_plan.md` §2.3，审计轮次记录）：
   headline `source_month_argmax_panel.csv` 的 `MAXraw` 来自未复权 `rraw`；
   除权日（送转/派息）会产生“除权断崖”，被当成单日负收益进入 MAX。
   `daily_panel` 的 `ca_flag` 在 2014–2017 全为 0（`close_qfq` 全空），
@@ -47,6 +47,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import math
 import os
 import shutil
@@ -62,7 +63,8 @@ import math
 import numpy as np
 import os
 import pandas as pd
-from fileio import write_json_atomic
+from fileio import write_json_atomic, file_size
+from fmt import fmt_float, fmt_int
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -82,7 +84,7 @@ MONTHLY_RAW = ROOT / "data/processed/monthly_returns_clean_v2.csv"
 
 RESUME_AUDIT = ROOT / "artifacts/phase2/2.2_resume_audit.csv"
 
-CONTRACTS = ROOT / "configs/m1_contracts.yaml"
+CONTRACTS = ROOT / "configs/pricing_inputs.yaml"
 
 SHADOW_DIR = ROOT / "data/processed/phase2_shadow"
 
@@ -116,7 +118,7 @@ EXPECTED_SOURCE_SHA = "944adbbab95a7b30d858f2943c8ec2844a852a9551b06224b21147d3c
 
 WINDOW_CAL = ("2015-01", "2023-12")
 
-WINDOW_M1 = ("2015-05", "2023-12")
+WINDOW_HISTORIC = ("2015-05", "2023-12")
 
 SHAREBONUS_VALID_STATUS = {"实施分配"}
 
@@ -219,16 +221,16 @@ def load_contracts(path: Path = CONTRACTS) -> dict:
 
 def anchor_snapshot(contracts: dict) -> dict:
     snap = {}
-    for key, meta in contracts["m1_inputs"].items():
+    for key, meta in contracts["pricing_inputs"].items():
         p = ROOT / meta["file"]
         if not p.is_file():
-            raise SystemExit(f"[P2.3] headline 锚缺失: {p}")
+            raise SystemExit(f"[shadow-adjusted-max] headline 锚缺失: {p}")
         h = file_size(p)
         snap[key] = {
             "file": meta["file"],
             "bytes": h,
             "bytes_registered": meta["bytes"],
-            "sha_match": bool(h == meta["bytes"]),
+            "bytes_match": bool(h == meta["bytes"]),
             "rows_expected": int(meta["expected_rows"]),
         }
     return snap
@@ -236,12 +238,12 @@ def anchor_snapshot(contracts: dict) -> dict:
 def assert_anchors_unchanged(before: dict, after: dict) -> None:
     for key in before:
         if not before[key]["sha_match"]:
-            raise SystemExit(f"[P2.3] 起始锚已不一致: {key}")
+            raise SystemExit(f"[shadow-adjusted-max] 起始锚已不一致: {key}")
         if before[key]["bytes"] != after[key]["bytes"]:
-            raise SystemExit(f"[P2.3] headline 锚在运行中变化: {key}")
+            raise SystemExit(f"[shadow-adjusted-max] headline 锚在运行中变化: {key}")
 
 def protected_paths(contracts: dict) -> set[Path]:
-    return {(ROOT / m["file"]).resolve() for m in contracts["m1_inputs"].values()}
+    return {(ROOT / m["file"]).resolve() for m in contracts["pricing_inputs"].values()}
 
 def code_column(code: str) -> str:
     """source_id(sh600000) -> 后复权 pkl 列名(600000.SH)。"""
@@ -269,7 +271,7 @@ def parse_sharebonus_frame(sb: pd.DataFrame,
             "BONUS_RATIO", "IT_RATIO", "PRETAX_BONUS_RMB"}
     missing = need - set(sb.columns)
     if missing:
-        raise SystemExit(f"[P2.3] sharebonus 缺列: {sorted(missing)}")
+        raise SystemExit(f"[shadow-adjusted-max] sharebonus 缺列: {sorted(missing)}")
     d = sb.copy()
     ex_raw = d["EX_DIVIDEND_DATE"].fillna("").astype(str).str.strip()
     status = d["ASSIGN_PROGRESS"].fillna("").astype(str).str.strip()
@@ -306,7 +308,7 @@ def parse_corporate_action_frame(ca: pd.DataFrame,
     need = {"code", "ex_date"}
     missing = need - set(ca.columns)
     if missing:
-        raise SystemExit(f"[P2.3] corporate_action 缺列: {sorted(missing)}")
+        raise SystemExit(f"[shadow-adjusted-max] corporate_action 缺列: {sorted(missing)}")
     d = ca.copy()
     d["code6"] = d["code"].fillna("").astype(str).str.strip().str.zfill(6)
     d["ex_date"] = d["ex_date"].fillna("").astype(str).str[:10]
@@ -361,12 +363,12 @@ def load_resume_monthly(path: Path, source_ids: set[str]):
     need = {"source_id", "date", "month"}
     missing = need - set(ra.columns)
     if missing:
-        raise SystemExit(f"[P2.3] resume audit 缺列: {sorted(missing)}")
+        raise SystemExit(f"[shadow-adjusted-max] resume audit 缺列: {sorted(missing)}")
     if ra.duplicated(["source_id", "date"]).any():
-        raise SystemExit("[P2.3] resume audit 键 (source_id,date) 不唯一")
+        raise SystemExit("[shadow-adjusted-max] resume audit 键 (source_id,date) 不唯一")
     bad = ~ra["source_id"].isin(source_ids)
     if bad.any():
-        raise SystemExit(f"[P2.3] resume audit 含 source 面板外 code: "
+        raise SystemExit(f"[shadow-adjusted-max] resume audit 含 source 面板外 code: "
                          f"{ra.loc[bad, 'source_id'].head(3).tolist()}")
     ra["month"] = ra["month"].astype(str).str[:7]
     monthly = ra.groupby(["source_id", "month"], as_index=False).size()
@@ -384,7 +386,7 @@ def build_adj_return_matrix(px: pd.DataFrame) -> pd.DataFrame:
         px = px.copy()
         px.index = pd.to_datetime(px.index)
     if px.index.has_duplicates:
-        raise SystemExit("[P2.3] 后复权 pkl 日期索引重复")
+        raise SystemExit("[shadow-adjusted-max] 后复权 pkl 日期索引重复")
     return px.sort_index().pct_change(fill_method=None)
 
 def monthly_adj_from_px(px: pd.DataFrame) -> pd.DataFrame:
@@ -520,14 +522,14 @@ def compute_monthly_aggregates(panel_dir: Path, years: range, adj_ret: pd.DataFr
     for y in years:
         p = panel_dir / f"{y}.csv"
         if not p.is_file():
-            raise SystemExit(f"[P2.3] daily_panel 缺文件: {p}")
+            raise SystemExit(f"[shadow-adjusted-max] daily_panel 缺文件: {p}")
         agg, st, ev_days, res_days = process_daily_year(
             p, adj_ret, adj_np, event_pairs, event_meta, resume_pairs, tie_rule)
         parts.append(agg)
         stats.append(st)
         event_days_all.update(ev_days)
         resume_days_all.update(res_days)
-        print(f"[P2.3] {y}: rows={st['daily_rows_with_rraw']:,} "
+        print(f"[shadow-adjusted-max] {y}: rows={st['daily_rows_with_rraw']:,} "
               f"adj_missing={st['adj_lookup_missing']:,} "
               f"fallback={st['adj_fallback_days']:,} "
               f"event_days={st['event_days']:,} resume_days={st['resume_days']:,}",
@@ -571,7 +573,7 @@ def build_shadow_panel(source: pd.DataFrame, agg: pd.DataFrame,
     old_cols = list(source.columns)
     collisions = [c for c in NEW_COLS if c in old_cols]
     if collisions:
-        raise SystemExit(f"[P2.3] 输入已含 shadow 列，拒绝覆盖: {collisions}")
+        raise SystemExit(f"[shadow-adjusted-max] 输入已含 shadow 列，拒绝覆盖: {collisions}")
 
     # 避免与 source 的 MAXraw / n_valid_days / month 列冲突。
     agg = agg.rename(columns={
@@ -586,9 +588,9 @@ def build_shadow_panel(source: pd.DataFrame, agg: pd.DataFrame,
                     right_on=["_code", "month"], how="left",
                     validate="one_to_one", indicator=True)
     if (out["_merge"] == "right_only").any():
-        raise SystemExit("[P2.3] 日频聚合存在 source 面板外键")
+        raise SystemExit("[shadow-adjusted-max] 日频聚合存在 source 面板外键")
     if int((out["_merge"] == "both").sum()) != len(agg):
-        raise SystemExit("[P2.3] 日频覆盖行数与聚合行数不一致")
+        raise SystemExit("[shadow-adjusted-max] 日频覆盖行数与聚合行数不一致")
     out = out.sort_values("_row", kind="mergesort").reset_index(drop=True)
     out = out.drop(columns=["_code"])
     covered = out["_merge"].eq("both")
@@ -612,14 +614,14 @@ def build_shadow_panel(source: pd.DataFrame, agg: pd.DataFrame,
     raw_mismatch = int((covered & (
         np.abs(_num(out["MAXraw_recomputed"]) - max_raw) > 1e-8)).sum())
     if mismatch_valid or raw_mismatch:
-        raise SystemExit(f"[P2.3] headline 对齐失败: n_valid={mismatch_valid}, "
+        raise SystemExit(f"[shadow-adjusted-max] headline 对齐失败: n_valid={mismatch_valid}, "
                          f"MAXraw={raw_mismatch}")
 
     # 与 2.2 复牌集交叉：日频重算的复牌日数必须与 2.2 审计表一致。
     resume_mismatch = int((covered & (
         _num(out["n_resume_days_daily"]).fillna(0) != n_resume)).sum())
     if resume_mismatch:
-        raise SystemExit(f"[P2.3] 2.2 resume 计数与日频复算不一致: "
+        raise SystemExit(f"[shadow-adjusted-max] 2.2 resume 计数与日频复算不一致: "
                          f"{resume_mismatch}")
 
     is_pre = out["month"].lt("2014-01")
@@ -705,7 +707,7 @@ def finalize_panel(out: pd.DataFrame, covered: pd.Series, n_valid: pd.Series,
         1 for s, d in zip(sub["source_id"], sub["argmax_date_adj_ex_resume"])
         if (s, d) in resume_pairs))
     if any(violations.values()):
-        raise SystemExit(f"[P2.3] 构造不变量失败: {violations}")
+        raise SystemExit(f"[shadow-adjusted-max] 构造不变量失败: {violations}")
     return out, violations
 
 def window_mask(df: pd.DataFrame, window: tuple[str, str]) -> pd.Series:
@@ -760,7 +762,7 @@ def compare_monthly_raw_adj(raw_path: Path, adj_path: Path) -> dict:
     out = {"rows_common": int(len(j)), "rows_raw": int(len(raw)),
            "rows_adj": int(len(adj))}
     for label, window in (("calendar_2015_2023", WINDOW_CAL),
-                          ("m1_window", WINDOW_M1)):
+                          ("pricing_window", WINDOW_HISTORIC)):
         w = j[j["month"].ge(window[0]) & j["month"].le(window[1])].copy()
         d = (w["R_adj"] - w["R_raw"]).abs()
         flip = ((w["R_raw"].abs() > 0.2)
@@ -921,17 +923,17 @@ def main(argv=None) -> int:
                      ("out-returns", out_returns_p), ("counts-out", counts_p),
                      ("diff-out", diff_p), ("exrights-out", exrights_p)):
         if p in protected:
-            raise SystemExit(f"[P2.3] {label} 指向 headline 路径，拒绝写出: {p}")
+            raise SystemExit(f"[shadow-adjusted-max] {label} 指向 headline 路径，拒绝写出: {p}")
     if out_p.parent != shadow_dir or meta_p.parent != shadow_dir \
             or out_returns_p.parent != shadow_dir:
-        raise SystemExit(f"[P2.3] shadow 输出必须位于 {shadow_dir}")
+        raise SystemExit(f"[shadow-adjusted-max] shadow 输出必须位于 {shadow_dir}")
     if any(p.parent != artifacts_dir for p in (counts_p, diff_p, exrights_p)):
-        raise SystemExit("[P2.3] 审计输出必须位于 artifacts/phase2/")
+        raise SystemExit("[shadow-adjusted-max] 审计输出必须位于 artifacts/phase2/")
 
     anchors_before = anchor_snapshot(contracts)
     if not all(v["sha_match"] for v in anchors_before.values()):
         bad = [k for k, v in anchors_before.items() if not v["sha_match"]]
-        raise SystemExit(f"[P2.3] headline 锚起始不一致: {bad}")
+        raise SystemExit(f"[shadow-adjusted-max] headline 锚起始不一致: {bad}")
 
     input_paths = {
         "source_month_argmax_panel": src_p,
@@ -944,7 +946,7 @@ def main(argv=None) -> int:
     }
     for key, p in input_paths.items():
         if not p.is_file():
-            raise SystemExit(f"[P2.3] 输入缺失 {key}: {p}")
+            raise SystemExit(f"[shadow-adjusted-max] 输入缺失 {key}: {p}")
     inputs_sha_before = {k: file_size(p) for k, p in input_paths.items()}
     daily_sha_before = {
         y: file_size(panel_dir / f"{y}.csv")
@@ -953,21 +955,21 @@ def main(argv=None) -> int:
 
     source = pd.read_csv(src_p, dtype=str, keep_default_na=False)
     if len(source) != args.expected_rows:
-        raise SystemExit(f"[P2.3] source 行数 {len(source)} != {args.expected_rows}")
+        raise SystemExit(f"[shadow-adjusted-max] source 行数 {len(source)} != {args.expected_rows}")
     if source.duplicated(["source_id", "month"]).any():
-        raise SystemExit("[P2.3] source 键 (source_id, month) 不唯一")
+        raise SystemExit("[shadow-adjusted-max] source 键 (source_id, month) 不唯一")
     src_sha_before = file_size(src_p)
     if src_sha_before != EXPECTED_SOURCE_SHA:
-        raise SystemExit(f"[P2.3] headline source panel sha 与登记不一致: {src_sha_before}")
+        raise SystemExit(f"[shadow-adjusted-max] headline source panel sha 与登记不一致: {src_sha_before}")
     old_cols = list(source.columns)
     if old_cols != ["source_id", "month", "MAXraw", "argmax_date", "n_valid_days",
                     "R", "tie_rule_version", "formula_id", "limit_hit_at_argmax",
                     "qualification_status", "st_flag_at_argmax"]:
-        raise SystemExit(f"[P2.3] source 列序与预期不一致: {old_cols}")
+        raise SystemExit(f"[shadow-adjusted-max] source 列序与预期不一致: {old_cols}")
 
     tie = resolve_tie_rule(args.registry)
     tie_rule = tie["id"]
-    print(f"[P2.3] tie_rule={tie_rule} source={tie['source']}", flush=True)
+    print(f"[shadow-adjusted-max] tie_rule={tie_rule} source={tie['source']}", flush=True)
 
     # ---- 事件：sharebonus 主 + corporate_action 2018+ 交叉
     sb_raw = pd.read_csv(sb_p, dtype=str, keep_default_na=False)
@@ -980,20 +982,20 @@ def main(argv=None) -> int:
     event_meta = {(r.source_id, r.ex_date):
                   (r.bonus_ratio, r.it_ratio, r.dividend)
                   for r in ev.itertuples(index=False)}
-    print(f"[P2.3] events: sharebonus={len(sb_ev):,} "
+    print(f"[shadow-adjusted-max] events: sharebonus={len(sb_ev):,} "
           f"corporate_action={len(ca_ev):,} combined={len(ev):,}", flush=True)
 
     # ---- 2.2 复牌集
     resume_month, resume_df = load_resume_monthly(resume_p, set(source["source_id"]))
     resume_pairs = set(zip(resume_df["source_id"], resume_df["date"]))
-    print(f"[P2.3] resume rows={len(resume_df):,} "
+    print(f"[shadow-adjusted-max] resume rows={len(resume_df):,} "
           f"months={len(resume_month):,}", flush=True)
 
     # ---- 后复权价：月频对拍 + 日度收益
-    print("[P2.3] 载入后复权 pkl …", flush=True)
+    print("[shadow-adjusted-max] 载入后复权 pkl …", flush=True)
     px = pd.read_pickle(adj_px_p)
     if not isinstance(px, pd.DataFrame):
-        raise SystemExit("[P2.3] 后复权 pkl 不是 DataFrame")
+        raise SystemExit("[shadow-adjusted-max] 后复权 pkl 不是 DataFrame")
     px.index = pd.to_datetime(px.index)
     px = px.sort_index()
     monthly_calc = monthly_adj_from_px(px)
@@ -1013,19 +1015,19 @@ def main(argv=None) -> int:
         "gt_1e_6": int((abs_diff > 1e-6).sum()),
     }
     if monthly_replication["gt_1e_12"]:
-        raise SystemExit(f"[P2.3] 月频复权对拍失败: {monthly_replication}")
-    print(f"[P2.3] 月频复权对拍: rows={len(both):,} "
+        raise SystemExit(f"[shadow-adjusted-max] 月频复权对拍失败: {monthly_replication}")
+    print(f"[shadow-adjusted-max] 月频复权对拍: rows={len(both):,} "
           f"max_abs_diff={monthly_replication['max_abs_diff']:.3e}", flush=True)
 
     adj_ret = build_adj_return_matrix(px)
-    print(f"[P2.3] 日度复权矩阵 {adj_ret.shape[0]:,} x {adj_ret.shape[1]:,}", flush=True)
+    print(f"[shadow-adjusted-max] 日度复权矩阵 {adj_ret.shape[0]:,} x {adj_ret.shape[1]:,}", flush=True)
 
     # ---- 日频聚合
     years = range(args.start_year, args.end_year + 1)
     agg, year_stats, event_days, resume_days_seen = compute_monthly_aggregates(
         panel_dir, years, adj_ret, event_pairs, event_meta, resume_pairs, tie_rule)
     del adj_ret, px
-    print(f"[P2.3] 月度聚合 {len(agg):,} 行；除权交易日 {len(event_days):,}；"
+    print(f"[shadow-adjusted-max] 月度聚合 {len(agg):,} 行；除权交易日 {len(event_days):,}；"
           f"复牌日 {len(resume_days_seen):,}", flush=True)
 
     # ---- 组装 shadow
@@ -1034,19 +1036,19 @@ def main(argv=None) -> int:
     out, invariant_checks = finalize_panel(
         out, covered, n_valid, max_raw, ev, resume_pairs, tie_rule)
     if len(out) != args.expected_rows:
-        raise SystemExit(f"[P2.3] shadow 行数 {len(out)} != {args.expected_rows}")
+        raise SystemExit(f"[shadow-adjusted-max] shadow 行数 {len(out)} != {args.expected_rows}")
     write_shadow_csv(out, old_cols, out_p)
     out_bytes = file_size(out_p)
-    print(f"[P2.3] shadow CSV 已写出 sha={out_bytes[:16]}…", flush=True)
+    print(f"[shadow-adjusted-max] shadow CSV 已写出 sha={out_bytes[:16]}…", flush=True)
 
     # 旧列只读：回读 shadow 并与 source 逐行比对（分块）。
-    old_digest_src = file_size()
+    old_digest_src = hashlib.sha256()
     for start in range(0, len(source), 100_000):
         old_digest_src.update(
             source.iloc[start:start + 100_000][old_cols]
             .to_csv(index=False, header=False, lineterminator="\n")
             .encode("utf-8"))
-    old_digest_out = file_size()
+    old_digest_out = hashlib.sha256()
     for chunk in pd.read_csv(out_p, usecols=old_cols, dtype=str,
                              keep_default_na=False, chunksize=100_000):
         old_digest_out.update(
@@ -1054,8 +1056,8 @@ def main(argv=None) -> int:
                                    lineterminator="\n").encode("utf-8"))
     old_readonly_ok = old_digest_src.hexdigest() == old_digest_out.hexdigest()
     if not old_readonly_ok:
-        raise SystemExit("[P2.3] shadow 旧列回读与 source 不一致")
-    print("[P2.3] 旧列回读一致", flush=True)
+        raise SystemExit("[shadow-adjusted-max] shadow 旧列回读与 source 不一致")
+    print("[shadow-adjusted-max] 旧列回读一致", flush=True)
 
     # ---- 月频复权文件：复制既有登记文件，不重算
     out_returns_p.parent.mkdir(parents=True, exist_ok=True)
@@ -1064,16 +1066,16 @@ def main(argv=None) -> int:
     os.replace(tmp, out_returns_p)
     returns_bytes = file_size(out_returns_p)
     if returns_bytes != inputs_sha_before["monthly_returns_adj_full_2006_2025"]:
-        raise SystemExit("[P2.3] monthly_returns_adj_p2shadow 与输入不一致")
+        raise SystemExit("[shadow-adjusted-max] monthly_returns_adj_p2shadow 与输入不一致")
 
     # ---- 计数
     def wmask(w):
         return window_mask(out, w)
 
     cal = out[wmask(WINDOW_CAL)]
-    m1 = out[wmask(WINDOW_M1)]
+    pricing_window_df = out[wmask(WINDOW_HISTORIC)]
     cal_eval = cal[pd.to_numeric(cal["n_max_days"], errors="coerce").gt(0)]
-    m1_eval = m1[pd.to_numeric(m1["n_max_days"], errors="coerce").gt(0)]
+    pricing_eval = pricing_window_df[pd.to_numeric(pricing_window_df["n_max_days"], errors="coerce").gt(0)]
     covered_2014_2025 = int(covered.sum())
     pre_2014 = int(out["month"].lt("2014-01").sum())
 
@@ -1081,7 +1083,7 @@ def main(argv=None) -> int:
     max_rows = {}
     for label, frame in (("all_rows", out), ("calendar_2015_2023", cal),
                          ("calendar_2015_2023_evaluable", cal_eval),
-                         ("m1_window", m1), ("m1_window_evaluable", m1_eval)):
+                         ("pricing_window", pricing_window_df), ("pricing_window_evaluable", pricing_eval)):
         tails[label] = {
             "raw": tail_stats(frame["MAXraw"]),
             "raw_ex_resume": tail_stats(frame["MAXraw_ex_resume"]),
@@ -1099,24 +1101,24 @@ def main(argv=None) -> int:
 
     # 2.2 联合：raw 排除复牌日后的 MAX 变化
     resume_changed_cal = int(cal["resume_joint_max_changed"].sum())
-    resume_changed_m1 = int(m1["resume_joint_max_changed"].sum())
+    resume_changed_pricing = int(pricing_window_df["resume_joint_max_changed"].sum())
     adj_changed_cal = int(cal["adj_max_changed_vs_raw"].sum())
     adj_nr_changed_cal = int(cal["adj_ex_resume_changed_vs_adj"].sum())
 
     # 除权影响
     ca_rows_cal = int(cal["corporate_action_flag"].sum())
-    ca_rows_m1 = int(m1["corporate_action_flag"].sum())
+    ca_rows_pricing = int(pricing_window_df["corporate_action_flag"].sum())
     argmax_ex_cal = int(cal["argmax_raw_on_ex_date"].sum())
     ex_rights_changed_cal = int(
         (pd.to_numeric(cal["MAXraw_ex_rights"], errors="coerce").notna()
          & pd.to_numeric(cal["MAXraw"], errors="coerce").notna()
          & (pd.to_numeric(cal["MAXraw_ex_rights"], errors="coerce")
             - pd.to_numeric(cal["MAXraw"], errors="coerce")).abs().gt(1e-8)).sum())
-    ex_rights_changed_m1 = int(
-        (pd.to_numeric(m1["MAXraw_ex_rights"], errors="coerce").notna()
-         & pd.to_numeric(m1["MAXraw"], errors="coerce").notna()
-         & (pd.to_numeric(m1["MAXraw_ex_rights"], errors="coerce")
-            - pd.to_numeric(m1["MAXraw"], errors="coerce")).abs().gt(1e-8)).sum())
+    ex_rights_changed_pricing = int(
+        (pd.to_numeric(pricing_window_df["MAXraw_ex_rights"], errors="coerce").notna()
+         & pd.to_numeric(pricing_window_df["MAXraw"], errors="coerce").notna()
+         & (pd.to_numeric(pricing_window_df["MAXraw_ex_rights"], errors="coerce")
+            - pd.to_numeric(pricing_window_df["MAXraw"], errors="coerce")).abs().gt(1e-8)).sum())
 
     # 事件覆盖
     sb_years = sb_ev["ex_date"].str[:4].astype(int)
@@ -1169,7 +1171,7 @@ def main(argv=None) -> int:
         "adj_gt_0_44_calendar": 22,
         "raw_gt_1_0_calendar": 6,
         "resume_max_changed_calendar": 2666,
-        "resume_max_changed_m1": 2396,
+        "resume_max_changed_pricing": 2396,
     }
     actual = {
         "raw_lt_neg_0_44_calendar": tails["calendar_2015_2023"]["raw"]["lt_neg_0_44"],
@@ -1178,7 +1180,7 @@ def main(argv=None) -> int:
         "adj_gt_0_44_calendar": tails["calendar_2015_2023"]["adj"]["gt_0_44"],
         "raw_gt_1_0_calendar": tails["calendar_2015_2023"]["raw"]["gt_1_0"],
         "resume_max_changed_calendar": resume_changed_cal,
-        "resume_max_changed_m1": resume_changed_m1,
+        "resume_max_changed_pricing": resume_changed_pricing,
     }
     replication = {
         k: {"expected": int(v), "actual": int(actual[k]),
@@ -1222,10 +1224,10 @@ def main(argv=None) -> int:
     daily_unchanged = all(daily_sha_before[y] == daily_sha_after[y]
                           for y in daily_sha_before)
     if not inputs_unchanged or not daily_unchanged:
-        raise SystemExit("[P2.3] 输入在运行中变化")
+        raise SystemExit("[shadow-adjusted-max] 输入在运行中变化")
     src_sha_after = file_size(src_p)
     if src_sha_after != src_sha_before:
-        raise SystemExit("[P2.3] headline source panel 在运行中变化")
+        raise SystemExit("[shadow-adjusted-max] headline source panel 在运行中变化")
 
     anchors_after = anchor_snapshot(contracts)
     assert_anchors_unchanged(anchors_before, anchors_after)
@@ -1299,7 +1301,7 @@ def main(argv=None) -> int:
         "source_panel_sha_after": src_sha_after,
         "source_panel_sha_match_registered": bool(src_sha_before == EXPECTED_SOURCE_SHA),
         "headline_files_modified": False,
-        "m1_rerun": False,
+        "pricing_rerun": False,
         "configs_modified": False,
         "rows": {
             "total": int(len(out)),
@@ -1362,7 +1364,7 @@ def main(argv=None) -> int:
             "resume_rows_in_2_2": int(len(resume_df)),
             "resume_days_seen_in_daily": int(len(resume_days_seen)),
             "max_changed_calendar_2015_2023": resume_changed_cal,
-            "max_changed_m1_window": resume_changed_m1,
+            "max_changed_pricing_window": resume_changed_pricing,
             "adj_vs_raw_changed_calendar": adj_changed_cal,
             "adj_changed_gt_1e_4_calendar": int(
                 (pd.to_numeric(cal["delta_MAXraw_adj"], errors="coerce")
@@ -1376,8 +1378,8 @@ def main(argv=None) -> int:
                  .abs() > 1e-2).sum()),
             "resume_only_months_calendar": int(
                 (pd.to_numeric(cal["n_max_days"], errors="coerce") == 0).sum()),
-            "resume_only_months_m1": int(
-                (pd.to_numeric(m1["n_max_days"], errors="coerce") == 0).sum()),
+            "resume_only_months_pricing": int(
+                (pd.to_numeric(pricing_window_df["n_max_days"], errors="coerce") == 0).sum()),
             "adj_neg_tail_all_calendar": tails["calendar_2015_2023"]["adj"]["lt_neg_0_44"],
             "adj_neg_tail_evaluable_calendar": tails["calendar_2015_2023_evaluable"]["adj"]["lt_neg_0_44"],
             "adj_ex_resume_neg_tail_calendar": tails["calendar_2015_2023"]["adj_ex_resume"]["lt_neg_0_44"],
@@ -1428,10 +1430,10 @@ def main(argv=None) -> int:
         },
         "corporate_action_impact": {
             "rows_with_ca_calendar": ca_rows_cal,
-            "rows_with_ca_m1": ca_rows_m1,
+            "rows_with_ca_pricing": ca_rows_pricing,
             "argmax_raw_on_ex_date_calendar": argmax_ex_cal,
             "max_changed_by_excluding_ex_dates_calendar": ex_rights_changed_cal,
-            "max_changed_by_excluding_ex_dates_m1": ex_rights_changed_m1,
+            "max_changed_by_excluding_ex_dates_pricing": ex_rights_changed_pricing,
             "max_raw_calendar": tails["calendar_2015_2023"]["raw"]["max"],
             "max_ex_rights_calendar": tails["calendar_2015_2023"]["raw_ex_rights"]["max"],
             "neg_tail_raw_calendar": tails["calendar_2015_2023"]["raw"]["lt_neg_0_44"],
@@ -1468,11 +1470,11 @@ def main(argv=None) -> int:
             "adj_ex_resume_neg_tail_zero": bool(
                 tails["calendar_2015_2023"]["adj_ex_resume"]["lt_neg_0_44"] == 0),
             "n_max_days_from_2_2_resume": {
-                "m1_not_gated_lt15": int(
-                    (m1["n_max_days"].notna()
-                     & pd.to_numeric(m1["n_max_days"], errors="coerce").lt(15)).sum()),
-                "m1_n_valid_lt15": int(
-                    (pd.to_numeric(m1["n_valid_days"], errors="coerce").lt(15)).sum()),
+                "pricing_not_gated_lt15": int(
+                    (pricing_window_df["n_max_days"].notna()
+                     & pd.to_numeric(pricing_window_df["n_max_days"], errors="coerce").lt(15)).sum()),
+                "pricing_n_valid_lt15": int(
+                    (pd.to_numeric(pricing_window_df["n_valid_days"], errors="coerce").lt(15)).sum()),
             },
             "inputs_unchanged": bool(inputs_unchanged and daily_unchanged),
         },
@@ -1501,14 +1503,14 @@ def main(argv=None) -> int:
     }
     write_json_atomic(meta, meta_p)
 
-    print(f"[P2.3] shadow rows={len(out):,} sha={out_bytes[:16]}…", flush=True)
-    print(f"[P2.3] adj coverage={int(out['MAXraw_adj'].notna().sum()):,} "
+    print(f"[shadow-adjusted-max] shadow rows={len(out):,} sha={out_bytes[:16]}…", flush=True)
+    print(f"[shadow-adjusted-max] adj coverage={int(out['MAXraw_adj'].notna().sum()):,} "
           f"pre2014={pre_2014:,}", flush=True)
-    print(f"[P2.3] raw tail={tails['calendar_2015_2023']['raw']}", flush=True)
-    print(f"[P2.3] adj tail={tails['calendar_2015_2023']['adj']}", flush=True)
-    print(f"[P2.3] adj_ex_resume tail="
+    print(f"[shadow-adjusted-max] raw tail={tails['calendar_2015_2023']['raw']}", flush=True)
+    print(f"[shadow-adjusted-max] adj tail={tails['calendar_2015_2023']['adj']}", flush=True)
+    print(f"[shadow-adjusted-max] adj_ex_resume tail="
           f"{tails['calendar_2015_2023']['adj_ex_resume']}", flush=True)
-    print(f"[P2.3] counts={counts_p} meta={meta_p}", flush=True)
+    print(f"[shadow-adjusted-max] counts={counts_p} meta={meta_p}", flush=True)
     return 0
 
 

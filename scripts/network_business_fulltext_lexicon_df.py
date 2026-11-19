@@ -164,7 +164,7 @@ def main() -> int:
         'aggregation_rule': ('df_ratio = max_t df_ratio_t（逐年独立上确界；doc_count 取 argmax 年计数）；'
                              '对照列 df_ratio_pooled = Σdoc_count / ΣN_docs'),
         'match_rule': 'full_substring (Aho-Corasick, set semantics), NFKC+strip_ws+lower；'
-                      '命中由 F1 缓存提供（缓存核验证据见 s3_ma_fulltext_cache_verification.json）',
+                      '命中由 F1 缓存提供（缓存核验证据见 network_business_fulltext_cache_verification.json）',
         'per_year': [{'text_year': y, 'n_docs': int(n_docs[i]), 'zero_hit_docs': int(zero_hit[i]),
                       'zero_hit_ratio': round(float(zero_hit[i] / max(1, n_docs[i])), 6),
                       'n_terms_df_gt_max': int((df_t[:, i] > args.df_max).sum()),

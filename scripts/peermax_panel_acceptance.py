@@ -1,4 +1,4 @@
-"""C1 验收：S4 v4 面板三轮检查（W1 bundle，P1.1-01 / P1.2-01 / P1.2-04 面板侧；2026-11-17）。
+"""C1 验收：panel v4 面板三轮检查（W1 bundle，口径更正 / 面板侧；2026-11-17）。
 
 R1 结构/合同：
   - 唯一键 (focal_id, month, corpus_id, panel_version) / (focal_id, month, network_use_case, network_version) 重复 0
@@ -16,13 +16,13 @@ R3 对抗：
   - 交叉口径：同一 (focal, month) 的 OwnMAXraw 在不同 v4 面板必须完全一致（同一 source-month 底层）
   - 覆盖率分布：报告 p10/中位/mean
 
-产物：reports/data_gates/G0/s4_c1_acceptance_{corpus}_v4.json
+产物：reports/data_gates/G0/peermax_panel_acceptance_{corpus}_v4.json
 用法（单面板模式）：
   python scripts/peermax_panel_acceptance.py \
     --panel data/processed/monthly_pricing_panel_ma_teacher_v4.csv --use-case ma \
     --net-dir data/processed/network_ma_teacher \
     --ref-panel data/processed/monthly_pricing_panel_ma_v4.csv \
-    --out reports/data_gates/G0/s4_c1_acceptance_ma_teacher_v4.json
+    --out reports/data_gates/G0/peermax_panel_acceptance_ma_teacher_v4.json
 """
 import argparse
 import csv
@@ -36,7 +36,7 @@ import numpy as np
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
-from pricing_lib import assert_m1_inputs, file_size  # noqa: E402
+from pricing_lib import assert_pricing_inputs, file_size  # noqa: E402
 
 REPD = ROOT / 'reports/data_gates/G0'
 PANELS = {'ma': ROOT / 'data/processed/monthly_pricing_panel_ma.csv',
@@ -83,20 +83,20 @@ def main(argv=None):
     ap.add_argument('--net-dir', default=None, help='单面板模式的网络目录（缺省按 use-case 取 NETS）')
     ap.add_argument('--ref-panel', default=None,
                     help='单面板模式下 R3 OwnMAXraw 交叉核对的参照 v4 面板')
-    ap.add_argument('--out', default='reports/data_gates/G0/s4_c1_acceptance_v4.json')
+    ap.add_argument('--out', default='reports/data_gates/G0/peermax_panel_acceptance_v4.json')
     args = ap.parse_args(argv)
 
     if not args.panel:
         raise SystemExit('[STOP] W1 acceptance 只允许单面板模式（--panel）；历史 ma+mb 双面板模式已停用')
     panels = {args.use_case: ROOT / args.panel}
     nets = {args.use_case: (ROOT / args.net_dir) if args.net_dir else NETS[args.use_case]}
-    # 07 §8.8：报告登记 script/sha 与 input_anchors（9 个 M1 输入锚 + 被验收面板/参照面板）。
-    m1_ledger = assert_m1_inputs()
+    # 07 §8.8：报告登记 script/sha 与 input_anchors（9 个 pricing_gate 输入锚 + 被验收面板/参照面板）。
+    pricing_ledger = assert_pricing_inputs()
     input_anchors = [
         {'input': e['input'], 'file': e['file'], 'rows': e['rows'],
          'rows_registered': e['rows_registered'],
          'rows_match_registered': e['rows_match_registered']}
-        for e in m1_ledger
+        for e in pricing_ledger
     ]
     input_anchors.append({'input': 'acceptance_panel',
                           'file': _rel(panels[args.use_case]),

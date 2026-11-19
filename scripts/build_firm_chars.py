@@ -1,19 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""S2.4 控制变量（Size/BM/Mom/Rev/Liquidity/Turnover；AnalystCov 由 S3A 填充）。
+"""daily-panel.4 控制变量（Size/BM/Mom/Rev/Liquidity/Turnover；AnalystCov 由 analyst-network 填充）。
 
 依赖顺序：本脚本输出的 analyst_cov 为空列；重跑本脚本后必须再执行
 scripts/analyst_chars_merge.py 从
-data/processed/analyst/firm_analyst_derived.csv 填充 analyst_cov（S3A v3 全期口径）。
+data/processed/analyst/firm_analyst_derived.csv 填充 analyst_cov（analyst-network v3 全期口径）。
 
 口径: execution_plan §5.4 Step 4；全部 available_at ≤ characteristic_cutoff_t（无前视）
 输入: market_equity_panel / monthly_returns_clean / Drive turnover(官方,全期 2000 起) / 东财财务 TOTAL_EQUITY_PK(NOTICE_DATE)
-2026-08-29 全期化：S1 面板已替换全期版（2006-2025）；turnover 改用 Drive 官方（batch2 决定替换）；
+2026-08-29 全期化：inventory 面板已替换全期版（2006-2025）；turnover 改用 Drive 官方（batch2 决定替换）；
        liquidity 保留腾讯日收益口径（2018 起，早期标 missing 如实）。
 输出: data/processed/firm_chars_clean.csv
 """
 import csv
 import glob
+import math
 import pickle
 import os
 import sys
@@ -52,6 +53,17 @@ def main():
         for _c, _v in _row.items():
             if _v == _v and _v > 0:  # 非 NaN
                 drive_to.setdefault(_m, {})[_c.split(".")[0]] = float(_v)
+
+    # 1.6 Drive 官方账面市值比（东财财务不可得时的 BM 来源）
+    drive_bm = {}
+    _bm = read_pickle(os.path.join(PROC, "..", "raw", "drive",
+                                   "daily_book_to_market_ratio_ttm_20260630.pkl"))
+    _bm_m = _bm.resample("ME").last()
+    for _d, _row in _bm_m.iterrows():
+        _m = _d.strftime("%Y-%m")
+        for _c, _v in _row.items():
+            if _v == _v and _v > 0:
+                drive_bm.setdefault(_m, {})[_c.split(".")[0]] = float(_v)
 
     # 2. 月收益
     mr = defaultdict(dict)
@@ -94,7 +106,7 @@ def main():
             # Size
             size = None
             if me_val > 0:
-                size = __import__("math").log(me_val)
+                size = math.log(me_val)
             # BM：NOTICE_DATE ≤ 月末 的最近净资产
             bm = None
             eq_list = eq.get(code6, [])
@@ -104,13 +116,18 @@ def main():
                     best = v
             if best is not None and me_val > 0:
                 bm = best / me_val
+            elif drive_bm.get(month, {}).get(code6):
+                # 东财净资产不可得时用 Drive 的 B/M(TTM)；两源都缺则保持 None（不填 0）
+                bm = drive_bm[month][code6]
             # Mom / Rev（月收益）
             r_series = mr.get(code, {})
             mom = None
             rev = None
-            if month in r_series:
-                rev = r_series[month]
             ys = sorted(m for m in r_series if m < month)
+            # rev = 事件月 t 之前最近一个月的收益（t-1）：registry 控制时点为「t-1 及更早」，
+            # 用当月收益会把同月信息放进事件前控制。
+            if ys:
+                rev = r_series[ys[-1]]
             need = ys[-12:-1]  # t-12 ~ t-2
             if len(need) >= MIN_MOM:
                 prod = 1.0
@@ -148,7 +165,6 @@ def main():
                                     n_liq += 1
                 # 2026-08-29：turnover 改用 Drive 官方月度换手率（全期；自算 vol/es 仅 2018 起）
                 to = drive_to.get(month, {}).get(code6)
-            missing = ""
             missing = ""
             if size is None: missing += "size;"
             if bm is None: missing += "bm;"

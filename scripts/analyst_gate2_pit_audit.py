@@ -1,4 +1,4 @@
-"""S3A Gate 2.5：时点链审计。
+"""analyst-network Gate 2.5：时点链审计。
 
 逐项检查：
   1. 网络可用性：覆盖表 available_at / coverage_end 不得晚于 network_cutoff；
@@ -9,7 +9,7 @@
   6. 形成月 q10 与 IPO 过滤：由生产脚本静态检查（代码级），记录证据行；
   7. 权重分母：focal 行归一化（C 线已复核）。
 
-产出：reports/data_gates/G0/s3a_gate2_pit_audit.json（+ Markdown 摘要）
+产出：reports/data_gates/G0/analyst_gate2_pit_audit.json（+ Markdown 摘要）
 """
 import json
 import sys
@@ -18,10 +18,11 @@ from pathlib import Path
 
 import pandas as pd
 import yaml
+from fileio import file_size
 
 ROOT = Path(__file__).resolve().parents[1]
-SPEC = ROOT / 'configs/s3a_final_spec.yaml'
-SPEC_HASH = file_size(SPEC.read_bytes()).hexdigest()
+SPEC = ROOT / 'configs/analyst_spec.yaml'
+SPEC_HASH = file_size(SPEC)
 COV = ROOT / 'data/processed/analyst/firm_analyst_coverage.csv'
 EDGED = ROOT / 'data/processed/analyst/edges'
 VERSION = 'coverage_win12_fy12_v3'
@@ -100,9 +101,9 @@ def main():
         'ok': all('recent_ipo' in t for t in (cf, npm)),
         'note': '上市不足 6 个月剔除'}
     # 生产 snapshot 是否用 Anndats 而非 Anndats_act
-    s5 = (ROOT / 'scripts/analyst_coverage_snapshot.py').read_text(encoding='utf-8')
+    spec_no_turnover = (ROOT / 'scripts/analyst_coverage_snapshot.py').read_text(encoding='utf-8')
     checks['code_uses_anndats_only'] = {
-        'ok': ('Anndats' in s5) and ("Anndats_act" not in s5.replace('Anndats_act 未进入', '')),
+        'ok': ('Anndats' in spec_no_turnover) and ("Anndats_act" not in spec_no_turnover.replace('Anndats_act 未进入', '')),
         'note': 'step5 只读 Anndats；Anndats_act 不出现在取数列'}
 
     result = {
@@ -113,10 +114,10 @@ def main():
         'checks': checks,
     }
     result['status'] = 'PASS' if all(v['ok'] for v in checks.values()) else 'FAIL'
-    out = ROOT / 'reports/data_gates/G0/s3a_gate2_pit_audit.json'
+    out = ROOT / 'reports/data_gates/G0/analyst_gate2_pit_audit.json'
     out.write_text(json.dumps(result, ensure_ascii=False, indent=1), encoding='utf-8')
 
-    lines = ['# S3A Gate 2.5 时点链审计\n',
+    lines = ['# analyst-network Gate 2.5 时点链审计\n',
              f'- spec_hash `{SPEC_HASH}`；状态 **{result["status"]}**\n',
              '| 检查项 | 结论 | 证据 |', '|---|---|---|']
     for k, v in checks.items():
@@ -124,7 +125,7 @@ def main():
               else ('违规 ' + str(len(v['violations'])) if isinstance(v.get('violations'), list) and v['violations']
                     else '见 JSON'))
         lines.append(f"| {k} | {'通过' if v['ok'] else '不通过'} | {ev} |")
-    (ROOT / 'reports/data_gates/G0/s3a_gate2_pit_audit.md').write_text(
+    (ROOT / 'reports/data_gates/G0/analyst_gate2_pit_audit.md').write_text(
         '\n'.join(lines) + '\n', encoding='utf-8')
     print(json.dumps({k: v['ok'] for k, v in checks.items()}, ensure_ascii=False, indent=1))
     print('status =', result['status'], '->', out.relative_to(ROOT))

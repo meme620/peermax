@@ -1,6 +1,6 @@
-"""S3A Step 6+7：二部图投影 -> 共同分析师边 -> 权重（按月落盘）。
+"""analyst-network Step 6+7：二部图投影 -> 共同分析师边 -> 权重（按月落盘）。
 
-规则（execution_plan S3A Step 5-6）:
+规则（execution_plan analyst-network Step 5-6）:
   common_analyst_count_{ij,t} = |A_i,t ∩ A_j,t|, i != j
   无向、无自环；边表输出 (i,j) 与 (j,i) 双向
   wA_{ij,t} = n_ij / sum_k n_ik   （focal 行归一化）

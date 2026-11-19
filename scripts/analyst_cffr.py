@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""S3A Step 9G：CFFR 盈余预测修正滞后检验（对标 AH Table 9 / 蒋丹凌 2023 表 9）。
+"""analyst-network Step 9G：CFFR 盈余预测修正滞后检验（对标 AH Table 9 / 蒋丹凌 2023 表 9）。
 
 逻辑（对标蒋丹凌等 2023 表 9）：
   - consensus_{i,t} = 焦点公司 i 在月末 t 的分析师 FY1 EPS 一致预测（当月及之前已知预测的均值，月末截点）
@@ -9,7 +9,7 @@
   - 判读：当期 CFFR_t 显著正 + 滞后 1 月 CFFR_{t-1} 仍显著正 + 滞后 2 月不显著
     → 分析师对关联公司信息迟缓反应约 1 个月（有限注意力机制证据）
 
-输出: reports/data_gates/G0/s3a_9g_cffr.json
+输出: reports/data_gates/G0/analyst_cffr.json
 用法: python scripts/analyst_cffr.py
 """
 import json
@@ -21,8 +21,8 @@ from analyst_cf_mom_replication import EDGES, NET_VER
 from statsutil import nw_t
 from analyst_meta import attach_meta
 
-SRC = 'data/processed/analyst/s3a_step3_clean.csv'
-OUT = Path('reports/data_gates/G0/s3a_9g_cffr.json')
+SRC = 'data/processed/analyst/analyst_step3_clean.csv'
+OUT = Path('reports/data_gates/G0/analyst_cffr.json')
 OUT.parent.mkdir(parents=True, exist_ok=True)
 EPS_MIN = 0.01  # 分母下界（蒋丹凌表 9 口径）
 
@@ -71,8 +71,8 @@ def fm_one(panel, x_name, y='fr', controls=('fr_lag',)):
         except np.linalg.LinAlgError:
             continue
         resid = yy - X @ beta
-        s2 = resid @ resid / max(len(yy) - X.shape[1], 1)
-        cov = s2 * np.linalg.inv(X.T @ X)
+        resid_cov = resid @ resid / max(len(yy) - X.shape[1], 1)
+        cov = resid_cov * np.linalg.inv(X.T @ X)
         se = np.sqrt(np.diag(cov))
         coefs.append(beta[1])
         t_iid.append(beta[1] / se[1])

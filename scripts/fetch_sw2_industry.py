@@ -14,10 +14,12 @@
 纪律：
     - 原子落盘（.part → rename），失败不清空既有文件
     - 站点 HEAD 返 502，必须 GET；curl 在本机 TLS 不通，用 urllib（关证书校验）
-    - 只下载不加工：解析产物另由 s3_* 脚本负责
+    - 只下载不加工：解析产物另由网络脚本负责
 """
 import argparse
+import hashlib
 import json
+import ssl
 import sys
 import time
 import urllib.request
@@ -39,15 +41,16 @@ def download() -> dict:
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
         'Referer': 'https://www.swsresearch.com/',
     })
+    ctx = ssl._create_unverified_context()  # 本机 python 无系统根证书，curl 直连同样不通
     t0 = time.time()
-    with urllib.request.urlopen(req, timeout=120) as r:
+    with urllib.request.urlopen(req, timeout=120, context=ctx) as r:
         status = r.status
         ctype = r.headers.get('Content-Type')
         blob = r.read()
     part = XLS.with_suffix('.xls.part')
     part.write_bytes(blob)
     part.replace(XLS)
-    sha = file_size(blob)
+    sha = hashlib.sha256(blob).hexdigest()
     rec = {
         'source_name': '申万宏源证券研究所 SwClass2021 股票行业分类',
         'url': URL,
@@ -55,7 +58,7 @@ def download() -> dict:
         'http_status': status,
         'content_type': ctype,
         'bytes': len(blob),
-        'bytes': sha,
+        'sha256': sha,
         'magic': blob[:8].hex(),
         'fetched_at': datetime.now(timezone.utc).isoformat(),
         'elapsed_sec': round(time.time() - t0, 2),
@@ -120,7 +123,7 @@ def main():
             'url': URL,
             'local_path': str(XLS.relative_to(ROOT)).replace('\\', '/'),
             'bytes': len(blob),
-            'bytes': file_size(blob),
+            'sha256': hashlib.sha256(blob).hexdigest(),
             'note': 'meta 由 --inspect 路径补写（未重新下载）',
         }
     meta['parse_diagnostics'] = diag

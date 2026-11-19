@@ -1,4 +1,4 @@
-"""S3A Step 3：ID 标准化 + A_code 拆分 + 落盘 forecast 层（零外部依赖）。
+"""analyst-network Step 3：ID 标准化 + A_code 拆分 + 落盘 forecast 层（零外部依赖）。
 
 输入: data/raw/analyst/forecast_raw_all.csv（2,922,904 行）
 处理:
@@ -9,7 +9,7 @@
      落盘前统一改小写 broker_code/broker_name/feps/fpe/fnetpro/foperev/anndats_act，
      与下游 step4/5/9/sens 引用一致，契约见 tests/test_analyst_contracts.py）
 输出:
-  data/processed/analyst/s3a_step3_clean.csv   拆分后 forecast 层
+  data/processed/analyst/analyst_step3_clean.csv   拆分后 forecast 层
   data/processed/analyst/step3_clean.json             清洗报告
 """
 import json, re
@@ -86,7 +86,7 @@ def main():
     out = out[OUT_COLS]
     out = out.rename(columns=OUTPUT_RENAME)
     print(f"split rows: {len(out)}", flush=True)
-    out.to_csv(OUTD / 's3a_step3_clean.csv', index=False, encoding='utf-8')
+    out.to_csv(OUTD / 'analyst_step3_clean.csv', index=False, encoding='utf-8')
 
     rep = {
         'input_rows': int(len(df)),

@@ -5,7 +5,7 @@
   2. 公司特征：MA 命中词条数、MA 团规模、MB 度、是否 J/S 门类（应已排除）
   3. 构造层面：MA 边数 vs MB 边数的关系（是否单纯"MA 更密"导致低 Jaccard）
 
-产物：reports/data_gates/G0/s3_cross_audit_attribution.json
+产物：reports/data_gates/G0/network_cross_audit_attribution.json
 """
 import json
 from datetime import datetime, timezone
@@ -73,9 +73,9 @@ def main():
     out['note'] = ('per-firm Jaccard 低主要来自"MA 团整体入选"造成的规模差异：'
                    f'MA/MB peer 数比中位 {out["ratio_ma_mb_peers"]["median"]}；'
                    '按各自 top-50 边对照可分离"规模差异"与"选择差异"。')
-    (REPD / 's3_cross_audit_attribution.json').write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding='utf-8')
+    (REPD / 'network_cross_audit_attribution.json').write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding='utf-8')
     print(json.dumps(out, ensure_ascii=False, indent=1)[:1800])
-    print('->', REPD / 's3_cross_audit_attribution.json')
+    print('->', REPD / 'network_cross_audit_attribution.json')
 
 
 if __name__ == '__main__':

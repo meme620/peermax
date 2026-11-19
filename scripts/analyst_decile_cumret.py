@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
-"""S3A 补做检验 P1（对标 AH/Long/蒋丹凌）：
+"""analyst-network 补做检验 A（对标 AH/Long/蒋丹凌）：
 1. 双变量分层：按反转(REV)或行业动量分 3 组，组内按 NPM 分 5 组的多空（对标 AH bivariate / 蒋表 5 注 4）
 2. 十分位：NPM 分 10 组多空（AH untabulated decile）
 3. 累计收益曲线：NPM 排序后 t+1..t+12 持有收益（蒋图 1 / AH Figure 1）
 
 输入: v3 边表 + 统一 spec 指定的全期收益面板
-输出: reports/data_gates/G0/s3a_9i_bivariate_decile_cumret.json
+输出: reports/data_gates/G0/analyst_decile_cumret.json
 """
 import json
 import sys
@@ -17,7 +17,7 @@ from dates import next_month as _next_month
 from analyst_cf_mom_replication import EDGES, RET, NET_VER
 from analyst_meta import attach_meta
 
-OUT = Path('reports/data_gates/G0/s3a_9i_bivariate_decile_cumret.json')
+OUT = Path('reports/data_gates/G0/analyst_decile_cumret.json')
 OUT.parent.mkdir(parents=True, exist_ok=True)
 
 MAX_HOLD = 12  # 累计收益最长持有月
@@ -151,7 +151,7 @@ def main():
         cum_curve.append({'hold': int(h), 'monthly_ls_pct': round(float(cum_agg.loc[h, 'mean']) * 100, 4),
                           'cumulative_pct': round(running * 100, 4), 'n_months': int(cum_agg.loc[h, 'count'])})
     res = {
-        'note': '补做检验 P1：十分位/双变量分层（控制反转、控制 CF）/累计收益曲线（NPM 五分位多空，持有 1-12 月）',
+        'note': '补做检验 A：十分位/双变量分层（控制反转、控制 CF）/累计收益曲线（NPM 五分位多空，持有 1-12 月）',
         'n_months_used': n_month_used,
         'decile': summ('decile'),
         'bivariate_control_rev': summ('bivar_rev'),

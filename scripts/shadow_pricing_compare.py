@@ -1,7 +1,7 @@
-"""Phase 2.6：shadow M1 对比（A fixed_sample / B rescreened / C rescreened_adj）vs headline。
+"""Phase 2.6：shadow pricing_gate 对比（A fixed_sample / B rescreened / C rescreened_adj）vs headline。
 
 范围（只读 shadow + headline；只写 artifacts/phase2/2.6_*）：
-  - 不重跑 headline M1/PC/网络；不改 headline 数据/系数/gate/configs/正式 reports；
+  - 不重跑 headline pricing_gate/PC/网络；不改 headline 数据/系数/gate/configs/正式 reports；
   - shadow 变量全部来自 Phase 2.1–2.5 产物（月频状态 / 2.2 MAX / 2.3 复权 MAX / 2.4 turnover）；
   - treatment（OwnMAX/PeerMAX/PeerReturn）在 headline 边表 + `max{available_at < month}` 版本
     选择下重建（复用 `peermax_panel_build.load_versions/select_version`；缺失不填 0）；
@@ -16,8 +16,9 @@
                       n_max_days<15；outcome：下月状态非 ok / complete_month_trade15!=1）
   C_rescreened_adj    B + 2.3 复权 MAX + 2.2 resume 排除 + 收益派生统一复权口径
 
-规格：S1 登记全控制（rev 同月 + turnover last）/ S2 +turnover mean / S3 合规 lag1 + last /
-      S4 合规 lag1 + mean / S5 无 turnover / S6 无 rev + 无 turnover。EW/VW，min_n、nw_lag 走 registry。
+规格：spec_full_last（登记全控制：rev 同月 + turnover last）/ spec_full_mean（+turnover mean）/
+      spec_lag1_last（合规 rev lag1 + last）/ spec_lag1_mean（合规 lag1 + mean）/ spec_no_turnover（无 turnover）/
+      spec_no_rev_no_turnover（无 rev + 无 turnover）。EW/VW，min_n、nw_lag 走 registry。
 
 输出：artifacts/phase2/2.6_comparison.csv、artifacts/phase2/2.6_counts.json
 运行：python scripts/shadow_pricing_compare.py [--teacher ma_teacher ...]"""
@@ -35,7 +36,7 @@ from datetime import datetime, timezone
 import numpy as np
 import pandas as pd
 from pricing_lib import (
-    RETURNS_V2, ROOT, assert_m1_inputs, fm_regression, load_amount_100m, load_edges,
+    RETURNS_V2, ROOT, assert_pricing_inputs, fm_regression, load_amount_100m, load_edges,
     param_value, require, file_size, winsor_bounds, ym_add,
 )
 from peermax_panel_build import load_versions, select_version
@@ -62,8 +63,8 @@ SHADOW_INPUTS = {
 }
 
 SAMPLE_PARQUET = {
-    'ma_teacher': ROOT / 'data/processed/m1_common_sample_ma_teacher_v2.parquet',
-    'mb_teacher': ROOT / 'data/processed/m1_common_sample_mb_teacher_v2.parquet',
+    'ma_teacher': ROOT / 'data/processed/pricing_sample_ma_teacher_v2.parquet',
+    'mb_teacher': ROOT / 'data/processed/pricing_sample_mb_teacher_v2.parquet',
 }
 
 NET_DIRS = {
@@ -71,7 +72,7 @@ NET_DIRS = {
     'mb_teacher': ROOT / 'data/processed/network_mb_teacher',
 }
 
-PRICING_TABLE_V2 = ROOT / 'reports/data_gates/G0/s3_m1_pricing_table_v2.json'
+PRICING_TABLE_V2 = ROOT / 'reports/data_gates/G0/pricing_table_v2.json'
 
 SAMPLE_REGISTERED = {'ma_teacher': 307503, 'mb_teacher': 384303}
 
@@ -86,30 +87,30 @@ OUT_CSV = ROOT / 'artifacts/phase2/2.6_comparison.csv'
 OUT_JSON = ROOT / 'artifacts/phase2/2.6_counts.json'
 
 HEADLINE_GUARD_FILES = {
-    'm1_common_sample_ma_teacher_v2.parquet': SAMPLE_PARQUET['ma_teacher'],
-    'm1_common_sample_mb_teacher_v2.parquet': SAMPLE_PARQUET['mb_teacher'],
+    'pricing_sample_ma_teacher_v2.parquet': SAMPLE_PARQUET['ma_teacher'],
+    'pricing_sample_mb_teacher_v2.parquet': SAMPLE_PARQUET['mb_teacher'],
     'monthly_returns_clean_v2.csv': RETURNS_V2,
     'monthly_pricing_panel_ma_teacher.csv':
         ROOT / 'data/processed/monthly_pricing_panel_ma_teacher.csv',
     'firm_chars_clean.csv': ROOT / 'data/processed/firm_chars_clean.csv',
-    's3_m1_pricing_table_v2.json': PRICING_TABLE_V2,
+    'pricing_table_v2.json': PRICING_TABLE_V2,
     'source_month_argmax_panel.csv': ROOT / 'data/processed/source_month_argmax_panel.csv',
 }
 
 TRIO = ['PeerMAXraw', 'OwnMAXraw', 'PeerReturn']
 
-SAMPLE_COLS = (['focal_id', 'month', 'network_version', 'available_at', 'm1_in_fm_sample',
+SAMPLE_COLS = (['focal_id', 'month', 'network_version', 'available_at', 'pricing_in_fm_sample',
                 'R_next', 'next_complete_month', 'market_equity']
                + TRIO + ['size', 'bm', 'mom', 'rev', 'turnover', 'illiq',
                          'AnalystCoverage', 'NetworkDegree'])
 
 SPEC_DEFS = {
-    'S1_full_last': dict(rev='same', turnover='last', label='登记全控制（rev 同月 + turnover last）'),
-    'S2_full_mean': dict(rev='same', turnover='mean', label='登记全控制 + turnover mean'),
-    'S3_lag1_last': dict(rev='lag1', turnover='last', label='合规 rev lag1 + turnover last'),
-    'S4_lag1_mean': dict(rev='lag1', turnover='mean', label='合规 rev lag1 + turnover mean'),
-    'S5_no_turnover': dict(rev='same', turnover=None, label='无 turnover'),
-    'S6_no_rev_no_turnover': dict(rev=None, turnover=None, label='无 rev + 无 turnover'),
+    'spec_full_last': dict(rev='same', turnover='last', label='登记全控制（rev 同月 + turnover last）'),
+    'spec_full_mean': dict(rev='same', turnover='mean', label='登记全控制 + turnover mean'),
+    'spec_lag1_last': dict(rev='lag1', turnover='last', label='合规 rev lag1 + turnover last'),
+    'spec_lag1_mean': dict(rev='lag1', turnover='mean', label='合规 rev lag1 + turnover mean'),
+    'spec_no_turnover': dict(rev='same', turnover=None, label='无 turnover'),
+    'spec_no_rev_no_turnover': dict(rev=None, turnover=None, label='无 rev + 无 turnover'),
 }
 
 SPEC_IDS = list(SPEC_DEFS)
@@ -118,7 +119,7 @@ COMPUTED_VARIANTS = ['headline_recompute', 'headline_rebuilt', 'A_fixed_sample',
                      'A_fixed_sample_adj', 'B_rescreened', 'C_rescreened_adj']
 
 VARIANT_META = {
-    'headline_G0_table_v2': dict(rows='fm', label='headline 登记主表（s3_m1_pricing_table_v2.json，只读引用）'),
+    'headline_G0_table_v2': dict(rows='fm', label='headline 登记主表（pricing_table_v2.json，只读引用）'),
     '2.4_control_matrix': dict(rows='fm', label='Phase 2.4 已发布矩阵（只读引用）'),
     '2.5_control_matrix': dict(rows='fm', label='Phase 2.5 已发布矩阵（只读引用）'),
     'headline_recompute': dict(rows='fm', label='headline 样本列直接回归（管线校验）'),
@@ -160,12 +161,14 @@ def _rel_or_abs(p) -> str:
         return Path(p).resolve().as_posix()
 
 def write_json(path, obj) -> None:
-    write_json_atomic(obj, assert_output_path_guard(path), indent=1, default=json_default,
+    assert_output_path_guard(path)
+    write_json_atomic(obj, Path(path), indent=1, default=json_default,
                       trailing_newline=False)
     print(f'  -> {_rel_or_abs(path)}', flush=True)
 
 def write_csv(path, rows, columns) -> None:
-    write_csv_rows(assert_output_path_guard(path),
+    assert_output_path_guard(path)
+    write_csv_rows(Path(path),
                    [[r.get(c, '') for c in columns] for r in rows], columns)
 
 def _num(v):
@@ -316,7 +319,7 @@ def build_teacher_frame(teacher: str, tab: dict, grid: pd.DataFrame) -> tuple:
     df = pd.read_parquet(SAMPLE_PARQUET[teacher], columns=SAMPLE_COLS)
     require(len(df) == SAMPLE_REGISTERED[teacher],
             f'{teacher} 样本行数 {len(df)} != 登记 {SAMPLE_REGISTERED[teacher]}')
-    n_fm = int(df['m1_in_fm_sample'].astype(bool).sum())
+    n_fm = int(df['pricing_in_fm_sample'].astype(bool).sum())
     require(n_fm == FM_REGISTERED[teacher],
             f'{teacher} FM 行数 {n_fm} != 登记 {FM_REGISTERED[teacher]}')
     diag = {'sample_rows': int(len(df)), 'fm_rows': n_fm, 'teacher': teacher}
@@ -344,7 +347,7 @@ def build_teacher_frame(teacher: str, tab: dict, grid: pd.DataFrame) -> tuple:
     frame = df.merge(ev, on=['focal_id', 'month'], how='left')
     require(len(frame) == len(df), 'event 月 shadow merge 膨胀')
     miss_status = frame['ev_status'].isna()
-    require(int((miss_status & frame['m1_in_fm_sample'].astype(bool)).sum()) == 0,
+    require(int((miss_status & frame['pricing_in_fm_sample'].astype(bool)).sum()) == 0,
             'FM 行 event 月 shadow 状态缺失（键不齐，停机）')
     require(int((miss_status & frame['rev'].notna()).sum()) == 0,
             '存在月收益但无 shadow 状态的键（结构性缺失，停机）')
@@ -371,7 +374,7 @@ def build_teacher_frame(teacher: str, tab: dict, grid: pd.DataFrame) -> tuple:
                         .rename(columns={'firm_id': 'focal_id'}),
                         on=['focal_id', 'month'], how='left')
     require(int((frame['own_shadow_status'].isna()
-                 & frame['m1_in_fm_sample'].astype(bool)).sum()) == 0,
+                 & frame['pricing_in_fm_sample'].astype(bool)).sum()) == 0,
             'FM 行 own MAX shadow 键缺失（停机）')
     diag['rows_without_source_month_key'] = int(frame['own_shadow_status'].isna().sum())
     # 2.3 复权 MAX（own；面板未施加 15 日门 -> 2.6 显式施加）
@@ -387,7 +390,7 @@ def build_teacher_frame(teacher: str, tab: dict, grid: pd.DataFrame) -> tuple:
                         .rename(columns={'firm_id': 'focal_id'}),
                         on=['focal_id', 'month'], how='left')
     require(int((frame['own_adj_status'].isna()
-                 & frame['m1_in_fm_sample'].astype(bool)).sum()) == 0,
+                 & frame['pricing_in_fm_sample'].astype(bool)).sum()) == 0,
             'FM 行 own 复权 MAX 键缺失（停机）')
     require(int((frame['adj_nmd'].notna() & frame['own_nmd'].notna()
                  & (frame['adj_nmd'] != frame['own_nmd'])).sum()) == 0,
@@ -561,7 +564,7 @@ def add_screen_flags(frame: pd.DataFrame) -> tuple:
     nx_bad = f['nx_status'].notna() & f['nx_status'].ne('ok')
     nx_cm_bad = ~f['nx_cm15'].eq(1)
     f['nx_ok'] = ~(nx_bad | nx_cm_bad)
-    fm = f['m1_in_fm_sample'].astype(bool)
+    fm = f['pricing_in_fm_sample'].astype(bool)
     f['screen_bc'] = fm & f['ev_ok'] & f['nx_ok']
 
     own_main_null = f['own_raw_main'].isna()          # A 主口径下的 treatment 不可评估
@@ -608,7 +611,7 @@ def add_screen_flags(frame: pd.DataFrame) -> tuple:
 
 def filter_rows(frame: pd.DataFrame, rows_mode: str) -> pd.DataFrame:
     if rows_mode == 'fm':
-        return frame[frame['m1_in_fm_sample'].astype(bool)].copy()
+        return frame[frame['pricing_in_fm_sample'].astype(bool)].copy()
     if rows_mode == 'bc':
         return frame[frame['screen_bc']].copy()
     raise SystemExit(f'未知 rows_mode: {rows_mode!r}')
@@ -652,7 +655,7 @@ def canonical_frame(frame: pd.DataFrame, variant: str) -> pd.DataFrame:
     return pd.DataFrame({
         'focal_id': frame['focal_id'], 'month': frame['month'],
         'market_equity': frame['market_equity'],
-        'm1_in_fm_sample': frame['m1_in_fm_sample'], 'screen_bc': frame['screen_bc'],
+        'pricing_in_fm_sample': frame['pricing_in_fm_sample'], 'screen_bc': frame['screen_bc'],
         'R_next': frame[m['R_next']],
         'PeerMAXraw': frame[m['PeerMAXraw']], 'OwnMAXraw': frame[m['OwnMAXraw']],
         'PeerReturn': frame[m['PeerReturn']],
@@ -699,7 +702,7 @@ def run_variant(cf: pd.DataFrame, min_n: int, nw_lag: int) -> dict:
     return out
 
 def zero_block(frame: pd.DataFrame) -> dict:
-    a = frame[frame['m1_in_fm_sample'].astype(bool)]
+    a = frame[frame['pricing_in_fm_sample'].astype(bool)]
     res = {
         'headline_fm_R_next_zero_rows': int((a['R_next'] == 0).sum()),
         'headline_fm_R_next_zero_share': float((a['R_next'] == 0).mean()),
@@ -731,7 +734,7 @@ def zero_block(frame: pd.DataFrame) -> dict:
     return res
 
 def max_tail_block(frame: pd.DataFrame, tab: dict) -> dict:
-    a = frame[frame['m1_in_fm_sample'].astype(bool)]
+    a = frame[frame['pricing_in_fm_sample'].astype(bool)]
     w = tab['max_panel']['month'].between('2015-05', '2023-12')
     srcp = tab['max_panel'][w]
     adjp = tab['adj_panel'][tab['adj_panel']['month'].between('2015-05', '2023-12')]
@@ -766,12 +769,12 @@ def max_tail_block(frame: pd.DataFrame, tab: dict) -> dict:
             'C_PeerMAXraw_adj': _col('peer_adj_g15', 'peer_adj_g15_w'),
         },
         'registered_winsorized_max_reference': 0.2003,
-        'scope': 'M1 窗口 2015-05..2023-12；FM 层为样本内 winsorized 列（宇宙=样本面板）',
+        'scope': 'pricing_gate 窗口 2015-05..2023-12；FM 层为样本内 winsorized 列（宇宙=样本面板）',
     }
 
 def decomposition_block(frame: pd.DataFrame) -> dict:
     """伪零/停牌/复牌/复权折叠的影响分解（全部在同一 FM 行集上，winsorized 列对 winsorized 列）。"""
-    a = frame[frame['m1_in_fm_sample'].astype(bool)]
+    a = frame[frame['pricing_in_fm_sample'].astype(bool)]
     # 原始口径（未经 winsor）的 2.2 vs headline：只由复牌排除驱动
     d_raw = (a['own_raw_main'] - a['own_legacy_headline']).abs()
     raw_changed = d_raw.gt(1e-8) & a['own_raw_main'].notna() & a['own_legacy_headline'].notna()
@@ -894,7 +897,7 @@ def calibration_block(matrix: dict, teacher: str) -> dict:
         for wname in ('ew', 'vw'):
             for term in TRIO + ['turnover_last', 'rev_same']:
                 s0 = g0[wname]['coefs'].get(term_map.get(term, term))
-                got = get_cell(matrix, variant, 'S1_full_last', wname, term)
+                got = get_cell(matrix, variant, 'spec_full_last', wname, term)
                 if s0 is None or got is None or got.get('beta') is None:
                     continue
                 db = abs(got['beta'] - s0['beta'])
@@ -913,8 +916,8 @@ def calibration_block(matrix: dict, teacher: str) -> dict:
     # 2.4 / 2.5 已发布矩阵是 ma_teacher 口径：只对 ma_teacher 做交叉锚（其余 teacher 不适用）
     if teacher == 'ma_teacher' and MATRIX_24.is_file():
         m24 = pd.read_csv(MATRIX_24)
-        pairs = [('c_no_turnover', 'S5_no_turnover'), ('d_no_turnover_no_rev', 'S6_no_rev_no_turnover'),
-                 ('a_turnover_last', 'S1_full_last'), ('b_turnover_mean', 'S2_full_mean')]
+        pairs = [('c_no_turnover', 'spec_no_turnover'), ('d_no_turnover_no_rev', 'spec_no_rev_no_turnover'),
+                 ('a_turnover_last', 'spec_full_last'), ('b_turnover_mean', 'spec_full_mean')]
         for sid, key in pairs:
             for _, r in m24[m24['spec_id'].eq(sid)].iterrows():
                 wname = str(r['weight']).lower()
@@ -926,9 +929,9 @@ def calibration_block(matrix: dict, teacher: str) -> dict:
                     'abs_diff': float(abs(got['beta'] - r['beta']))}
     if teacher == 'ma_teacher' and MATRIX_25.is_file():
         m25 = pd.read_csv(MATRIX_25)
-        pairs = [('b_rev_lag1_turnover_last', 'S3_lag1_last'),
-                 ('a_registered_rev_turnover', 'S1_full_last'),
-                 ('e_rev_removed_no_turnover', 'S6_no_rev_no_turnover')]
+        pairs = [('b_rev_lag1_turnover_last', 'spec_lag1_last'),
+                 ('a_registered_rev_turnover', 'spec_full_last'),
+                 ('e_rev_removed_no_turnover', 'spec_no_rev_no_turnover')]
         for sid, key in pairs:
             for _, r in m25[m25['spec_id'].eq(sid)].iterrows():
                 wname = str(r['weight']).lower()
@@ -957,14 +960,14 @@ def headline_table_rows(teacher: str) -> list:
             rows.append({
                 'variant': 'headline_G0_table_v2',
                 'variant_label': VARIANT_META['headline_G0_table_v2']['label'],
-                'teacher': teacher, 'spec_id': 'S1_full_last',
-                'spec_label': SPEC_DEFS['S1_full_last']['label'], 'weight': wname,
+                'teacher': teacher, 'spec_id': 'spec_full_last',
+                'spec_label': SPEC_DEFS['spec_full_last']['label'], 'weight': wname,
                 'term': term, 'beta': _num(s.get('beta')), 'se_nw': _num(s.get('se_nw')),
                 't_nw': _num(s.get('t_nw')), 'n_months_used': int(cell['n_months_used']),
                 'n_rows_used': int(blk['n_rows']), 'n_per_month_min': None,
                 'n_per_month_median': None, 'n_per_month_max': None, 'p_two_sided': None,
                 'ci95_low': None, 'ci95_high': None, 'is_treatment': term in TRIO,
-                'rows_mode': 'fm', 'source': 'reports/data_gates/G0/s3_m1_pricing_table_v2.json',
+                'rows_mode': 'fm', 'source': 'reports/data_gates/G0/pricing_table_v2.json',
                 'note': 'headline 登记主表（只读）',
             })
     return rows
@@ -973,13 +976,13 @@ def published_matrix_rows() -> list:
     """2.4 / 2.5 已发布系数（ma_teacher；供 memo 交叉引用）。"""
     rows = []
     mapping = [
-        ('2.4_control_matrix', MATRIX_24, {'a_turnover_last': 'S1_full_last',
-                                           'b_turnover_mean': 'S2_full_mean',
-                                           'c_no_turnover': 'S5_no_turnover',
-                                           'd_no_turnover_no_rev': 'S6_no_rev_no_turnover'}),
-        ('2.5_control_matrix', MATRIX_25, {'a_registered_rev_turnover': 'S1_full_last',
-                                           'b_rev_lag1_turnover_last': 'S3_lag1_last',
-                                           'e_rev_removed_no_turnover': 'S6_no_rev_no_turnover'}),
+        ('2.4_control_matrix', MATRIX_24, {'a_turnover_last': 'spec_full_last',
+                                           'b_turnover_mean': 'spec_full_mean',
+                                           'c_no_turnover': 'spec_no_turnover',
+                                           'd_no_turnover_no_rev': 'spec_no_rev_no_turnover'}),
+        ('2.5_control_matrix', MATRIX_25, {'a_registered_rev_turnover': 'spec_full_last',
+                                           'b_rev_lag1_turnover_last': 'spec_lag1_last',
+                                           'e_rev_removed_no_turnover': 'spec_no_rev_no_turnover'}),
     ]
     for variant, path, spec_map in mapping:
         if not path.is_file():
@@ -1057,10 +1060,10 @@ def coef_summary_block(matrix_by_teacher: dict) -> dict:
 
     insig = df[df['t'].abs() < 1.96]
     min_row = df.loc[df['t'].idxmin()]
-    s1_mb_vw = {}
+    full_mb_vw = {}
     for variant in ['B_rescreened', 'C_rescreened_adj']:
-        s = get_cell(matrix_by_teacher['mb_teacher'], variant, 'S1_full_last', 'vw', 'PeerReturn')
-        s1_mb_vw[variant] = {'beta': s['beta'], 't': s['t_nw']}
+        s = get_cell(matrix_by_teacher['mb_teacher'], variant, 'spec_full_last', 'vw', 'PeerReturn')
+        full_mb_vw[variant] = {'beta': s['beta'], 't': s['t_nw']}
     ew_win, vw_win = _win(df[df['weight'].eq('ew')]), _win(df[df['weight'].eq('vw')])
     return {
         'PeerReturn': {
@@ -1072,7 +1075,7 @@ def coef_summary_block(matrix_by_teacher: dict) -> dict:
                                           for t in sorted(df['teacher'].unique())},
             'cells_abs_t_lt_196': insig.to_dict('records'),
             'min_t_cell': dict(min_row),
-            's1_registered_mb_vw': s1_mb_vw,
+            'registered_mb_vw': full_mb_vw,
             'note': (f"EW 有 {ew_win['n_abs_t_lt_196']}/{ew_win['n_cells']} 个 |t|<1.96 单元；"
                      f"VW 有 {vw_win['n_abs_t_lt_196']}/{vw_win['n_cells']} 个；"
                      '方向：全部为正'),
@@ -1081,7 +1084,7 @@ def coef_summary_block(matrix_by_teacher: dict) -> dict:
 
 def promotion_block(matrix_by_teacher: dict, blocks: dict, calib: dict,
                     p6_evidence: dict | None = None) -> dict:
-    """§7 推广判据 P1–P8 的机器可读判定（P8 = 项目显式批准，默认未给）。
+    """§7 推广判据的机器可读判定（末项 = 项目显式批准，默认未给）。
 
     P5/P6 的状态由数据与校验结果推导（`p6_evidence` 为真实锚/链路/重跑证据），不硬编码。
     """
@@ -1102,11 +1105,11 @@ def promotion_block(matrix_by_teacher: dict, blocks: dict, calib: dict,
     peer = [c for c in cells if c['term'] == 'PeerMAXraw']
     peer_sig_pos = [c for c in peer if c['t'] is not None and c['t'] >= 1.96]
     peer_sig_any = [c for c in peer if c['t'] is not None and abs(c['t']) >= 1.96]
-    own_s6 = [c for c in cells if c['term'] == 'OwnMAXraw' and c['spec_id'] == 'S6_no_rev_no_turnover']
+    own_s6 = [c for c in cells if c['term'] == 'OwnMAXraw' and c['spec_id'] == 'spec_no_rev_no_turnover']
     own_s6_neg = [c for c in own_s6 if c['beta'] is not None and c['beta'] < 0]
     own_s6_sig = [c for c in own_s6 if c['t'] is not None and abs(c['t']) > 1.96]
     own_s6_teacher = {(c['teacher'], c.get('weight')) for c in own_s6_sig}
-    p1 = {
+    criterion_sign = {
         'status': 'PASS' if (not peer_sig_pos and not peer_sig_any) else
                   ('PASS_with_caveat' if (not peer_sig_pos and peer_sig_any) else 'FAIL'),
         'criterion': 'shadow 变体（A/B/C × EW/VW × ma/mb teacher × 6 规格）全部 PeerMAX |t|<1.96 '
@@ -1121,9 +1124,9 @@ def promotion_block(matrix_by_teacher: dict, blocks: dict, calib: dict,
         'note': '2 个 |t|≥1.96 单元均为负号（VW + 无 turnover 规格），无正显著；'
                 '按 §7 失败处理条目（正显著）未触发',
     }
-    p2 = {
+    criterion_state = {
         'status': 'PASS' if (len(own_s6_neg) == len(own_s6) and len(own_s6_teacher) >= 4) else 'FAIL',
-        'criterion': 'S6（无 rev + 无 turnover）OwnMAX beta<0；且 ≥3/4 的 EW/VW × ma/mb 组合 |t|>1.96',
+        'criterion': 'spec_no_rev_no_turnover（无 rev + 无 turnover）OwnMAX beta<0；且 ≥3/4 的 EW/VW × ma/mb 组合 |t|>1.96',
         'n_s6_cells': len(own_s6), 'n_s6_negative': len(own_s6_neg),
         'n_s6_abs_t_gt_196_teacher_weight_combos': len(own_s6_teacher),
         's6_cells': [{'teacher': c['teacher'], 'variant': c['variant'], 'weight': c['weight'],
@@ -1131,7 +1134,7 @@ def promotion_block(matrix_by_teacher: dict, blocks: dict, calib: dict,
     }
     zt = blocks['ma_teacher']['zero_shares']
     fm_rows_ma = blocks['ma_teacher']['sample_loss']['fm_rows']
-    p3 = {
+    criterion_coverage = {
         'status': 'PASS' if (zt['shadow_outcome_zero_share_A'] <= 0.009) else 'FAIL',
         'criterion': 'FM 伪零 ≤0.10%（当前 0.62%）；R_next==0 ≤0.9%（当前 1.11%）',
         'headline_R_next_zero_share': zt['headline_fm_R_next_zero_share'],
@@ -1141,22 +1144,22 @@ def promotion_block(matrix_by_teacher: dict, blocks: dict, calib: dict,
         'shadow_outcome_missing_share_A': 1.0 - zt['shadow_outcome_available_rows_A'] / max(fm_rows_ma, 1),
         'note': 'shadow outcome 的伪零 = 0（全月停牌下月不入样）；0 值比例即真实零收益',
     }
-    p4_rows = {}
+    criterion_robust_rows = {}
     for teacher, matrix in matrix_by_teacher.items():
         blk = blocks[teacher]['sample_loss']
-        cell = matrix['B_rescreened']['S1_full_last']['ew']
-        p4_rows[teacher] = {
+        cell = matrix['B_rescreened']['spec_full_last']['ew']
+        criterion_robust_rows[teacher] = {
             'fm_rows_headline': blk['fm_rows'], 'B_rows': blk['B_rows_explicit_screen'],
             'B_share_of_headline': blk['B_rows_explicit_screen'] / blk['fm_rows'],
             'threshold_95pct': 0.95 * blk['fm_rows'],
             'n_months_used': cell['n_months_used'],
             'n_per_month_min': cell['n_per_month_min'],
         }
-    p4 = {
+    criterion_promotion = {
         'status': 'PASS' if all(v['B_share_of_headline'] >= 0.95 and v['n_months_used'] == 104
-                                and v['n_per_month_min'] >= 100 for v in p4_rows.values()) else 'FAIL',
+                                and v['n_per_month_min'] >= 100 for v in criterion_robust_rows.values()) else 'FAIL',
         'criterion': 'FM 行数 ≥95% headline；月数 =104；每月 n≥100',
-        'teachers': p4_rows,
+        'teachers': criterion_robust_rows,
     }
     ma_tail = blocks['ma_teacher']['max_tail']
     tail = ma_tail['source_level_2015_05_2023_12']
@@ -1170,7 +1173,7 @@ def promotion_block(matrix_by_teacher: dict, blocks: dict, calib: dict,
     p5_pass = bool(main_max is not None and main_max <= 1.1
                    and reg_ref is not None
                    and max(fm_max_b, fm_max_c) <= reg_ref + 1e-9)
-    p5 = {
+    criterion_max_tail = {
         # 状态由数据推导（不硬编码）：shadow 主口径 max ≤1.1 且 winsorized FM OwnMAX ≤ 登记参考
         'status': 'PASS' if p5_pass else 'FAIL',
         'status_basis': 'derived: shadow_MAXraw_main_gate.max<=1.1 and '
@@ -1187,14 +1190,14 @@ def promotion_block(matrix_by_teacher: dict, blocks: dict, calib: dict,
         'fm_ownmax_max_B': fm_max_b, 'fm_ownmax_max_C': fm_max_c,
         'registered_reference': reg_ref,
     }
-    p6 = {
+    criterion_reproducibility = {
         # 状态由实际锚与链路校验推导（_anchors_ok / shadow chain），不再恒为 PENDING
-        'status': 'PASS' if (p6_evidence.get('m1_anchors_match')
+        'status': 'PASS' if (p6_evidence.get('pricing_anchors_match')
                              and p6_evidence.get('shadow_chain_all_match')) else 'FAIL',
-        'status_basis': 'derived: m1_anchors_match and shadow_chain_vs_phase2_counts.all_match',
+        'status_basis': 'derived: pricing_anchors_match and shadow_chain_vs_phase2_counts.all_match',
         'criterion': '全链重跑 sha 一致；9 锚不变；pytest 全绿',
         'evidence': {
-            'm1_anchors_match': p6_evidence.get('m1_anchors_match'),
+            'pricing_anchors_match': p6_evidence.get('pricing_anchors_match'),
             'shadow_chain_all_match': p6_evidence.get('shadow_chain_all_match'),
             'comparison_csv_bytes': p6_evidence.get('comparison_csv_bytes'),
             'comparison_csv_double_run_identical': p6_evidence.get(
@@ -1206,14 +1209,14 @@ def promotion_block(matrix_by_teacher: dict, blocks: dict, calib: dict,
     }
     p7_cells = {}
     for teacher, matrix in matrix_by_teacher.items():
-        base = matrix['headline_recompute']['S1_full_last']
+        base = matrix['headline_recompute']['spec_full_last']
         for variant in ['B_rescreened', 'C_rescreened_adj']:
             for wname in ('ew', 'vw'):
                 for term in ('PeerMAXraw', 'OwnMAXraw'):
                     b0 = base[wname]['coefs'][term]['beta']
                     t0 = base[wname]['coefs'][term]['t_nw']
-                    b1 = matrix[variant]['S1_full_last'][wname]['coefs'][term]['beta']
-                    t1 = matrix[variant]['S1_full_last'][wname]['coefs'][term]['t_nw']
+                    b1 = matrix[variant]['spec_full_last'][wname]['coefs'][term]['beta']
+                    t1 = matrix[variant]['spec_full_last'][wname]['coefs'][term]['t_nw']
                     same = (b0 is None or b1 is None) or (b0 == 0 or b1 == 0) or (np.sign(b0) == np.sign(b1))
                     insig = (t0 is not None and abs(t0) < 1.96) and (t1 is not None and abs(t1) < 1.96)
                     if same:
@@ -1226,10 +1229,10 @@ def promotion_block(matrix_by_teacher: dict, blocks: dict, calib: dict,
                         'headline': b0, 'headline_t': t0, 'shadow': b1, 'shadow_t': t1,
                         'same_sign': bool(same), 'verdict': verdict,
                         'ratio': (None if (b0 in (None, 0) or b1 is None) else b1 / b0)}
-    p7 = {
+    criterion_robustness = {
         'status': 'PASS' if not any(v['verdict'] == 'flip_meaningful'
                                     for v in p7_cells.values()) else 'FAIL',
-        'criterion': '四个 headline 数字（PeerMAX/OwnMAX × EW/VW，S1）shadow 与 headline 方向一致；'
+        'criterion': '四个 headline 数字（PeerMAX/OwnMAX × EW/VW，inventory）shadow 与 headline 方向一致；'
                      'PeerMAX 量级不出现数量级变化',
         'n_cells': len(p7_cells),
         'n_same_sign': sum(1 for v in p7_cells.values() if v['verdict'] == 'same_sign'),
@@ -1237,21 +1240,21 @@ def promotion_block(matrix_by_teacher: dict, blocks: dict, calib: dict,
                                          if v['verdict'] == 'flip_both_insignificant'),
         'n_flip_meaningful': sum(1 for v in p7_cells.values()
                                  if v['verdict'] == 'flip_meaningful'),
-        'note': 'S1 的 OwnMAX/PeerMAX 在 headline 本为 |t|<1.2 的零结果；发生符号变化的单元两侧 '
-                '|t| 均 <1.96（噪声带内），无「有意义翻转」；S5/S6 中 OwnMAX 的显著负号为 P2 覆盖',
+        'note': 'inventory 的 OwnMAX/PeerMAX 在 headline 本为 |t|<1.2 的零结果；发生符号变化的单元两侧 '
+                '|t| 均 <1.96（噪声带内），无「有意义翻转」；spec_no_turnover/spec_no_rev_no_turnover 中 OwnMAX 的显著负号为 one_sided_significance 覆盖',
         'cells': p7_cells,
     }
-    p8 = {'status': 'PENDING_PROJECT_APPROVAL',
+    criterion_approval = {'status': 'PENDING_PROJECT_APPROVAL',
           'criterion': '项目书面批准（推广范围、版本号、registry 变更）',
           'default': '未批准 → 保持 shadow，headline 不动（Phase 2 不推广）'}
-    return {'P1_peer_max_direction_significance': p1,
-            'P2_own_max_direction': p2,
-            'P3_pseudo_zero': p3,
-            'P4_sample_loss': p4,
-            'P5_max_tail': p5,
-            'P6_reproducibility': p6,
-            'P7_conclusion_robustness': p7,
-            'P8_explicit_approval': p8}
+    return {'peer_max_direction_significance': criterion_sign,
+            'own_max_direction': criterion_state,
+            'pseudo_zero': criterion_coverage,
+            'sample_loss': criterion_robust_rows,
+            'max_tail': criterion_max_tail,
+            'reproducibility': criterion_reproducibility,
+            'conclusion_robustness': criterion_robustness,
+            'explicit_approval': criterion_approval}
 
 def verify_shadow_chain() -> dict:
     """shadow 输入与 2.1–2.4 counts 里登记 sha 的一致性（链路未被篡改的证据）。"""
@@ -1278,7 +1281,7 @@ def verify_shadow_chain() -> dict:
     return out
 
 def parse_args(argv=None):
-    ap = argparse.ArgumentParser(description='Phase 2.6 shadow M1 对比（A/B/C vs headline）')
+    ap = argparse.ArgumentParser(description='Phase 2.6 shadow pricing_gate 对比（A/B/C vs headline）')
     ap.add_argument('--teacher', action='append', default=None,
                     choices=['ma_teacher', 'mb_teacher'],
                     help='可重复；缺省两者都跑（ma_teacher 主、mb_teacher 稳健性）')
@@ -1298,13 +1301,13 @@ def main(argv=None) -> int:
     assert_output_path_guard(out_json)
     t_run = datetime.now(timezone.utc).isoformat(timespec='seconds')
 
-    print('[2.6] preflight：9 个 M1 输入锚（只读）', flush=True)
-    anchors_before = assert_m1_inputs()
+    print('[2.6] preflight：9 个 pricing_gate 输入锚（只读）', flush=True)
+    anchors_before = assert_pricing_inputs()
     headline_sha_before = {k: file_size(p) for k, p in HEADLINE_GUARD_FILES.items()}
     shadow_sha_before = {k: file_size(p) for k, p in SHADOW_INPUTS.items()}
 
     nw_lag = int(param_value('nw_lag'))
-    min_n = int(param_value('m1_sample_and_spec_registry')['min_focal_count_per_month'])
+    min_n = int(param_value('sample_and_spec_registry')['min_focal_count_per_month'])
     lo, hi = winsor_bounds()
     print(f'[2.6] registry：nw_lag={nw_lag} min_n={min_n} winsor=[{lo},{hi}]', flush=True)
 
@@ -1343,8 +1346,8 @@ def main(argv=None) -> int:
                 for spec_id in SPEC_IDS:
                     for wname in ('ew', 'vw'):
                         matrix_by_teacher[teacher][variant][spec_id][wname]['n_rows_requested'] = int(len(cf))
-            c = matrix_by_teacher[teacher][variant]['S1_full_last']['ew']
-            print(f'  [{variant}] requested={len(cf):,} S1-ew used={c["n_rows_used"]:,} '
+            c = matrix_by_teacher[teacher][variant]['spec_full_last']['ew']
+            print(f'  [{variant}] requested={len(cf):,} inventory-ew used={c["n_rows_used"]:,} '
                   f'T={c["n_months_used"]}', flush=True)
 
     rows = []
@@ -1357,21 +1360,21 @@ def main(argv=None) -> int:
     write_csv(out_csv, rows, COMPARISON_COLUMNS)
     csv_bytes = file_size(out_csv)
 
-    anchors_after = assert_m1_inputs()
+    anchors_after = assert_pricing_inputs()
     headline_sha_after = {k: file_size(p) for k, p in HEADLINE_GUARD_FILES.items()}
     shadow_sha_after = {k: file_size(p) for k, p in SHADOW_INPUTS.items()}
     require(headline_sha_before == headline_sha_after, 'headline 守卫文件 sha 变化（停机）')
     require(shadow_sha_before == shadow_sha_after, 'shadow 输入 sha 变化（停机）')
-    require(all(a['match'] for a in anchors_before + anchors_after), 'M1 锚校验失败')
+    require(all(a['match'] for a in anchors_before + anchors_after), 'pricing_gate 锚校验失败')
 
     calib = {t: calibration_block(matrix_by_teacher[t], t) for t in teachers}
     chain = verify_shadow_chain()
     p6_evidence = {
-        'm1_anchors_match': bool(all(a['match'] for a in anchors_before + anchors_after)),
+        'pricing_anchors_match': bool(all(a['match'] for a in anchors_before + anchors_after)),
         'shadow_chain_all_match': bool(chain['all_match']),
         'comparison_csv_bytes': csv_bytes,
         'comparison_csv_double_run_identical': True,   # 由 2.6_execution.md/run 日志的双跑 sha 记录背书
-        'pytest': {'p2_6_module': '23 passed', 'full_suite': '374 passed',
+        'pytest': {'comparison_module': '23 passed', 'full_suite': '374 passed',
                    'logs': ['artifacts/phase2/2.6_pytest_full.log',
                             'artifacts/phase2/2.6_execution.md']},
     }
@@ -1413,7 +1416,7 @@ def main(argv=None) -> int:
 
     counts = {
         'report_id': 'shadow_pricing_compare',
-        'phase': '2.6（shadow M1 对比 + 推广决策）',
+        'phase': '2.6（shadow pricing_gate 对比 + 推广决策）',
         'run_at_utc': t_run,
         'script': 'scripts/shadow_pricing_compare.py',
         'script_bytes': file_size(Path(__file__)),
@@ -1432,9 +1435,9 @@ def main(argv=None) -> int:
         'plan_2_0_replication': plan_repl,
         'comparison_matrix': matrix_by_teacher,
         'inputs_bytes': {
-            'm1_anchors_before': [a['bytes'] for a in anchors_before],
-            'm1_anchors_after': [a['bytes'] for a in anchors_after],
-            'm1_anchors_match': True,
+            'pricing_anchors_before': [a['bytes'] for a in anchors_before],
+            'pricing_anchors_after': [a['bytes'] for a in anchors_after],
+            'pricing_anchors_match': True,
             'shadow_before': shadow_sha_before, 'shadow_after': shadow_sha_after,
             'shadow_unchanged': bool(shadow_sha_before == shadow_sha_after),
             'headline_guard_before': headline_sha_before,
@@ -1448,7 +1451,7 @@ def main(argv=None) -> int:
                     'counts_json': _rel(out_json),
                     'execution_record': 'artifacts/phase2/2.6_execution.md'},
         'residual_limitations': [
-            '2.1 daily_panel_missing 96 行（M1 窗口 38 行）按缺失排除，不填 0',
+            '2.1 daily_panel_missing 96 行（pricing_gate 窗口 38 行）按缺失排除，不填 0',
             '2.1 sh601313 → sh601360 alias 46 行（窗口内 30 行）恢复交易日，R 仍用原值',
             '2.3 2014–2017 除权事件只有 sharebonus 一个来源（8,580 条），无法交叉校验',
             '2.2 新股无涨跌幅限制日（sh688026 1.085 / sz300939 1.010）未剔除（无 ipo_no_limit_flag）',
@@ -1459,11 +1462,11 @@ def main(argv=None) -> int:
             '2.6 mom/illiq 为 shadow 重算列（mom 用 build_firm_chars 的 ys[-12:-1] 规则，illiq = |R|/amount_100m）；'
             'legacy 重建口径对 mom 施加 headline 可用性掩码（面板 831 行），净效应 ≤5e-8 β',
             'pre-2014 legacy（2.1 §8.1 / 2.3 §11.3）：shadow 未覆盖 2006–2013 的复牌/复权，'
-            '该窗口 MAX 为 legacy 直通，M1 窗口外结论不适用',
+            '该窗口 MAX 为 legacy 直通，pricing_gate 窗口外结论不适用',
             '2018+ 重整/重新上市事件源缺口（2.3 §11.6，sh600145 2020-06 / sh600733 2018-09）：'
             'sharebonus 与 corporate_action 均未覆盖，仅靠 2.2 resume 联合排除',
         ],
-        'governance': {'headline_files_modified': False, 'm1_rerun': False,
+        'governance': {'headline_files_modified': False, 'pricing_rerun': False,
                        'configs_modified': False, 'g0_written': False,
                        'promotion_executed': False},
     }

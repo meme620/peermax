@@ -1,8 +1,8 @@
-"""S3A NPM 复刻（Long et al. 2025 Table 3 锚点，2026-08-16）。
+"""analyst-network NPM 复刻（Long et al. 2025 Table 3 锚点，2026-08-16）。
 
 NPM(i, t-1) = CF(i, t-1) − R(i, t-1)   （论文式 1：连接公司收益 − 焦点自身收益）
 分组变量 NPM，预测 R(i, t)；其余口径与 analyst_cf_mom_replication.py 完全一致
-（同一网络版本=NET_VER（默认来自统一 S3A spec）、同一 microcap/次新股过滤、同一 5 组分位）。
+（同一网络版本=NET_VER（默认来自统一 analyst-network spec）、同一 microcap/次新股过滤、同一 5 组分位）。
 
 用法: python analyst_npm_replication.py [weight=count|ln]
 锚点: Long 2025 Table 3 —— NPM EW 多空 1.28%/月, t=5.20（CSMAR 2004-2022）
@@ -17,9 +17,10 @@ from dates import next_month as _next_month
 from analyst_cf_mom_replication import EDGES, RET, MEQ, NET_VER, SPEC, _SPEC
 from statsutil import nw_t
 from analyst_meta import attach_meta
+from fileio import file_size
 
 OUT = Path('data/processed/analyst/npm_replication.json')
-_SPEC_HASH = file_size(SPEC.read_bytes()).hexdigest()
+_SPEC_HASH = file_size(SPEC)
 _INPUT_HASHES = _SPEC['provenance']['input_hashes']
 
 def main():

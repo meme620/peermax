@@ -1,4 +1,4 @@
-"""S3A smoketest C4：h12 复合窗口的月数要求对比（2026-08-14）。
+"""analyst-network smoketest C4：h12 复合窗口的月数要求对比（2026-08-14）。
 
 自设计：min_count=1（有 1 个月可得就算累计收益）。
 外部方案：要求窗口内可得月数 >= 8 或 >= 11（完整窗口，Jegadeesh-Titman 式严格口径）。

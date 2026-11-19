@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""S1 Step 3：schema 审计（5 表逐项检查）。
+"""inventory Step 3：schema 审计（5 表逐项检查）。
 
 输出: data/processed/schema_audit_report.csv（table, check, result, detail）
 检查项:

@@ -1,4 +1,4 @@
-"""S3A 管线 runner（批次三，2026-08-12）：按依赖顺序调用各步并汇总关键数字。
+"""analyst-network 管线 runner（批次三，2026-08-12）：按依赖顺序调用各步并汇总关键数字。
 
 用法：
   python scripts/run_analyst_pipeline.py             # 全流程（步骤 1 起）

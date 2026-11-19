@@ -35,10 +35,10 @@ def strategy_a(t: str):
     """期末总股本 + 数字（单位判读：股/万股/亿股；2026-08-09 修单位 bug）。"""
     for m in re.finditer("期末总股本", t):
         seg = t[m.end():m.end() + 120]
-        m2 = NUM.search(seg)
-        if m2:
-            v = parse_num(m2.group(1))
-            after = seg[m2.end():m2.end() + 15]
+        num_match = NUM.search(seg)
+        if num_match:
+            v = parse_num(num_match.group(1))
+            after = seg[num_match.end():num_match.end() + 15]
             if "万股" in after:
                 v *= 10000
             elif "亿股" in after:
@@ -51,13 +51,13 @@ def strategy_c(t: str):
     """总股本 X 股/万股为基数（分红描述；要求"为基数"在数字后 25 字符内，收紧防误匹配）。"""
     for m in re.finditer("总股本", t):
         seg = t[m.end():m.end() + 80]
-        m2 = NUM.search(seg)
-        if not m2:
+        num_match = NUM.search(seg)
+        if not num_match:
             continue
-        after = seg[m2.end():m2.end() + 25]
+        after = seg[num_match.end():num_match.end() + 25]
         if "为基数" not in after:
             continue
-        v = parse_num(m2.group(1))
+        v = parse_num(num_match.group(1))
         if "万股" in after:
             v *= 10000
         elif "亿股" in after:

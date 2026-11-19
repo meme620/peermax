@@ -1,9 +1,9 @@
-"""S3-MB v2：年报 MD&A 章节提取（修复 v1 的 STOP 半句误切 + 去 30k 截断 + 来源身份列）。
+"""network-mda v2：年报 MD&A 章节提取（修复 v1 的 STOP 半句误切 + 去 30k 截断 + 来源身份列）。
 
 v1 提取器审计发现的三处缺陷（2026-09-11，见 reports/data_gates/G0/mda_integrity_audit.json）：
   1. STOP 标题用裸 str.find，正文半句命中即截断（"为规范公司治理，"）→ 262 条锚点在却提取失败；
   2. MAX_LEN=3e4 硬截断 → 17.6% 文本被腰斩，M-B TF-IDF 词频视野受损；
-  3. 无来源身份列 → 下载管线错位文本（s3_text_closure_report.md）无法在产物层剔除。
+  3. 无来源身份列 → 下载管线错位文本（text_closure_report.md）无法在产物层剔除。
 
 v2 规则：
   - 标题必须独占一行：去空白后长度 <= 40 且无点线（目录行），其后 300 字内须有正文；

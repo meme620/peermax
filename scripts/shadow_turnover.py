@@ -5,12 +5,12 @@
     即「月末最后一个有数据的交易日」快照；
   - `firm_chars_clean.turnover` 是月均值但文件旧（2014–2016 覆盖率 0），不可直接使用；
   - 本脚本在 shadow 层构造 `turnover_last` / `turnover_mean` / `n_days`（只读 pkl），
-    并在**只读** M1 headline 样本上跑 4 个规格的 FM 矩阵（a 登记全控制 / b 均值替换 /
+    并在**只读** pricing_gate headline 样本上跑 4 个规格的 FM 矩阵（a 登记全控制 / b 均值替换 /
     c 无 turnover / d 无 turnover+无 rev），其余控制、outcome、估计器与 headline 完全一致。
 
 口径与护栏：
-  - 只读：`data/raw/drive/daily_turnover_rate_20260630.pkl`、M1 样本 parquet、G0 定价表 json；
-  - 不重跑 M1/PC/网络；不写 9 个 M1 输入 / headline 面板 / 样本 / configs / 正式 reports；
+  - 只读：`data/raw/drive/daily_turnover_rate_20260630.pkl`、pricing_gate 样本 parquet、G0 定价表 json；
+  - 不重跑 pricing_gate/PC/网络；不写 9 个 pricing_gate 输入 / headline 面板 / 样本 / configs / 正式 reports；
     结果只写 `data/processed/phase2_shadow/`、`artifacts/phase2/`；
   - `turnover_last` 规格（a）**直接使用样本自身的 `turnover` 列**（winsorized last/100），
     不重新计算 last，避免 winsor 差异；`turnover_mean` 在 panel 宇宙（样本 parquet 全 307,503 行）
@@ -42,10 +42,10 @@ from datetime import datetime, timezone
 import numpy as np
 import pandas as pd
 from pricing_lib import (
-    ROOT, TURNOVER_PKL, assert_m1_inputs, drive_code_to_firm_id, fm_regression,
-    param_value, require, file_size, winsor_bounds,
+    ROOT, TURNOVER_PKL, assert_pricing_inputs, drive_code_to_firm_id, fm_regression,
+    param_value, require, file_size, shadow_sample_path, winsor_bounds,
 )
-from fileio import assert_path_allowed, read_pickle
+from fileio import assert_path_allowed, read_pickle, atomic_write_text
 
 
 SHADOW_DIR = ROOT / 'data/processed/phase2_shadow'
@@ -60,14 +60,14 @@ DIFF_CSV = ROOT / 'artifacts/phase2/2.4_turnover_diff.csv'
 
 MATRIX_CSV = ROOT / 'artifacts/phase2/2.4_control_matrix.csv'
 
-SAMPLE_PARQUET = ROOT / 'data/processed/m1_common_sample_ma_teacher_v2.parquet'
+SAMPLE_PARQUET = shadow_sample_path('ma_teacher')
 
-PRICING_TABLE_V2 = ROOT / 'reports/data_gates/G0/s3_m1_pricing_table_v2.json'
+PRICING_TABLE_V2 = ROOT / 'reports/data_gates/G0/pricing_table_v2.json'
 
 HEADLINE_GUARD_FILES = {
     'firm_chars_clean.csv': ROOT / 'data/processed/firm_chars_clean.csv',
     'monthly_pricing_panel_ma_teacher.csv': ROOT / 'data/processed/monthly_pricing_panel_ma_teacher.csv',
-    'm1_common_sample_ma_teacher_v2.parquet': SAMPLE_PARQUET,
+    'pricing_sample_ma_teacher_v2.parquet': SAMPLE_PARQUET,
 }
 
 WINDOW_START, WINDOW_END = '2014-01', '2024-01'
@@ -116,7 +116,7 @@ DIAG_SPEC_DEFS = {
 
 def write_json(path: Path, obj) -> None:
     assert_output_path_guard(path)
-    _atomic_write_text(path, json.dumps(obj, ensure_ascii=False, indent=1))
+    atomic_write_text(path, json.dumps(obj, ensure_ascii=False, indent=1))
     print(f'  -> {path.relative_to(ROOT)}', flush=True)
 
 def load_turnover_wide(path=TURNOVER_PKL) -> pd.DataFrame:
@@ -221,10 +221,10 @@ def yearly_diff_stats(frame: pd.DataFrame, start: str, end: str) -> list:
     return rows
 
 def build_control_frame(sample_path: Path = SAMPLE_PARQUET, shadow: pd.DataFrame = None) -> tuple:
-    """只读 M1 样本 + shadow turnover -> FM 行 frame（含 winsor 变体）与诊断信息。"""
+    """只读 pricing_gate 样本 + shadow turnover -> FM 行 frame（含 winsor 变体）与诊断信息。"""
     if shadow is None:
         shadow = build_shadow_frame()
-    cols = ['focal_id', 'month', 'm1_in_fm_sample', 'R_next', 'market_equity'] + TRIO + CONTROLS
+    cols = ['focal_id', 'month', 'pricing_in_fm_sample', 'R_next', 'market_equity'] + TRIO + CONTROLS
     df = pd.read_parquet(sample_path, columns=cols)
     require(len(df) == 307503, f'样本 parquet 行数 {len(df)} != 307503')
     m = df.merge(shadow.rename(columns={'firm_id': 'focal_id'})[
@@ -239,7 +239,7 @@ def build_control_frame(sample_path: Path = SAMPLE_PARQUET, shadow: pd.DataFrame
     m[MEAN_COL] = (m[MEAN_COL_RAW].clip(lower=b_lo, upper=b_hi)) / 100.0
     m['turnover_mean_capped_upper'] = (m[MEAN_COL_RAW] > b_hi).astype(int)
     m['turnover_mean_capped_lower'] = (m[MEAN_COL_RAW] < b_lo).astype(int)
-    fm = m[m['m1_in_fm_sample'].astype(bool)].copy()
+    fm = m[m['pricing_in_fm_sample'].astype(bool)].copy()
     # 敏感性变体 A：只在 FM 样本内 winsor（供对比，不进入主规格）
     gf = fm.groupby('month')[MEAN_COL_RAW]
     fm[MEAN_COL_FM] = (fm[MEAN_COL_RAW].clip(lower=gf.transform(lambda s: s.quantile(lo)),
@@ -274,7 +274,7 @@ def build_control_frame(sample_path: Path = SAMPLE_PARQUET, shadow: pd.DataFrame
 def run_spec_matrix(fm: pd.DataFrame, spec_defs: dict = None) -> dict:
     """四规格 × EW/VW 的 FM（min_n=100，NW lag=6，与 headline 一致）。"""
     spec_defs = spec_defs or SPEC_DEFS
-    min_n = int(param_value('m1_sample_and_spec_registry')['min_focal_count_per_month'])
+    min_n = int(param_value('sample_and_spec_registry')['min_focal_count_per_month'])
     nw_lag = int(param_value('nw_lag'))
     out = {'min_n': min_n, 'nw_lag': nw_lag, 'n_rows': int(len(fm)),
            'months': [str(fm['month'].min()), str(fm['month'].max())], 'specs': {}}
@@ -300,7 +300,7 @@ def run_spec_matrix(fm: pd.DataFrame, spec_defs: dict = None) -> dict:
 
 def headline_comparison(matrix: dict, table_path: Path = PRICING_TABLE_V2,
                         tol_beta: float = 1e-4, tol_t: float = 1e-3) -> dict:
-    """规格 a 与 headline 主表（s3_m1_pricing_table_v2.json, ma_teacher）逐值对比（只读）。"""
+    """规格 a 与 headline 主表（pricing_table_v2.json, ma_teacher）逐值对比（只读）。"""
     table = json.loads(table_path.read_text(encoding='utf-8'))
     mt = table['main']['ma_teacher']
     spec_a = matrix['specs']['a_turnover_last']
@@ -514,7 +514,7 @@ def plan_replication(stats_plan_window: dict, matrix: dict, diag_matrix: dict,
 # headline 关键文件（本脚本必须不写、且 sha 前后不变）
 
 # shadow turnover CSV 窗口：2014-01..2024-01（与 2.0_plan §2.4 R1 的「匹配 446,301 行」窗口一致；
-# 覆盖 M1 事件月 2015-01..2023-12 与 outcome 月 2015-05..2023-12）
+# 覆盖 pricing_gate 事件月 2015-01..2023-12 与 outcome 月 2015-05..2023-12）
 
 
 # ---------------------------------------------------------------- 基础 IO
@@ -538,8 +538,8 @@ def plan_replication(stats_plan_window: dict, matrix: dict, diag_matrix: dict,
 def main(argv=None):
     args = parse_args(argv)
     t_generated = datetime.now(timezone.utc).isoformat(timespec='seconds')
-    print('[2.4] preflight：9 个 M1 输入锚（只读）', flush=True)
-    anchors_before = assert_m1_inputs()
+    print('[2.4] preflight：9 个 pricing_gate 输入锚（只读）', flush=True)
+    anchors_before = assert_pricing_inputs()
     headline_sha_before = {k: file_size(p) for k, p in HEADLINE_GUARD_FILES.items()}
 
     print('[2.4] 读取 Drive turnover pkl 并聚合 last/mean/n_days', flush=True)
@@ -593,7 +593,7 @@ def main(argv=None):
     }
     write_json(Path(args.meta_out), meta)
 
-    print('[2.4] 只读 M1 样本并构造控制矩阵', flush=True)
+    print('[2.4] 只读 pricing_gate 样本并构造控制矩阵', flush=True)
     fm, diag = build_control_frame(Path(args.sample), shadow)
     print(f"  FM rows={len(fm):,} mean 覆盖={diag['fm_turnover_mean_raw_coverage']:.4f} "
           f"last 桥 max|diff|={diag['last_bridge_max_abs_diff_vs_sample_turnover']:.2e}", flush=True)
@@ -625,8 +625,8 @@ def main(argv=None):
     diff_info = write_diff_csv(yearly, Path(args.diff_out))
     matrix_info = write_matrix_csv(matrix, Path(args.matrix_out))
 
-    print('[2.4] postflight：9 个 M1 输入锚与 headline 文件 sha 复核', flush=True)
-    anchors_after = assert_m1_inputs()
+    print('[2.4] postflight：9 个 pricing_gate 输入锚与 headline 文件 sha 复核', flush=True)
+    anchors_after = assert_pricing_inputs()
     headline_sha_after = {k: file_size(p) for k, p in HEADLINE_GUARD_FILES.items()}
     anchors_match = bool([a['bytes'] for a in anchors_before]
                          == [a['bytes'] for a in anchors_after])
@@ -640,7 +640,7 @@ def main(argv=None):
         'script': 'scripts/shadow_turnover.py',
         'script_bytes': file_size(Path(__file__)),
         'scope': ('只读 pkl/样本/headline 定价表；只写 data/processed/phase2_shadow/turnover_p2shadow* '
-                  '与 artifacts/phase2/2.4_*；不重跑 M1/PC/网络，不改 headline/configs/正式 reports'),
+                  '与 artifacts/phase2/2.4_*；不重跑 pricing_gate/PC/网络，不改 headline/configs/正式 reports'),
         'outputs': {'shadow_turnover_csv': out_info,
                     'meta_json': {'file': str(Path(args.meta_out).relative_to(ROOT))},
                     'counts_json': {'file': str(Path(args.counts_out).relative_to(ROOT))},
@@ -650,10 +650,10 @@ def main(argv=None):
                              'bytes': meta['source']['bytes'],
                              'shape': meta['source']['shape'],
                              'index_range': meta['source']['index_range'], 'read_only': True},
-            'm1_common_sample_ma_teacher_v2': {
+            'pricing_sample_ma_teacher_v2': {
                 'file': str(Path(args.sample).relative_to(ROOT)),
-                'bytes_before': headline_sha_before['m1_common_sample_ma_teacher_v2.parquet'],
-                'bytes_after': headline_sha_after['m1_common_sample_ma_teacher_v2.parquet'],
+                'bytes_before': headline_sha_before['pricing_sample_ma_teacher_v2.parquet'],
+                'bytes_after': headline_sha_after['pricing_sample_ma_teacher_v2.parquet'],
                 'rows': int(diag['sample_rows']), 'fm_rows': int(diag['fm_rows']),
                 'read_only': True},
             'headline_pricing_table_v2': {'file': str(PRICING_TABLE_V2.relative_to(ROOT)),
@@ -686,7 +686,7 @@ def main(argv=None):
                 'unchanged': headline_sha_before[k] == headline_sha_after[k]}
             for k in HEADLINE_GUARD_FILES},
         'headline_files_modified': not headline_unchanged,
-        'm1_rerun': False,
+        'pricing_rerun': False,
         'configs_modified': False,
         'notes': [
             ('`pricing_lib._drive_monthly_wide(pkl, "mean")` 实际落到 `.last()`（该分支只区分 sum/其它），'
@@ -695,7 +695,7 @@ def main(argv=None):
              '= 未 winsor 的 Drive 均值变体（diagnostic b3，逐值复现）；主口径 b（registry [0.01,0.99] '
              '月度 winsor，与 headline `turnover` 施加方式同构）实测 OwnMAX +0.01188/t=0.62、'
              'PeerMAX +0.05694/t=0.80，与审计 L-8 判定表逐值一致。两变体方向相同、均不显著。'),
-            ('审计 L-8 的「平均绝对差 0.954pp / 中位差 0.410pp」= M1 v2 面板口径（306,673 个双非空格，'
+            ('审计 L-8 的「平均绝对差 0.954pp / 中位差 0.410pp」= pricing_gate v2 面板口径（306,673 个双非空格，'
              '2015-01..2023-12，原始 % 单位、未 winsor）的 mean/median |Δ|，复现 0.9541/0.4101；'
              '审计该行跨口径混用（水平 2.746/2.892 与 corr 0.779 属 pkl 口径；面板水平 2.1457/2.2394、'
              '面板 corr 0.7524）；plan 口径 1.2572/0.4843 亦正确，两者不冲突。'

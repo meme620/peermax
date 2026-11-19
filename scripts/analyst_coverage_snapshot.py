@@ -1,6 +1,6 @@
-"""S3A Step 5：月度覆盖快照 -> firm_analyst_coverage（零外部依赖）。
+"""analyst-network Step 5：月度覆盖快照 -> firm_analyst_coverage（零外部依赖）。
 
-规则（execution_plan S3A Step 4 / protocol §5A 第 6 步）:
+规则（execution_plan analyst-network Step 4 / protocol §5A 第 6 步）:
   - 月末 snapshot（自然月末）
   - 窗口：cutoff 前 12 个月（coverage_window=12，2026-08-12 冻结）
   - 只使用 report_date <= cutoff 的记录
@@ -27,7 +27,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-SRC = 'data/processed/analyst/s3a_step3_clean.csv'
+SRC = 'data/processed/analyst/analyst_step3_clean.csv'
 OUTD = Path('data/processed/analyst')
 OUTD.mkdir(parents=True, exist_ok=True)
 WINDOW_MONTHS = 12

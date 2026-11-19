@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""S2 Step 1-2：firm-day 面板构造 + rraw 派生 + 除权日检测。
+"""daily-panel Step 1-2：firm-day 面板构造 + rraw 派生 + 除权日检测。
 
 输入：腾讯 daily_raw + daily_qfq（854.6 万行/版）
 输出（按年分片）：
@@ -8,7 +8,7 @@
     code,date,close_raw,close_qfq,volume,amount,rraw,ca_flag
   - rraw = raw_close_d/raw_close_{d-1}-1（raw 版主路径，新浪双源已验）
   - ca_flag = 1 当 qfq/raw 比值相邻日跳变 > 1%（除权事件候选；qfq 噪声 <0.5% 不误触）
-  - 停牌日无行（腾讯原始语义）；上市首日 rraw=NaN（valid_trade=0 由 S2 质量门处理）
+  - 停牌日无行（腾讯原始语义）；上市首日 rraw=NaN（valid_trade=0 由 daily-panel 质量门处理）
 
 写入语义（Phase 1.1 / I-4）：
   - 默认：目标年度文件已存在则拒绝写入（SystemExit 2），不改动现有文件；
@@ -31,7 +31,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 TENCENT = ROOT / "data/raw/tencent"
 OUT_DIR = ROOT / "data/processed/daily_panel"
-REPORT_PATH = ROOT / "reports/data_gates/G0/s2_daily_panel_report.json"
+REPORT_PATH = ROOT / "reports/data_gates/G0/daily_panel_build_report.json"
 from pricing_lib import param_value
 
 RATIO_JUMP = float(param_value('ca_ratio_jump'))  # qfq/raw 比值跳变阈值（除权日检测）
@@ -39,7 +39,7 @@ COLUMNS = ["code", "date", "close_raw", "close_qfq", "volume", "amount", "rraw",
 
 
 def _refuse(msg):
-    print(f"[S2][REFUSE] {msg}", file=sys.stderr)
+    print(f"[daily-panel][REFUSE] {msg}", file=sys.stderr)
     raise SystemExit(2)
 
 
@@ -188,14 +188,115 @@ def run(tencent_dir=TENCENT, out_dir=OUT_DIR, years=None, *, mode="default",
     total_rows = sum(v[0] for v in stats.values())
     total_ca = sum(v[1] for v in stats.values())
     summary = {
-        "report_id": "s2_daily_panel",
+        "report_id": "daily_panel_build",
         "mode": mode,
         "append_reason": append_reason if mode == "append" else None,
         "rows": total_rows,
         "ca_flags": total_ca,
         "ca_rate": round(total_ca / total_rows, 6) if total_rows else None,
         "by_year": {y: {"rows": v[0], "ca_flags": v[1], "firms": v[2]} for y, v in sorted(stats.items())},
-        "note": f"rraw=raw close 派生；ca_flag=qfq/raw 比值跳变>{RATIO_JUMP}（除权事件候选，S2.5 mv 交叉校验复核）",
+        "note": f"rraw=raw close 派生；ca_flag=qfq/raw 比值跳变>{RATIO_JUMP}（除权事件候选，factor mv 交叉校验复核）",
+    }
+    if report_path is not None:
+        _write_json_atomic(report_path, summary)
+    return summary
+
+
+DRIVE_DIR = ROOT / "data" / "raw" / "drive"
+DRIVE_PX = DRIVE_DIR / "daily_close_none_20260630.pkl"
+DRIVE_ADJ = DRIVE_DIR / "daily_adj_close_post_20260630.pkl"
+DRIVE_AMT = DRIVE_DIR / "daily_total_amount_20260630.pkl"
+
+
+def _drive_code(col: str) -> str:
+    """'000001.SZ' -> 'sz000001'；'600000.SH' -> 'sh600000'。"""
+    num, _, mkt = str(col).partition(".")
+    return ("sz" if mkt.upper() == "SZ" else "sh") + num
+
+
+def run_drive(out_dir=OUT_DIR, years=None, *, mode="default", append_reason=None,
+              report_path=REPORT_PATH):
+    """从 Drive 面板重建日频面板（tencent 不可得时的替代源）。
+
+    口径差异（必须登记，不得静默替换）：
+      - close_raw = daily_close_none；close_qfq = daily_adj_close_post（后复权）
+      - volume 源不可得，写 amount 作为"有成交"的代理：下游只用 volume>0 判交易日
+      - ca_flag = 后复权/不复权比值跳变 > RATIO_JUMP
+    """
+    import pandas as pd
+
+    out_dir = Path(out_dir)
+    years = {str(y) for y in (years or range(2018, 2026))}
+    if mode not in ("default", "append"):
+        _refuse(f"未知写入模式: {mode!r}（仅支持 default / append）")
+    if mode == "append" and not (append_reason or "").strip():
+        _refuse("--append 必须同时提供 --append-reason，说明追加原因")
+    targets = {yr: out_dir / f"{yr}.csv" for yr in sorted(years)}
+    existing = [p for p in targets.values() if p.exists()]
+    if mode == "default" and existing:
+        names = ", ".join(sorted(p.name for p in existing))
+        _refuse(f"目标年度文件已存在，拒绝写入：{names}。如确需追加，请显式 --append --append-reason <原因>")
+
+    for p in (DRIVE_PX, DRIVE_ADJ, DRIVE_AMT):
+        if not Path(p).is_file():
+            _refuse(f"Drive 输入不存在：{p}")
+
+    raw = pd.read_pickle(DRIVE_PX)
+    adj = pd.read_pickle(DRIVE_ADJ).reindex(index=raw.index, columns=raw.columns)
+    amt = pd.read_pickle(DRIVE_AMT).reindex(index=raw.index, columns=raw.columns)
+
+    rraw = raw.pct_change(fill_method=None)
+    ratio = adj / raw.where(raw > 0)
+    ca = (ratio.pct_change(fill_method=None).abs() > RATIO_JUMP).fillna(False)
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    stats = defaultdict(lambda: [0, 0, 0])
+    total_ca = 0
+    for yr in sorted(years):
+        m = (raw.index.year == int(yr))
+        if not m.any():
+            continue
+        sub = pd.DataFrame({
+            "close_raw": raw.loc[m].stack(future_stack=True),
+            "close_qfq": adj.loc[m].stack(future_stack=True),
+            "amount": amt.loc[m].stack(future_stack=True),
+            "rraw": rraw.loc[m].stack(future_stack=True),
+            "ca": ca.loc[m].stack(future_stack=True),
+        }).reset_index()
+        sub.columns = ["date", "code", "close_raw", "close_qfq", "amount", "rraw", "ca"]
+        sub = sub[sub["close_raw"].notna()]
+        if sub.empty:
+            continue
+        sub["code"] = sub["code"].map(_drive_code)
+        sub["date"] = pd.to_datetime(sub["date"]).dt.strftime("%Y-%m-%d")
+        f, w, tmp = _open_year_writer(targets[yr], mode)
+        try:
+            for rec in sub.itertuples(index=False):
+                vol = "" if pd.isna(rec.amount) else f"{rec.amount:.4f}"
+                w.writerow([rec.code, rec.date,
+                            f"{rec.close_raw:.6f}",
+                            "" if pd.isna(rec.close_qfq) else f"{rec.close_qfq:.6f}",
+                            vol, vol,
+                            "" if pd.isna(rec.rraw) else f"{rec.rraw:.8f}",
+                            int(bool(rec.ca))])
+        finally:
+            f.close()
+        os.replace(tmp, targets[yr])
+        flags = int(sub["ca"].fillna(False).sum())
+        stats[yr] = [int(len(sub)), flags, int(sub["code"].nunique())]
+        total_ca += flags
+
+    total_rows = sum(v[0] for v in stats.values())
+    summary = {
+        "report_id": "daily_panel_build_drive",
+        "mode": mode, "source": "drive",
+        "append_reason": append_reason if mode == "append" else None,
+        "rows": total_rows, "ca_flags": total_ca,
+        "ca_rate": round(total_ca / total_rows, 6) if total_rows else None,
+        "by_year": {y: {"rows": v[0], "ca_flags": v[1], "firms": v[2]} for y, v in sorted(stats.items())},
+        "volume_semantics": "amount_proxy_v1（volume 列写成交额；下游只用 >0 判交易日）",
+        "close_qfq_semantics": "daily_adj_close_post（后复权）",
+        "note": "rraw=raw close 派生；ca_flag=后复权/不复权比值跳变阈值",
     }
     if report_path is not None:
         _write_json_atomic(report_path, summary)
@@ -207,18 +308,28 @@ def main(argv=None):
     ap.add_argument("--years", default="2018-2025")
     ap.add_argument("--append", action="store_true", help="显式允许向已存在的年度文件追加（必须同时给 --append-reason）")
     ap.add_argument("--append-reason", default=None, help="追加原因（--append 必填，用于审计）")
+    ap.add_argument("--source", choices=["tencent", "drive"], default="tencent",
+                    help="数据源：tencent（原始日 K，需 data/raw/tencent）/ drive（Drive 面板，离线可用）")
     args = ap.parse_args(argv)
     y0, y1 = (int(x) for x in args.years.split("-"))
     years = {str(y) for y in range(y0, y1 + 1)}
 
-    summary = run(
-        TENCENT,
-        OUT_DIR,
-        years,
-        mode="append" if args.append else "default",
-        append_reason=args.append_reason,
-        report_path=REPORT_PATH,
-    )
+    if args.source == "drive":
+        summary = run_drive(
+            OUT_DIR, years,
+            mode="append" if args.append else "default",
+            append_reason=args.append_reason,
+            report_path=REPORT_PATH,
+        )
+    else:
+        summary = run(
+            TENCENT,
+            OUT_DIR,
+            years,
+            mode="append" if args.append else "default",
+            append_reason=args.append_reason,
+            report_path=REPORT_PATH,
+        )
     print(f"面板完成: {summary['rows']:,} 行, ca_flag {summary['ca_flags']:,} ({summary['ca_rate']})")
     for y, v in sorted(summary["by_year"].items()):
         print(f"  {y}: {v['rows']:,} 行, ca {v['ca_flags']:,}, firms {v['firms']}")

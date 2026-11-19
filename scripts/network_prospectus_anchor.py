@@ -1,25 +1,25 @@
 """第二梯队 #9 路线 A（plan §8 B″11-7 锚 1）：招股书「同行业可比公司」自报锚试点。
 
 口径真源 = `configs/parameter_registry.yaml` 的 `prospectus_peer_anchor_pilot`（P0 先登记后执行）
-+ `reports/audits/s3_remaining_workplan_20261011.md` 第二梯队 #9 路线 A。
++ `reports/audits/network_remaining_workplan_20261011.md` 第二梯队 #9 路线 A。
 
-步骤（P2–P5 一体）：
-  P2 解析定位：pymupdf 页码级扫描 4 个关键词（同行业可比公司 / 可比上市公司 / 同行业上市公司 /
+步骤（解析→抽取→映射→核验一体）：
+  解析定位：pymupdf 页码级扫描 4 个关键词（同行业可比公司 / 可比上市公司 / 同行业上市公司 /
      同行业可比上市公司），记录命中数、首个命中页码；`located = 命中数 > 0`。
-  P3 抽名单：在命中窗口（hit−150 .. hit+1500，重叠合并）内按 5 条正则规则抽取公司名：
+  抽取名单：在命中窗口（hit−150 .. hit+1500，重叠合并）内按 5 条正则规则抽取公司名：
      R1 全称型（…股份有限公司/有限责任公司/有限公司）；R2 短名+代码型（短名（NNNNNN））；
      R3 代码+短名型（NNNNNN.SZ/SH 后随短名）；R4 列举型（包括/分别为/主要有… ×、×）；
      R5 表格行型（独立成行的 2–10 字短名，下一非空行以数字/百分号开头）。
      归一化：去空白/全角半角统一/去引号；去「股份有限公司/有限责任公司/有限公司」后缀得 base；
      排除发行人自身（全称与简称）、聚合词与通用词（黑名单）、纯数字/长度 <2 的 token。
-  P4 映射：名称→代码，模式 = `exact_short`（项目 firm 名单简称精确）/ `exact_full`（全称字典精确）/
+  名称映射：名称→代码，模式 = `exact_short`（项目 firm 名单简称精确）/ `exact_full`（全称字典精确）/
      `suffix_norm`（去公司后缀后精确）/ `adjacent_code`（窗口内自带 6 位 A 股代码）；失败 = 上述全不中。
      全称字典 = ① 年报文本头部全称（本地抽取，缓存 artifacts/tmp）+ ② 东财曾用名/全称缓存。
-  P5 度量（主口径网络 = `pm_ma_ewcos_teacher_v1_{试点年+2}`，该 focal 上市后第一个其为节点的版本）：
+  核验 度量（主口径网络 = `pm_ma_ewcos_teacher_v1_{试点年+2}`，该 focal 上市后第一个其为节点的版本）：
      重合率 share = Σ_i #{j∈D_i : (i,j)∈E} / Σ_i #D_i；基线 d = E/(N(N−1)/2)（N = 入网公司含零对手，
      E = 无向边数，与 lift_pair_density_readout 同口径）；lift = share / d。
 
-产出：`reports/data_gates/G0/s3_network_prospectus_pilot_<year>.json` + `.md`（+ 逐公司明细 CSV）。
+产出：`reports/data_gates/G0/network_prospectus_pilot_<year>.json` + `.md`（+ 逐公司明细 CSV）。
 停机（已登记）：解析成功率 <80% / 映射失败率 >20% / 覆盖率 <50% → 停（不得宽松匹配或人工补录）。
 
 用法: python scripts/network_prospectus_anchor.py --year 2018
@@ -33,6 +33,7 @@ import csv
 import json
 import math
 import os
+import pickle
 import re
 import shutil
 import subprocess
@@ -300,7 +301,7 @@ def is_generic_name(b):
     return len(b) <= GEN_SUB_MAXLEN and any(t in b for t in GEN_SUB)
 
 def geo_prefix():
-    """「区域/中国」前缀集（H1 切分判据用；延迟引用 §P5 的 PLACE_PREFIX，避免前向引用歧义）。"""
+    """「区域/中国」前缀集（H1 切分判据用；延迟引用 §核验 的 PLACE_PREFIX，避免前向引用歧义）。"""
     global _GEO
     if _GEO is None:
         _GEO = set(PLACE_PREFIX) | set(GEO_EXTRA)
@@ -358,7 +359,7 @@ def ctx_suffix_frags():
     return _CTX_SUFFIX
 
 def repair_r2_left(raw, uni_keys=()):
-    """M1-(a) + 修 1(e)：R2 左边界修复——语境/连接词前缀逐层剥离 + 语境后缀片段剥离 +
+    """pricing_gate-(a) + 修 1(e)：R2 左边界修复——语境/连接词前缀逐层剥离 + 语境后缀片段剥离 +
     尾随连接词（「有」）**名录守卫**剥离（修复轮二，registry 1.5.17）。
 
     守则（顺序）：
@@ -395,7 +396,7 @@ def repair_r2_left(raw, uni_keys=()):
     return s
 
 def lev_leq1(a, b):
-    """M2 容错：|Δlen| ≤1 且编辑距离 ≤1 的快速判据（O(n)）。"""
+    """名称容错：|Δlen| ≤1 且编辑距离 ≤1 的快速判据（O(n)）。"""
     if a == b:
         return True
     if abs(len(a) - len(b)) > 1:
@@ -415,7 +416,7 @@ def lev_leq1(a, b):
     return True
 
 def build_self_index(full, short_hist):
-    """按 code 倒排名称注册表（H1/M2 修复轮：自名集合须含**代码锚定历史简称**；一次构建、全程复用）。"""
+    """按 code 倒排名称注册表（名称锚定修复轮：自名集合须含**代码锚定历史简称**；一次构建、全程复用）。"""
     fu, sh = {}, {}
     for k, v in full.items():
         for c in v:
@@ -428,7 +429,7 @@ def build_self_index(full, short_hist):
 def self_names_for(firm, code):
     """发行人自名集合 (exact, core)：universe 当前名 + 全称字典键 + **名称注册表历史简称**（均含基名）。
 
-    core = 容错判据比较池 = exact 中长度 ≥2 者（**不设长度上限**——登记 M2 判据为「与**某自名**」，
+    core = 容错判据比较池 = exact 中长度 ≥2 者（**不设长度上限**——登记容错判据为「与**某自名**」，
     长度窗口会漏掉长全称（如「…股份有限公司」>14 字）上的同核/近全包含命中）。**登记 = registry 1.5.15**。
     """
     ent = _SELF_IDX["cache"].get(code)
@@ -446,7 +447,7 @@ def self_names_for(firm, code):
     return ent
 
 def is_self_name(b, raw, self_exact, self_core, uni_keys=()):
-    """M2：发行人自指容错判据（登记 = registry 1.5.15）。
+    """发行人自指容错判据（登记 = registry 1.5.15）。
 
     判据（任一命中即判自指）：(i) 精确；(ii) 同核（与某自名共享 **≥3 字前缀，上限 4 字**——逐 k∈{4,3} 比对）；
     (iii) 编辑距离/OCR 近似（|Δlen| ≤1 且 lev ≤1，双方 ≥4 字）；(iv) 近全包含（b ⊆ 自名，残差 ≤4 字，len(b) ≥3）。
@@ -870,14 +871,14 @@ def extract_candidates(text, spans, self_exact, self_core, uni_keys=()):
         if is_self_name(b, c["raw"], self_exact, self_core, uni_keys):
             REJECT_LOG.append(dict(base=b, raw=c["raw"], code=None,
                                    why="发行人自指（容错：精确/同核/编辑距离/近全包含）"))
-            continue                                  # 修 5（M2）：自名过滤加容错，逐条留证据
+            continue                                  # 修 5：自名过滤加容错，逐条留证据
         if any(s in b for s in NOISE_SUB):
             continue
         if c["rule"] in ("R4_enum", "R5_table_row", "R4_tbl_head"):
             if any(s in b for s in NOISE_WEAK):       # 弱证据规则（无代码锚定）加严
                 continue
             if c["rule"] in ("R5_table_row", "R4_tbl_head"):
-                # 修 5（M1②）：NOISE_CHAR 单字判据 → **整名判据**（不得因单字命中丢整名，如 红日药业）
+                # 修 5（pricing_gate②）：NOISE_CHAR 单字判据 → **整名判据**（不得因单字命中丢整名，如 红日药业）
                 if b in NOISE_TOKEN or all(ch in NOISE_CHAR for ch in b):
                     continue
                 if not R5_NAME.match(b):
@@ -1352,7 +1353,7 @@ def write_md(r, path):
       "量级与「自报同行更可能落在网内边」一致，但**单年、单网络版本，不能外推为全期结论**；"
       "且**方向未证**（§2.2）：漏抽与污染剔除两侧偏置方向不一致。")
     A("- **建议**：① 全量前补 OCR 通道处理无文本层扫描件（2 份）；② 逐年重复本脚本并汇总为 "
-      "`s3_network_prospectus_anchor.json`；③ **在完成全量（≥3 年）之前，论文仍不得写 pre-validated**；"
+      "`network_prospectus_anchor.json`；③ **在完成全量（≥3 年）之前，论文仍不得写 pre-validated**；"
       "④ 全量轮补「表格列错行 → 码-名配对校验」（本轮已知残余，见 §6）。")
     A("")
     A("## 6. 已知限制")
@@ -1367,14 +1368,14 @@ def write_md(r, path):
     A(f"python scripts/network_prospectus_anchor.py --year {sc['pilot_year']}")
     A("```")
     A("")
-    A("- **明细 CSV 版本关系（修 5）**：本报告同目录 `s3_network_prospectus_pilot_2018_detail.csv` 为**权威交付版**"
+    A("- **明细 CSV 版本关系（修 5）**：本报告同目录 `network_prospectus_pilot_2018_detail.csv` 为**权威交付版**"
       "（脚本 `--detail-csv` 直出，105 行）。修正轮清理了中间产物 `artifacts/tmp/tier2_prosp/pilot_2018_detail.csv`"
       "（v4 期中间件，与交付版有 **9 行 × 6 字段 = 54 处字段填充差异**：`no_section` 行在中间件里留空、"
       "交付版填 0/True；bytes = 45a61e31… 已留档 `artifacts/tmp/tier2_prosp_fix/f5_tmp_evidence.json`）。"
       "**以交付版为准，中间件不再保留、不得引用。**")
     A("- **tmp 大件清理（修 5）**：`artifacts/tmp/tier2_prosp/` 下 2 份探针 PDF（300748 165 MB / 300760 31 MB，"
       "用于「无文本层扫描件」实测：413 页 948 字 / 620 页 2,480 字）已删除，其 bytes、字节数与页/字计数留档于"
-      " `artifacts/tmp/tier2_prosp_fix/f5_tmp_evidence.json`（PDF 可经 P1 下载器重取；下载日志 "
+      " `artifacts/tmp/tier2_prosp_fix/f5_tmp_evidence.json`（PDF 可经下载器重取；下载日志 "
       "`download_log.csv` 已登记 `all_candidates_failed` + `extract_fail`）。")
     A("- **CID 恢复缓存（修 3）**：`artifacts/tmp/tier2_prosp/cid_recover/<code>.{txt,key}`（3 份解码文本 + "
       "PDF 字节数键；删缓存后可由 `pdfminer.six + SimSun GID 反查`确定性重建，需 `C:/Windows/Fonts/simsun.ttc`）。")
@@ -1407,7 +1408,7 @@ def write_anchor_md(r, path):
     fr2 = r.get("fix_round2") or {}
     A(f"- 范围：IPO 年 **{sc['ipo_years'][0]}–{sc['ipo_years'][-1]} 全量不抽样**；cohort 合计 **{sc['cohort_n']}**"
       f"（universe = `{sc['universe']}`）；四项定义 / 停机线 / 匹配口径逐字沿用试点登记值；"
-      f"解析层为 **registry {r.get('fix_round', {}).get('registry_version', '1.5.15')} H1/M1/M2 修复轮**后的读数；"
+      f"解析层为 **registry {r.get('fix_round', {}).get('registry_version', '1.5.15')} 名称锚定修复轮 修复轮**后的读数；"
       f"本轮为 **registry {fr2.get('registry_version', '1.5.17')} 修复轮二（修 1–7）**读数"
       f"（上一轮 1.5.16 = 本轮修复前基线，见 §0）。")
     if fr2:
@@ -1423,7 +1424,7 @@ def write_anchor_md(r, path):
     pre2 = r.get("sensitivity_pre_round2")
     fr = r.get("fix_round") or {}
     if fr:
-        A("## 0. 修复轮与修复前/后对照（三轮读数：v1 → 上一轮 H1/M1/M2 → 本轮修 1–7）")
+        A("## 0. 修复轮与修复前/后对照（三轮读数：v1 → 上一轮 名称锚定修复轮 → 本轮修 1–7）")
         A("")
         A(f"- 登记：{fr.get('change', '')}")
         A(f"- **判据零改动**：{fr.get('judgment_unchanged', '')}")
@@ -1437,7 +1438,7 @@ def write_anchor_md(r, path):
             A(f"v1 基线来源：`{pre['source']}`（run_at {pre['run_at_before_fix']}）。{pre['note']}")
             if pre2 and not pre2.get("error"):
                 A("")
-                A(f"**本轮修复前基线（上一轮 H1/M1/M2 修复后，registry 1.5.16）**：`{pre2['source']}`"
+                A(f"**本轮修复前基线（上一轮 名称锚定修复轮 修复后，registry 1.5.16）**：`{pre2['source']}`"
                   f"（run_at {pre2['run_at_before_fix2']}）。{pre2['note']}")
             A("")
             A("| 指标 | v1 基线（1.5.13/1.5.14） | 上一轮修复后（1.5.16） | 本轮修复后（1.5.17） | 停机线 | 判定 |")
@@ -1715,7 +1716,7 @@ def write_anchor_md(r, path):
           "可能来源并列三类（不宣称单一原因）：① 口径内不可映射实体（未上市/境外/港股同业、子公司实体）；"
           "② 抽取层伪影（弱证据规则在部分年份正文/表格上误触发，通用词·科目·句片段，及桶内的句片段/公司名混合）；"
           "③ 名称漂移残余（历史简称不在代码锚定字典内）。**逐名归因需独立判读、不在本轮**；本轮已按登记执行"
-          "「先修解析」两轮修复（H1/M1/M2 = registry 1.5.15/1.5.16；修 1–7 = registry 1.5.17），"
+          "「先修解析」两轮修复（名称锚定修复轮 = registry 1.5.15/1.5.16；修 1–7 = registry 1.5.17），"
           "**修复未触及任何判据/门槛/匹配口径/分母**。")
         A("- **措辞限制保持**：**「pre-validated / 已验证」仍禁用**（外部锚条件未满足）；且与 #10 的"
           "「AI 独立判读（三代理，非人工）」证据层级限定**并列存在、互不替代**。")
@@ -1753,7 +1754,7 @@ def write_anchor_md(r, path):
           "的差异全部来自**登记在案**的（a）解析子通道新增（OCR 回退使 2 份无文本层扫描件进入口径）、（b）修复轮二"
           "抽取层触发条件修复（R4 复合触发 / R4_tbl_head / R2 空白容错与左边界扩展）、（c）覆盖率分母口径"
           "（全量 = cohort 全量 105）。回归证据：`artifacts/tmp/tier2_full/fix2/regress_2018.json`"
-          "（+ `_detail.csv`）；交付版试点产物 `reports/data_gates/G0/s3_network_prospectus_pilot_2018.*` 零改动。")
+          "（+ `_detail.csv`）；交付版试点产物 `reports/data_gates/G0/network_prospectus_pilot_2018.*` 零改动。")
     else:
         A("（未找到试点产物，跳过对照）")
     A("")
@@ -1766,24 +1767,24 @@ def write_anchor_md(r, path):
     A("")
     A("```bash")
     A("python scripts/network_prospectus_anchor.py --measure --years 2015-2023 --workers 6 \\")
-    A("    --ingest-detail reports/data_gates/G0/s3_network_prospectus_full_ingest_detail.csv \\")
-    A("    --pre-fix-report reports/data_gates/G0/s3_network_prospectus_anchor_v1.json \\")
-    A("    --pre-fix-report2 reports/data_gates/G0/s3_network_prospectus_anchor_v2_pre_fix.json")
+    A("    --ingest-detail reports/data_gates/G0/network_prospectus_full_ingest_detail.csv \\")
+    A("    --pre-fix-report reports/data_gates/G0/network_prospectus_anchor_v1.json \\")
+    A("    --pre-fix-report2 reports/data_gates/G0/network_prospectus_anchor_v2_pre_fix.json")
     A("```")
     A("")
-    A("前置步骤（本报告口径）：修复前报告先留档为 `s3_network_prospectus_anchor_v1.*`（标 superseded）；"
+    A("前置步骤（本报告口径）：修复前报告先留档为 `network_prospectus_anchor_v1.*`（标 superseded）；"
       "首次运行因名称注册表 `cache_version` 3→4 触发**强制重算**（约 2 min，缓存 `artifacts/tmp/tier2_prosp/full_name_map.json`）；"
       "locate/抽取通道（pymupdf → CID 确定性还原 → OCR 缓存）与修复前逐字一致，**不重新下载 PDF**。")
     A("")
     A(f"- 逐份明细：`{rel(path).replace('.md', '_detail.csv')}`（{sc['cohort_n']} 行：peers / mapped_peers_codes / "
       f"unmapped / channel / network_version_used）。")
-    A("- 阶段报告（全量第一轮 ingest）：`reports/data_gates/G0/s3_network_prospectus_full_ingest_status.{json,md}`。")
-    A("- 修复前基线（只读）：`reports/data_gates/G0/s3_network_prospectus_anchor_v1.{json,md,_detail.csv}`"
+    A("- 阶段报告（全量第一轮 ingest）：`reports/data_gates/G0/network_prospectus_full_ingest_status.{json,md}`。")
+    A("- 修复前基线（只读）：`reports/data_gates/G0/network_prospectus_anchor_v1.{json,md,_detail.csv}`"
       "（superseded，修复前数值 = 本报告 `sensitivity_pre_fix`）。")
     A("")
     fx = r.get("fix_round_evidence")
     if fx:
-        A("## 9. 解析层修复轮证据（H1/M1/M2；registry 1.5.15）")
+        A("## 9. 解析层修复轮证据（名称锚定修复轮；registry 1.5.15）")
         A("")
         A(fx["note"])
         A("")
@@ -1793,12 +1794,12 @@ def write_anchor_md(r, path):
           f"历史简称条目 {ni.get('n_short_hist')}；全称键 {ni.get('n_full_names')}；"
           f"构建耗时 {ni.get('elapsed_sec')} s；变更来源命中 = 更名披露 {ni.get('n_name_change_hits')} / "
           f"释义缩写 {ni.get('n_defn_hits')}。来源与代码锚定机制不变，**无人工补录**。")
-        A(f"- M1② R2 左边界剥离（语境/连接词前缀）：命中 **{fx.get('n_r2_left_repairs')}** 条"
+        A(f"- pricing_gate② R2 左边界剥离（语境/连接词前缀）：命中 **{fx.get('n_r2_left_repairs')}** 条"
           "（raw → fixed，逐条留在逐份记录 `r2_left_repairs`）。")
         ex_ = fx.get("r2_left_repair_examples") or []
         if ex_:
             A("  - 高频样例：" + "、".join(f"`{x['raw→fixed']}`（{x['n']}）" for x in ex_[:10]))
-        A(f"- M2 发行人自名容错剔除：**{fx.get('n_self_name_rejections')}** 条（判据 = 精确/同核/编辑距离·OCR 近似/"
+        A(f"- 发行人自名容错剔除：**{fx.get('n_self_name_rejections')}** 条（判据 = 精确/同核/编辑距离·OCR 近似/"
           "近全包含；A 股 universe 名录守卫不做自指剔除）；形态约束/交叉校验剔除 "
           f"**{fx.get('n_shape_rejections')}** 条。")
         A("")
@@ -2008,7 +2009,7 @@ import time
 def _init_measure_worker():
     """worker 初始化：加载 firm universe + 名称注册表（缓存）+ universe 名称键（每进程一次）。
 
-    修 5（M2-i / registry 1.5.15）：同时构建**名称注册表按 code 倒排**（`build_self_index`），
+    修 5（名称锚定修复 / registry 1.5.15）：同时构建**名称注册表按 code 倒排**（`build_self_index`），
     使发行人自名集合含「本发行人自身的代码锚定历史简称」（不再只用 universe 当前名 + 全称字典）。
     """
     firm, short = load_firm_universe()
@@ -2055,10 +2056,10 @@ def _measure_one(job):
                          f"chars={len(text)}, pages={n_pages}）" if insuf else
                          f"章节未定位（4 关键词全 0；chars={len(text)}, pages={n_pages}）")
         return rec
-    self_exact, self_core = self_names_for(firm, code)     # 修 5（M2-i）：含代码锚定历史简称
+    self_exact, self_core = self_names_for(firm, code)     # 修 5：含代码锚定历史简称
     uni_keys = _MEAS["uni_keys"]
     REJECT_LOG.clear()
-    REPAIR_LOG.clear()                                     # 修 5（M1②）：R2 左边界修复证据（逐份）
+    REPAIR_LOG.clear()                                     # 修 5（pricing_gate②）：R2 左边界修复证据（逐份）
     cands = extract_candidates(text, spans, self_exact, self_core, uni_keys)
     rej = [dict(base=x["base"], peer=x.get("code"), why=x["why"]) for x in REJECT_LOG]
     REJECT_LOG.clear()
@@ -2489,7 +2490,7 @@ def measure_main(args):
             "**停机不解除**、外部锚条件仍不满足（机械判定，未放宽任何门槛）。"),
     }
 
-    # ---- 修复轮证据（H1/M1/M2；描述性，不改任何口径）----
+    # ---- 修复轮证据（名称锚定修复轮；描述性，不改任何口径）----
     n_r2_rep = sum(len(r.get("r2_left_repairs") or []) for r in recs)
     r2_ex = collections.Counter()
     for r in recs:
@@ -2503,8 +2504,8 @@ def measure_main(args):
             rule_tot[k] += v
     fix_evidence = {
         "note": "registry 1.5.15「先修解析」修复轮证据（解析层规则化修复；**无人工补录、未放宽匹配口径、未剔失败件**）："
-                "H1 = 年报头部名称注册表切分（cache_version 3→4 强制重算）；M1 = 招股书抽取规则（R2 标签集 + 左边界剥离 + "
-                "R5 整名噪声判据）；M2 = 发行人自名过滤容错（含代码锚定历史简称）。"
+                "H1 = 年报头部名称注册表切分（cache_version 3→4 强制重算）；pricing_gate = 招股书抽取规则（R2 标签集 + 左边界剥离 + "
+                "R5 整名噪声判据）；发行人自名过滤容错（含代码锚定历史简称）。"
                 "**修复轮二（registry 1.5.17）**：修 1 抽取层触发条件（R4 复合触发 + 和/与/及 并列切分 + R2 括号内空白容错 + "
                 "R2 左边界语境后缀片段/尾随「有」（名录守卫）剥离 + 新增 R4_tbl_head）——逐份规则计数见 `extraction_rule_counts`。",
         "extraction_rule_counts": dict(sorted(rule_tot.items())),
@@ -2519,7 +2520,7 @@ def measure_main(args):
 
     # ---- 与试点 2018 的对照 ----
     pilot_cmp = None
-    ppath = os.path.join(ROOT, "reports", "data_gates", "G0", "s3_network_prospectus_pilot_2018.json")
+    ppath = os.path.join(ROOT, "reports", "data_gates", "G0", "network_prospectus_pilot_2018.json")
     if os.path.exists(ppath):
         pj = read_json(ppath)
         py = per_year_lift["2018"]
@@ -2555,7 +2556,7 @@ def measure_main(args):
 
     low_cov = [y for y in years if (per_year[str(y)]["coverage_rate"] or 0) < 0.50]
     known_limitations = [
-        "**本轮为登记在案的「先修解析」修复轮**（registry 1.5.15；H1/M1/M2 三处解析缺陷的规则化修复）："
+        "**本轮为登记在案的「先修解析」修复轮**（registry 1.5.15；名称锚定修复轮 三处解析缺陷的规则化修复）："
         "**判据零改动**（四项定义 / 停机线 / 匹配口径 / 覆盖率分母 / 网络版本规则 / 边界年处理一律不改）；"
         "修复前基线逐值见 `sensitivity_pre_fix`（含修复前后对照，§0）；修复**不解除任何措辞限制**——"
         "外部锚条件按修复后读数机械重出、不加宽任何门槛。",
@@ -2587,7 +2588,7 @@ def measure_main(args):
         "边界年只报下载/解析/覆盖计数，单列不混入主读数。",
         "**修复轮二（registry 1.5.17，修 1–7）**：**判据零改动**（四项定义 / 停机线 / 匹配口径 / 覆盖率分母 / 网络版本规则 / "
         "边界年处理一律不改）；只修**抽取层触发条件**与**归因判据/文案**，**无人工补录、未放宽匹配、未调分母、未剔失败件**；"
-        "修复前基线（上一轮 H1/M1/M2 后的读数）逐值见 `sensitivity_pre_round2`（更早的 v1 基线见 `sensitivity_pre_fix`）；"
+        "修复前基线（上一轮 名称锚定修复轮 后的读数）逐值见 `sensitivity_pre_round2`（更早的 v1 基线见 `sensitivity_pre_fix`）；"
         "修复件清单与新增同行对见 `repair_round2_evidence`。",
         "**修 1 修复件（曾漏抽、已修）**：① **300748**（上市 2018，OCR 件）：原抽 0 名（正文「同行业可比公司中科三环、宁波韵升、"
         "正海磁材、英洛华、京磁股份和大地能」无「包括/有：」触发词、末位成员含「和」→ 现由 R4 复合触发 + 和字切分 + R4_tbl_head 抽出）；"
@@ -2628,7 +2629,7 @@ def measure_main(args):
             pre = {
                 "source": rel(ppre), "run_at_before_fix": p["run_at"],
                 "note": "修复前（registry 1.5.13/1.5.14 全量第二轮）读数；口径与判据逐字未改，"
-                        "差异全部来自解析层修复（H1/M1/M2，registry 1.5.15 登记）。"
+                        "差异全部来自解析层修复（名称锚定修复轮，registry 1.5.15 登记）。"
                         "修复前分类为**三分类**（碎片/名称漂移/非 A 股实体）——本轮新增第 4 类「抽取噪声」"
                         "（作用位置 = 原「非 A 股实体」桶内细分，additive），故修复前「非 A 股实体」"
                         "1,584 个内含两类（形态为公司名 1,470 / 通用词·科目·句片段 114）。",
@@ -2653,7 +2654,7 @@ def measure_main(args):
         except Exception as e:      # 只读对照，失败不阻断本轮（报告注明缺失）
             pre = {"source": rel(ppre), "error": f"{type(e).__name__}: {str(e)[:120]}"}
 
-    # ---- 修复轮二：上一轮（H1/M1/M2）基线 + 修复件清单/新增同行对（只读对照，不改本轮读数）----
+    # ---- 修复轮二：上一轮（名称锚定修复轮）基线 + 修复件清单/新增同行对（只读对照，不改本轮读数）----
     pre2, repair2 = None, None
     if args.pre_fix_report2 and os.path.exists(args.pre_fix_report2):
         try:
@@ -2664,7 +2665,7 @@ def measure_main(args):
             qres_key = qres[0] if qres else "非 A 股实体"
             pre2 = {
                 "source": rel(args.pre_fix_report2), "run_at_before_fix2": q["run_at"],
-                "note": "上一轮（H1/M1/M2 解析层修复轮，registry 1.5.15/1.5.16）修复后读数 = **本轮修复前基线**；"
+                "note": "上一轮（名称锚定修复轮 解析层修复轮，registry 1.5.15/1.5.16）修复后读数 = **本轮修复前基线**；"
                         "本轮（修复轮二，registry 1.5.17）差异全部来自修 1（抽取层触发条件）/ 修 2（命名）/"
                         "修 3（抽取噪声判据）——判据（四项定义/停机线/匹配口径/分母/网络版本规则）逐字未改。",
                 "parse_success_rate": q["rates"]["overall"]["parse_success_rate"],
@@ -2730,13 +2731,13 @@ def measure_main(args):
         "report": "第二梯队 #9 路线 B 全量（2015–2023）招股书「同行业可比公司」自报锚（锚 1 / plan §8 B″11-7）",
         "run_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
         "parameter": "prospectus_peer_anchor_pilot（registry 1.5.17 全量口径 + 修复轮二（修 1–7）；"
-                     "其中 H1/M1/M2 解析层修复轮 = registry 1.5.15/1.5.16；四项定义 / 停机线 / 匹配口径逐字沿用"
+                     "其中 名称锚定修复轮 解析层修复轮 = registry 1.5.15/1.5.16；四项定义 / 停机线 / 匹配口径逐字沿用"
                      "试点登记值，**判据零改动**）",
         "fix_round": {
             "registry_version": "1.5.15",
             "change": "第二梯队 #9 全量「先修解析」修复轮：H1（年报头部名称注册表「简称+全称同头拼接」错切 + 标签边界切分 + "
-                      "cache_version 3→4）/ M1（R2 标签集补证券代码·公司代码 + R2 左边界剥离 + R5 单字噪声判据 → 整名判据）/ "
-                      "M2（发行人自名过滤容错：自名集合含代码锚定历史简称 + 同核/编辑距离·OCR 近似/近全包含 + universe 名录守卫）",
+                      "cache_version 3→4）/ pricing_gate（R2 标签集补证券代码·公司代码 + R2 左边界剥离 + R5 单字噪声判据 → 整名判据）/ "
+                      "发行人自名过滤容错：自名集合含代码锚定历史简称 + 同核/编辑距离·OCR 近似/近全包含 + universe 名录守卫）",
             "judgment_unchanged": "四项定义 / 停机线（0.80 / 0.20 / 0.50 逐字不变）/ 匹配口径（精确 + 仅公司后缀归一化 + "
                                   "代码锚定，无模糊匹配）/ 覆盖率分母（cohort 2,656）/ 网络版本规则（min(Y+2,2023) + fallback v1_2022）/ "
                                   "边界年处理；**无人工补录、未放宽匹配、未调分母、未剔除失败件**",
@@ -2778,7 +2779,7 @@ def measure_main(args):
                                          "键数下降来自错切键与头部标签残片键移除，**非**人工删除）",
             "channels": "pymupdf → pdfminer+SimSun GID（CID 编码损坏件，确定性还原）→ OCR 回退"
                         "（tesseract 5.3.4 chi_sim，--psm 3、200 DPI）；不足判据 = 公司<20 或 字符数<max(5000,50×页数)",
-            "parse_layer_fix": "registry 1.5.15「先修解析」修复轮（H1 名称注册表切分 + M1 抽取规则 + M2 自名容错）；"
+            "parse_layer_fix": "registry 1.5.15「先修解析」修复轮（H1 名称注册表切分 + pricing_gate 抽取规则 + 自名容错）；"
                                "locate/通道/匹配口径/判据与修复前逐字一致",
         },
         "rates": {"overall": overall, "thresholds": th, "stop_triggered": bool(stop),
@@ -2830,7 +2831,7 @@ def measure_main(args):
     }
 
     out = args.out or os.path.join(ROOT, "reports", "data_gates", "G0",
-                                   "s3_network_prospectus_anchor.json")
+                                   "network_prospectus_anchor.json")
     out_md = args.out_md or out.replace(".json", ".md")
     detail_csv = args.detail_csv or out.replace(".json", "_detail.csv")
     os.makedirs(os.path.dirname(out), exist_ok=True)
@@ -2919,11 +2920,11 @@ from pathlib import Path
 # 连接词/句式子串：出现即说明该 token 是句子片段而非公司名（公司名不含这些连接成分）
 
 
-# ---- 修 5（2026-10-14 修复轮，registry 1.5.15「先登记后跑」）：H1/M1/M2 三处解析缺陷的规则化修复 ----
+# ---- 修 5（2026-10-14 修复轮，registry 1.5.15「先登记后跑」）：名称锚定修复轮 三处解析缺陷的规则化修复 ----
 # H1-(b) 标签边界切分：年报头部副标题行无空白，「简称」捕获串常与紧随的代码类标签粘连
 #（如「公司代码：603501公司简称：韦尔股份转债代码：113616转债简称：韦尔转债…」）→ 按最早标签边界切分。
-#（与 §P5 PLACE_PREFIX 同源；PLACE_PREFIX 收录 2 字形态（黑龙/内蒙），此处按登记原文补 3 字前缀
-#（黑龙江/内蒙古）——登记原文：「区域/『中国』前缀（与 §P5 PLACE_PREFIX 同源，**含黑龙江/内蒙古等 3 字前缀**）」）
+#（与 §核验 PLACE_PREFIX 同源；PLACE_PREFIX 收录 2 字形态（黑龙/内蒙），此处按登记原文补 3 字前缀
+#（黑龙江/内蒙古）——登记原文：「区域/『中国』前缀（与 §核验 PLACE_PREFIX 同源，**含黑龙江/内蒙古等 3 字前缀**）」）
 # 修 5（registry 1.5.15）④：归因口径第 4 类「抽取噪声」判据 = 既有通用词/科目/句片段词表
 #（与第一轮 `failure_diagnostics.GEN_SUB` 同表；此处提为模块级单一真源）。
 # 修 3（registry 1.5.17）：GEN_SUB 判据 = **整名 ≈ 通用词**（+ 公司后缀豁免）。
@@ -2942,7 +2943,7 @@ from pathlib import Path
 # ---------------------------------------------------------------- dictionaries
 
 
-# ---------------------------------------------------------------- P2 locate
+# ---------------------------------------------------------------- 第二段：定位
 
 
 # ------------------------------------------------- OCR 回退通道（全量轮新增；registry 1.5.13 预登记）
@@ -2952,13 +2953,13 @@ from pathlib import Path
                            # 见 ocr_tesseract_chunk.sh 的 OMP_THREAD_LIMIT=2）
 
 
-# ---------------------------------------------------------------- P3 extract
+# ---------------------------------------------------------------- 第三段：抽取
 
 
-# ---------------------------------------------------------------- P4 map
+# ---------------------------------------------------------------- 第四段：映射
 
 
-# ---------------------------------------------------------------- P5 classify
+# ---------------------------------------------------------------- 核验 classify
 # 修 2（2026-10-13 修正轮）：unmapped 名三分类 = 抽取碎片 / 名称漂移 / 非 A 股实体。
 # 碎片判据（规则 + 复核清单）：① 正文中总以「前接汉字」出现（截断残片）；② 起头 公司/本公司/发行人；
 # ③ 含体裁词（招股书/说明书）；④ 含科目/句片段词（信息来源/销售数量/竞争力…）。
@@ -2994,14 +2995,14 @@ def main():
     ap.add_argument("--measure", action="store_true",
                     help="全量测量模式（汇总轮）：抽取+映射+四项率+逐年/池化 lift+边界年单列+最终锚报告")
     ap.add_argument("--ingest-detail", default=os.path.join(ROOT, "reports", "data_gates", "G0",
-                                                            "s3_network_prospectus_full_ingest_detail.csv"),
+                                                            "network_prospectus_full_ingest_detail.csv"),
                     help="阶段报告逐份明细（--measure 模式下作 channel/status 逐份对照）")
     ap.add_argument("--pre-fix-report", default=os.path.join(ROOT, "reports", "data_gates", "G0",
-                                                             "s3_network_prospectus_anchor_v1.json"),
+                                                             "network_prospectus_anchor_v1.json"),
                     help="修复前锚报告（只读；--measure 模式下嵌入 sensitivity_pre_fix 前置/后对照）")
     ap.add_argument("--pre-fix-report2", default=os.path.join(ROOT, "reports", "data_gates", "G0",
-                                                              "s3_network_prospectus_anchor_v2_pre_fix.json"),
-                    help="上一轮（H1/M1/M2 修复轮）锚报告（只读；修复轮二的前置基线 sensitivity_pre_round2）")
+                                                              "network_prospectus_anchor_v2_pre_fix.json"),
+                    help="上一轮（名称锚定修复轮 修复轮）锚报告（只读；修复轮二的前置基线 sensitivity_pre_round2）")
     args = ap.parse_args()
 
     if args.measure:
@@ -3015,7 +3016,7 @@ def main():
     datadir = os.path.join(args.base, str(year))
     pdfd, txtd = os.path.join(datadir, "pdf"), os.path.join(datadir, "txt")
     out = args.out or os.path.join(ROOT, "reports", "data_gates", "G0",
-                                   f"s3_network_prospectus_pilot_{year}.json")
+                                   f"network_prospectus_pilot_{year}.json")
     out_md = args.out_md or out.replace(".json", ".md")
     detail_csv = args.detail_csv or os.path.join(ROOT, "artifacts", "tmp", "tier2_prosp",
                                                  f"pilot_{year}_detail.csv")
@@ -3027,7 +3028,7 @@ def main():
     for nm, cs in short_hist.items():
         short.setdefault(nm, set()).update(cs)
     uni_keys = load_universe_name_keys()
-    build_self_index(full, short_hist)     # 修 5（M2-i）：自名集合含代码锚定历史简称（试点路径同链）
+    build_self_index(full, short_hist)     # 修 5：自名集合含代码锚定历史简称（试点路径同链）
     print(f"[P-2] 名称字典：firm universe {len(firm)}；简称键 {len(short)}（含历史简称 {len(short_hist)}）；"
           f"全称键 {len(full)}（{full_info.get('n_codes')} 只覆盖）", flush=True)
 
@@ -3087,7 +3088,7 @@ def main():
                 print(f"[P-2] 进度 {i + 1}/{len(cohort)}（located={n_located}）", flush=True)
             continue
         n_located += 1
-        self_exact, self_core = self_names_for(firm, code)   # 修 5（M2-i）：含代码锚定历史简称
+        self_exact, self_core = self_names_for(firm, code)   # 修 5：含代码锚定历史简称
         REJECT_LOG.clear()
         REPAIR_LOG.clear()
         cands = extract_candidates(text, spans, self_exact, self_core, uni_keys)
@@ -3122,7 +3123,7 @@ def main():
                        u["base"], u["raw"], text, uni_keys, self_exact)[0],
                        evidence=classify_unmapped(u["base"], u["raw"], text, uni_keys, self_exact)[1])
                        for u in unmapped])
-        # P5 lift 分量（节点与边均为 firm_id 口径）
+        # 核验 lift 分量（节点与边均为 firm_id 口径）
         fid = firm[code]["firm_id"]
         if fid in nodes:
             pset = sorted({firm[j]["firm_id"] for j in {v["code6"] for v in mapped.values()}} - {fid})
@@ -3246,20 +3247,20 @@ def main():
     parse_iterations = [
         {"round": "v1 初始抽取规则", "mapping_failure_rate": 0.4681, "n_unmapped": 293,
          "n_unique": 626, "coverage_rate": 0.6762, "lift": 26.0008,
-         "log": "artifacts/tmp/tier2_prosp/p2_p5_analysis.log",
+         "log": "artifacts/tmp/tier2_prosp/prospectus_analysis.log",
          "note": "窗口 hit−150..+1500；无形态过滤（连接词/数字/科目词未过滤）；R5 表格行无同行语境要求"},
         {"round": "v2 收窄窗口 + R1 近邻 + 兄弟前缀", "mapping_failure_rate": 0.3653, "n_unmapped": 183,
          "n_unique": 501, "coverage_rate": 0.6667, "lift": 26.1124,
-         "log": "artifacts/tmp/tier2_prosp/p2_p5_analysis_v2.log",
+         "log": "artifacts/tmp/tier2_prosp/prospectus_analysis_v2.log",
          "note": "窗口 hit−100..+500；R1 只取命中近邻（+250 字内）；R5 增加同行语境词与兄弟前缀过滤"},
         {"round": "v3 形态过滤生效 + 弱证据规则加严", "mapping_failure_rate": 0.2382, "n_unmapped": 81,
          "n_unique": 340, "coverage_rate": 0.5905, "lift": 25.3663,
-         "log": "artifacts/tmp/tier2_prosp/p2_p5_analysis_v3.log",
+         "log": "artifacts/tmp/tier2_prosp/prospectus_analysis_v3.log",
          "note": "接上 `_raw_ok` 形态过滤（连接词/数字/括号/句片段）；R4 列举必须紧跟同行语境词；R5 语境 60 字 + "
                  "科目/资产/费用词表加严"},
         {"round": "v4 名称注册表补历史简称（代码锚定）", "mapping_failure_rate": 0.1869,
          "n_unmapped": 63, "n_unique": 337, "coverage_rate": 0.5905, "lift": 25.7681,
-         "log": "artifacts/tmp/tier2_prosp/p2_p5_analysis_v4.log",
+         "log": "artifacts/tmp/tier2_prosp/prospectus_analysis_v4.log",
          "note": "年报头部「股票简称+股票代码」配对抽取历史简称（代码锚定、非模糊匹配），弥合 2018 名称与"
                  "2026 项目名单的名称漂移（v4 为**交付口径**，其后经独立复核 CONFIRMED_WITH_ISSUES）"},
         {"round": "v5 修正轮（本轮）：R3 名称形态约束 + 名称注册表标签/顺序/更名/释义 + CID 备选通道",

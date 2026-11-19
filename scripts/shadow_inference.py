@@ -2,9 +2,9 @@
 
 范围（`artifacts/phase3/3.0_plan.md` §2.4；审计 N-1 / N-8 / N-11）
 ------------------------------------------------------------------
-**只读 headline**（M1 样本 parquet、headline 边表/聚类/`{y}_pc.csv`、`source_month_argmax_panel.csv`、
+**只读 headline**（pricing_gate 样本 parquet、headline 边表/聚类/`{y}_pc.csv`、`source_month_argmax_panel.csv`、
 `monthly_returns_clean.csv`、`monthly_pricing_panel_ma_teacher.csv`、registry 参数），
-**只写** `artifacts/phase3/3.4_*`；不重跑 headline M1/网络/PC、不写 G0、不改 configs/reports/scripts。
+**只写** `artifacts/phase3/3.4_*`；不重跑 headline pricing_gate/网络/PC、不写 G0、不改 configs/reports/scripts。
 
 三项子任务
 ----------
@@ -76,8 +76,8 @@ from datetime import datetime, timezone
 import numpy as np
 import pandas as pd
 from pricing_lib import (
-    assert_m1_inputs, fm_regression, newey_west, param_value, require, file_size,
-    two_sided_p, winsor_bounds, _ols,
+    assert_pricing_inputs, fm_regression, newey_west, param_value, require, file_size,
+    shadow_sample_path, two_sided_p, winsor_bounds, _ols,
 )
 from peermax_panel_build import (
     ARGMAX, EXCLUDE_QUAL, RETURNS, load_versions, select_version,
@@ -90,11 +90,11 @@ ART = ROOT / 'artifacts/phase3'
 
 HEADLINE_NET = ROOT / 'data/processed/network_ma_teacher'
 
-SAMPLE_PARQUET = ROOT / 'data/processed/m1_common_sample_ma_teacher_v2.parquet'
+SAMPLE_PARQUET = shadow_sample_path('ma_teacher')
 
 PRICING_PANEL = ROOT / 'data/processed/monthly_pricing_panel_ma_teacher.csv'
 
-ASOF_MAP = ROOT / 'data/processed/phase3_shadow/sw2_asof_map_p3shadow.parquet'   # 3.1 交接（只读）
+ASOF_MAP = ROOT / 'data/processed/phase3_shadow/sw2_asof_map_shadow.parquet'   # as-of 交接（只读）
 
 SW2_LATEST = ROOT / 'data/processed/sw2_industry_latest.csv'
 
@@ -124,7 +124,7 @@ OUTPUT_SHA = ART / '3.4_output_bytes.json'
 
 RUN_LOG = ART / '3.4_run.log'
 
-SHADOW_TAG = 'p3shadow_v1_inference'
+SHADOW_TAG = 'shadow_inference_v1'
 
 YEARS = list(range(2014, 2023))          # 文本年（网络年 y+1）
 
@@ -174,7 +174,7 @@ PC_BASE_REG = {'beta_pct': -0.5068, 't_nw': -1.4365, 'label': '登记基准 EW l
 
 PC_T5B_REG = {'beta_pct': +0.2152, 't_nw': +0.5815, 'label': 'T5/T5B 团层等权 FM 单变量'}
 
-OLD_PLACEBO = {'beta': -0.061998, 't_nw': -2.1395, 'model': 'M1_RANDOM_DENSITY_NETWORK_v1（单次，只保 out-degree）'}
+OLD_PLACEBO = {'beta': -0.061998, 't_nw': -2.1395, 'model': 'PRICING_RANDOM_DENSITY_NETWORK_v1（单次，只保 out-degree）'}
 
 MOVED_SHARE_GATE = 0.10                  # 3.0_plan §2.4 停机条件：中位 moved-edge share < 10% → 停机
 
@@ -182,9 +182,9 @@ PCT_POINT_TOL = 1e-10                    # (b)/(c) 点估计 vs (a) 容差
 
 NW_LAG = int(param_value('nw_lag'))      # registry headline_value = 6
 
-M1_REG = param_value('m1_sample_and_spec_registry')
+PRICING_REG = param_value('sample_and_spec_registry')
 
-MIN_N = M1_REG['min_focal_count_per_month']
+MIN_N = PRICING_REG['min_focal_count_per_month']
 
 WINSOR = winsor_bounds()
 
@@ -270,12 +270,12 @@ def sha_ledger_headline_net() -> dict:
     return out
 
 def anchors_snapshot(tag: str) -> dict:
-    ledger = assert_m1_inputs()
+    ledger = assert_pricing_inputs()
     snap = {
         'tag': tag, 'run_at': datetime.now(timezone.utc).isoformat(),
         'script': 'scripts/shadow_inference.py',
-        'm1_inputs_9': {r['input']: r['rows'] for r in ledger},
-        'm1_inputs_ledger': ledger,
+        'pricing_inputs_9': {r['input']: r['rows'] for r in ledger},
+        'pricing_inputs_ledger': ledger,
         'headline_network_bytes': sha_ledger_headline_net(),
     }
     snap['headline_network_n_files'] = len(snap['headline_network_bytes'])
@@ -283,13 +283,13 @@ def anchors_snapshot(tag: str) -> dict:
 
 def compare_anchors(pre: dict, post: dict) -> dict:
     diffs = []
-    for sect in ('m1_inputs_9', 'headline_network_bytes'):
+    for sect in ('pricing_inputs_9', 'headline_network_bytes'):
         a, b = pre.get(sect) or {}, post.get(sect) or {}
         for k in sorted(set(a) | set(b)):
             if a.get(k) != b.get(k):
                 diffs.append({'section': sect, 'key': k, 'pre': a.get(k), 'post': b.get(k)})
     return {'status': 'MATCH' if not diffs else 'CHANGED', 'n_diff': len(diffs), 'diffs': diffs,
-            'n_m1_inputs': len(pre.get('m1_inputs_9') or {}),
+            'n_pricing_inputs': len(pre.get('pricing_inputs_9') or {}),
             'n_headline_files': len(pre.get('headline_network_bytes') or {})}
 
 def fm_cluster_scores(df: pd.DataFrame, ycol: str, xcols, weight_col=None,
@@ -421,13 +421,13 @@ def eff_opponents_from_edges(e: pd.DataFrame, nodes: list) -> tuple:
     require(int(fi.min()) >= 0 if len(fi) else True, 'eff_opponents：边表含未知 focal')
     w = e['weight'].to_numpy(dtype=float)
     n = len(nodes)
-    s2 = np.bincount(fi, weights=w * w, minlength=n)
+    weight_sq_sum = np.bincount(fi, weights=w * w, minlength=n)
     cnt = np.bincount(fi, minlength=n)
     wsum = np.bincount(fi, weights=w, minlength=n)
     top1 = np.zeros(n)
     np.maximum.at(top1, fi, w)
     sel = cnt > 0
-    eff = pd.Series(1.0 / s2[sel], index=np.array(nodes, dtype=object)[sel])
+    eff = pd.Series(1.0 / weight_sq_sum[sel], index=np.array(nodes, dtype=object)[sel])
     return eff, top1[sel], cnt[sel], wsum[sel]
 
 def eff_opponents(inp: Inputs) -> tuple:
@@ -669,11 +669,11 @@ def pc_readings(inp: Inputs) -> dict:
     pc = pc_all[pc_all['pc'].notna()][['focal_id', 'text_year', 'pc', 'hhi', 'n_competitors',
                                       'revenue_coverage']].copy()
     pc['text_year'] = pc['text_year'].astype(int)
-    d = inp.sample[['focal_id', 'month', 'ty', 'cid', 'R_next', 'm1_in_fm_sample',
+    d = inp.sample[['focal_id', 'month', 'ty', 'cid', 'R_next', 'pricing_in_fm_sample',
                     'market_equity'] + CONTROLS].copy()
     d['ty'] = d['ty'].astype('Int64')
     m = d.merge(pc, left_on=['focal_id', 'ty'], right_on=['focal_id', 'text_year'], how='left')
-    samp = m[m['m1_in_fm_sample'].astype(bool) & m['R_next'].notna() & m['pc'].notna()].copy()
+    samp = m[m['pricing_in_fm_sample'].astype(bool) & m['R_next'].notna() & m['pc'].notna()].copy()
     samp['PC'] = samp['pc'].astype(float)      # 原始单位（PC ∈ [−1,0]）；报告时 ×100 转 %/单位 PC
     inf = {}
     per = fm_cluster_scores(samp, 'R_next', ['PC'], cluster_col='cid')
@@ -733,8 +733,8 @@ def pc_block_permutation(inp: Inputs, reps: int, seed: int) -> dict:
                         usecols=['focal_id', 'text_year', 'pc'])
         d = d[d['pc'].notna()]
         pc[y] = dict(zip(d['focal_id'], d['pc'].astype(float)))
-    d = inp.sample[['focal_id', 'month', 'ty', 'cid', 'R_next', 'm1_in_fm_sample']].copy()
-    d = d[d['m1_in_fm_sample'].astype(bool) & d['R_next'].notna() & d['ty'].isin(PC_YEARS)]
+    d = inp.sample[['focal_id', 'month', 'ty', 'cid', 'R_next', 'pricing_in_fm_sample']].copy()
+    d = d[d['pricing_in_fm_sample'].astype(bool) & d['R_next'].notna() & d['ty'].isin(PC_YEARS)]
     d['ty'] = d['ty'].astype(int)
     firms = d['focal_id'].to_numpy()
     tyv = d['ty'].to_numpy()
@@ -1121,7 +1121,7 @@ def write_long_tables(counts: dict) -> None:
             note=f"design={bp.get('sample_design')}；size-adjusted 真网络分位={bp.get('true_percentile')}%"
                  f"（未调整 {bp.get('true_percentile_unadjusted')}%；corr(n,β)="
                  f"{(bp.get('size_adjusted') or {}).get('corr_n_beta')}）；"
-                 f"null p5/p50/p95={bp['null_quantiles']['p5']}/{bp['null_quantiles']['p50']}/{bp['null_quantiles']['p95']}")
+                 f"null p5/p50/p95={bp['null_quantiles']['p05']}/{bp['null_quantiles']['p50']}/{bp['null_quantiles']['p95']}")
     n11 = counts.get('n11') or {}
     for r in n11.get('rows') or []:
         add(r['block'], item=r['item'], value=r['value'], reference=r.get('reference'),
@@ -1139,8 +1139,8 @@ def write_long_tables(counts: dict) -> None:
     if n8:
         add('n8_null', item='true_beta_EW_percentile', value=n8.get('beta_EW_true_percentile'),
             p=n8.get('empirical_p_two_sided_EW'), n_rows=n8.get('reps_done'),
-            note=f"null p1/p5/p50/p95/p99="
-                 f"{n8['null_beta_EW']['quantiles']['p1']}/{n8['null_beta_EW']['quantiles']['p5']}/"
+            note=f"null p01/p05/p50/p95/p99="
+                 f"{n8['null_beta_EW']['quantiles']['p01']}/{n8['null_beta_EW']['quantiles']['p05']}/"
                  f"{n8['null_beta_EW']['quantiles']['p50']}/{n8['null_beta_EW']['quantiles']['p95']}/"
                  f"{n8['null_beta_EW']['quantiles']['p99']}；"
                  f"moved 中位={n8['moved_edge_share']['median']}；"
@@ -1205,11 +1205,11 @@ class Inputs:
         self.sample = pd.read_parquet(SAMPLE_PARQUET)
         require(len(self.sample) == SAMPLE_ROWS, f'样本行数 {len(self.sample)} != {SAMPLE_ROWS}')
         req_cols = ['focal_id', 'month', 'network_version', 'PeerMAXraw', 'OwnMAXraw', 'PeerReturn',
-                    'R_next', 'm1_in_fm_sample', 'n_sources'] + CONTROLS
+                    'R_next', 'pricing_in_fm_sample', 'n_sources'] + CONTROLS
         miss = [c for c in req_cols if c not in self.sample.columns]
         require(not miss, f'样本缺列 {miss}')
         self.sample['ty'] = pd.to_numeric(self.sample['network_version'], errors='coerce')
-        self.fm_mask = self.sample['m1_in_fm_sample'].astype(bool).to_numpy()
+        self.fm_mask = self.sample['pricing_in_fm_sample'].astype(bool).to_numpy()
         require(int(self.fm_mask.sum()) == FM_ROWS, f'FM 行数 {int(self.fm_mask.sum())} != {FM_ROWS}')
         # month → 文本年（authoritative：available_at 规则；与面板 network_version 逐月对齐核验）
         months = sorted(self.sample.loc[self.sample['ty'].notna(), 'month'].unique())
@@ -1226,7 +1226,7 @@ class Inputs:
             c = pd.read_csv(HEADLINE_NET / 'clusters' / f'{y}_clusters.csv', dtype={'firm_id': str})
             self.cluster[y] = dict(zip(c['firm_id'], c['cluster_id']))
             sizes = c.groupby('cluster_id').size()
-            self.cluster_size[y] = {int(k): int(v) for k, v in file_size()}
+            self.cluster_size[y] = {int(k): int(v) for k, v in sizes.items()}
         # 节点宇宙 + 边结构
         nodes = set(self.sample['focal_id'])
         self.edges = {}
@@ -1239,7 +1239,7 @@ class Inputs:
         self.nodes = sorted(nodes)
         self.nidx = {f: i for i, f in enumerate(self.nodes)}
         self.n = len(self.nodes)
-        # 价值矩阵（MAXraw / R）与资格掩码（与 s4_step2 面板口径逐项一致）
+        # 价值矩阵（MAXraw / R）与资格掩码（与面板构建口径逐项一致）
         maxraw, qual = {}, {}
         with open(ARGMAX, encoding='utf-8', newline='') as fh:
             for r in csv.DictReader(fh):
@@ -1296,7 +1296,7 @@ class Inputs:
                 key = pd.Timestamp(f'{y + 1}-04-30')
                 sub = m[m['effective_from'] <= key].drop_duplicates('firm_id', keep='last')
                 asof[y] = dict(zip(sub['firm_id'], sub['l2_code']))
-            src = 'phase3_shadow/sw2_asof_map_p3shadow.parquet（3.1 交接，只读）'
+            src = 'phase3_shadow/sw2_asof_map_shadow.parquet（as-of 交接，只读）'
         out = {'asof': {}, 'latest': {}, 'source': src,
                'coverage': {}}
         for y in YEARS:

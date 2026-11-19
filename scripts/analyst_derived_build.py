@@ -1,6 +1,6 @@
-"""S3A Step 9：firm-month 派生变量表（v2，2026-08-12）。
+"""analyst-network Step 9：firm-month 派生变量表（v2，2026-08-12）。
 
-从冻结口径的覆盖表/边表生成 methodology §3.2A 第 144 行与 execution_plan S3A Step 6 定义的派生变量：
+从冻结口径的覆盖表/边表生成 methodology §3.2A 第 144 行与 execution_plan analyst-network Step 6 定义的派生变量：
   AnalystCoverage       : 覆盖该公司的分析师数
   BrokerCoverage        : 覆盖该公司的去重券商数（与网络同口径：FY1/FY2 + 12 月窗口）
   NetworkDegree         : 网络度数（连接 peer 数）
@@ -8,14 +8,14 @@
   EffectivePeerCount    : 1 / sum_j w_ij^2
   Top1Weight            : max_j w_ij
 
-v2 变更（2026-08-12，对抗检查 R2-3/P2-1 修复）:
+v2 变更（2026-08-12，对抗检查修复）:
   - network_version 列由 cutoff 日期改为真实版本串（与 step5 VERSION 同源）；
   - BrokerCoverage 由"全历史 records 的 broker 明细"改为与覆盖表完全同口径：
     行级 clean 数据 -> ok/格式校验 -> FY1/FY2 行级过滤 -> 当 cutoff 的 12 个月窗口
     -> 非空券商码去重计数。修复旧版两处虚高来源（换券商分析师的旧券商计入当月、
     空串 broker_code 被 nunique 当作一个券商）。
 
-输入: firm_analyst_coverage.csv（v2 冻结口径）、s3a_step3_clean.csv（broker 明细）、
+输入: firm_analyst_coverage.csv（v2 冻结口径）、analyst_step3_clean.csv（broker 明细）、
       edges/edges_<version>_<cutoff>.csv
 输出: data/processed/analyst/firm_analyst_derived.csv（firm_id, month, 派生变量）
       data/processed/analyst/step9_derived.json（月度覆盖诊断）
@@ -26,7 +26,7 @@ import pandas as pd
 import numpy as np
 
 COV = 'data/processed/analyst/firm_analyst_coverage.csv'
-CLEAN = 'data/processed/analyst/s3a_step3_clean.csv'
+CLEAN = 'data/processed/analyst/analyst_step3_clean.csv'
 EDGES = Path('data/processed/analyst/edges')
 OUTD = Path('data/processed/analyst')
 NET_VER = 'coverage_win12_fy12_v3'  # 与 step5/step67 同源

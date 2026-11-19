@@ -1,28 +1,28 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Phase 3B / N-6（B2）：四列并报统一到 2018-05..2023-12 共同窗口重跑 S1。
+"""Phase 3B / N-6（B2）：四列并报统一到 2018-05..2023-12 共同窗口重跑 inventory。
 
 任务（N-6 处理项 ①）：
   - 四列 v2 样本（ma_teacher / mb_teacher / ma / mb）统一过滤事件月
-    2018-05..2023-12，重跑 S1（登记全控制规格），报 n / T / PeerMAX / OwnMAX /
+    2018-05..2023-12，重跑 inventory（登记全控制规格），报 n / T / PeerMAX / OwnMAX /
     PeerReturn 的 beta 与 NW t；同时报各列原窗口读数作对照。
-  - 只写 `artifacts/phase3b/3b_n6_*`；不重跑 M1 / PC / 网络；不改
+  - 只写 `artifacts/phase3b/3b_n6_*`；不重跑 pricing_gate / PC / 网络；不改
     headline / 系数 / gate / configs / G0 / reports。
 
 口径（只读既有实现与登记参数）：
-  - S1 = PeerMAXraw + OwnMAXraw + PeerReturn + 8 controls
+  - inventory = PeerMAXraw + OwnMAXraw + PeerReturn + 8 controls
     （size / bm / mom / rev / turnover / illiq / AnalystCoverage / NetworkDegree），
-    与 `scripts/shadow_network_pricing.py` 的 S1、`m1_main_v1` 主规格同。
-  - FM 样本 = 样本文件内 `m1_in_fm_sample == True` 的行（与 headline 主表一致）。
+    与 `scripts/shadow_network_pricing.py` 的 inventory、`pricing_main_v1` 主规格同。
+  - FM 样本 = 样本文件内 `pricing_in_fm_sample == True` 的行（与 headline 主表一致）。
   - 逐月横截面 OLS（EW）/ WLS（VW，weight=market_equity）-> 系数序列 ->
     均值 + Newey-West(lag=6, Bartlett)。
-  - min_n = registry `m1_sample_and_spec_registry.min_focal_count_per_month`（当前 100）。
+  - min_n = registry `sample_and_spec_registry.min_focal_count_per_month`（当前 100）。
   - 共同窗口 = 2018-05..2023-12（含端点，事件月口径）。
 
 验证：
-  - 原窗口读数与 `reports/data_gates/G0/s3_m1_pricing_table_v2.json` 的主表逐值对账
+  - 原窗口读数与 `reports/data_gates/G0/pricing_table_v2.json` 的主表逐值对账
     （beta / NW t / N / T），不一致即退出，不写任何产物。
-  - 9 个 M1 主输入 + 4 个样本 parquet 的 bytes 在计算前后各记一次，必须不变。
+  - 9 个 pricing_gate 主输入 + 4 个样本 parquet 的 bytes 在计算前后各记一次，必须不变。
 
 用法：
   python scripts/shadow_common_window.py
@@ -41,7 +41,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 
 from pricing_lib import (  # noqa: E402
-    SAMPLE_WINDOW_END, SAMPLE_WINDOW_START, assert_m1_contract, assert_m1_inputs,
+    SAMPLE_WINDOW_END, SAMPLE_WINDOW_START, assert_pricing_contract, assert_pricing_inputs,
     fm_regression, param_value, require, sample_path, file_size,
 )
 
@@ -49,8 +49,8 @@ ART = ROOT / 'artifacts/phase3b'
 OUT_CSV = ART / '3b_n6_common_window.csv'
 OUT_JSON = ART / '3b_n6_counts.json'
 OUT_MD = ART / '3b_n6_execution.md'
-SAMPLE_REPORT = ROOT / 'reports/data_gates/G0/s3_m1_sample_report.json'
-G0_REFERENCE = ROOT / 'reports/data_gates/G0/s3_m1_pricing_table_v2.json'
+SAMPLE_REPORT = ROOT / 'reports/data_gates/G0/pricing_sample_report.json'
+G0_REFERENCE = ROOT / 'reports/data_gates/G0/pricing_table_v2.json'
 REGISTRY = ROOT / 'configs/parameter_registry.yaml'
 SCRIPT = Path(__file__).resolve()
 
@@ -64,13 +64,13 @@ ROLE = {
 VARS = ['PeerMAXraw', 'OwnMAXraw', 'PeerReturn']
 CONTROLS = ['size', 'bm', 'mom', 'rev', 'turnover', 'illiq',
             'AnalystCoverage', 'NetworkDegree']
-S1 = VARS + CONTROLS
+inventory = VARS + CONTROLS
 
 COMMON_START = '2018-05'
 COMMON_END = '2023-12'
-SAMPLE_VERSION = 'm1_s5_v2_2015_2023'
-MIN_N = int(param_value('m1_sample_and_spec_registry')['min_focal_count_per_month'])
-MIN_MONTHS = int(param_value('m1_sample_and_spec_registry')['min_effective_month_count'])
+SAMPLE_VERSION = 'pricing_sample_v2_2015_2023'
+MIN_N = int(param_value('sample_and_spec_registry')['min_focal_count_per_month'])
+MIN_MONTHS = int(param_value('sample_and_spec_registry')['min_effective_month_count'])
 NW_LAG = int(param_value('nw_lag'))
 WINSOR = param_value('winsorization_pct')
 
@@ -120,10 +120,10 @@ def _median(values):
 
 
 def _block(df: pd.DataFrame) -> dict:
-    """单列单窗口 S1：EW + VW。"""
+    """单列单窗口 inventory：EW + VW。"""
     out = {}
     for weight_tag, weight_col in (('ew', None), ('vw', 'market_equity')):
-        res, per_month = fm_regression(df, 'R_next', S1, weight_col=weight_col,
+        res, per_month = fm_regression(df, 'R_next', inventory, weight_col=weight_col,
                                        min_n=MIN_N, nw_lag=NW_LAG)
         used = [d for d in per_month if d.get('used')]
         ns = [int(d['n']) for d in used]
@@ -148,12 +148,12 @@ def _load_fm_sample(key: str, sample_report: dict) -> pd.DataFrame:
     path = sample_path(key, 'v2')
     df = pd.read_parquet(path)
     expected = int(sample_report['samples'][key]['rows_total'])
-    assert_m1_contract(df, expected_rows=expected, kind='sample',
-                       where=f'p3b_n6:{key}:v2')
-    require('m1_in_fm_sample' in df.columns,
-            f'{key}: 样本缺 m1_in_fm_sample 列，无法复刻 headline FM 样本')
-    require('R_next' in df.columns and set(S1).issubset(df.columns),
-            f'{key}: S1 变量不齐（需 R_next + {S1}）')
+    assert_pricing_contract(df, expected_rows=expected, kind='sample',
+                       where=f'shadow_common_window:{key}:v2')
+    require('pricing_in_fm_sample' in df.columns,
+            f'{key}: 样本缺 pricing_in_fm_sample 列，无法复刻 headline FM 样本')
+    require('R_next' in df.columns and set(inventory).issubset(df.columns),
+            f'{key}: inventory 变量不齐（需 R_next + {inventory}）')
     return df
 
 
@@ -182,8 +182,8 @@ def main():
         assert_output_path_guard(p)
     ART.mkdir(parents=True, exist_ok=True)
 
-    # ---------------- 计算前 sha 账本（9 个 M1 主输入 + 4 个样本 + 只读参照）
-    pre_m1 = assert_m1_inputs()
+    # ---------------- 计算前 sha 账本（9 个 pricing_gate 主输入 + 4 个样本 + 只读参照）
+    pre_inputs = assert_pricing_inputs()
     sample_paths = {k: sample_path(k, 'v2') for k in COLUMNS}
     pre_samples = {k: {'path': _rel(p), 'bytes': file_size(p)}
                    for k, p in sample_paths.items()}
@@ -202,7 +202,7 @@ def main():
     readings = {}
     for key in COLUMNS:
         df = _load_fm_sample(key, sample_report)
-        fm = df[df['m1_in_fm_sample'].astype(bool)].copy()
+        fm = df[df['pricing_in_fm_sample'].astype(bool)].copy()
         common = fm[(fm['month'] >= COMMON_START) & (fm['month'] <= COMMON_END)].copy()
         require(len(common) > 0, f'{key}: 共同窗口无样本')
         readings[key] = {
@@ -275,7 +275,7 @@ def main():
                     row[f'beta_{var}'] = c['beta']
                     row[f'se_{var}'] = c['se_nw']
                     row[f't_{var}'] = c['t_nw']
-                    row[f'p1_{var}'] = c['p_one_sided']
+                    row[f'p_one_sided_{var}'] = c['p_one_sided']
                     if base is not None:
                         bc = base['coefs'][var]
                         row[f'delta_beta_{var}'] = (
@@ -293,7 +293,7 @@ def main():
     table = pd.DataFrame(rows)
 
     # ---------------- 计算后 sha：必须与计算前一致
-    post_m1 = assert_m1_inputs()
+    post_inputs = assert_pricing_inputs()
     post_samples = {k: {'path': _rel(p), 'bytes': file_size(p)}
                     for k, p in sample_paths.items()}
     post_refs = {
@@ -305,22 +305,22 @@ def main():
                           'bytes': file_size(SAMPLE_REPORT)},
     }
     sha_ledger = {
-        'before': {'m1_inputs_9': pre_m1, 'samples': pre_samples, 'references': pre_refs},
-        'after': {'m1_inputs_9': post_m1, 'samples': post_samples, 'references': post_refs},
+        'before': {'pricing_inputs_9': pre_inputs, 'samples': pre_samples, 'references': pre_refs},
+        'after': {'pricing_inputs_9': post_inputs, 'samples': post_samples, 'references': post_refs},
         'unchanged': True,
         'checks': [],
     }
-    for name, pre in [(f'm1:{x["input"]}', x) for x in pre_m1] + \
+    for name, pre in [(f'input:{x["input"]}', x) for x in pre_inputs] + \
                      [(f'sample:{k}', v) for k, v in pre_samples.items()] + \
                      [(f'ref:{k}', v) for k, v in pre_refs.items()]:
-        post = ({f'm1:{x["input"]}': x for x in post_m1}.get(name)
+        post = ({f'input:{x["input"]}': x for x in post_inputs}.get(name)
                 or post_samples.get(name.split(':', 1)[1])
                 or post_refs.get(name.split(':', 1)[1]))
         ok = pre['bytes'] == post['bytes']
         sha_ledger['checks'].append({'item': name, 'pre': pre['bytes'],
                                      'post': post['bytes'], 'unchanged': bool(ok)})
         require(ok, f'{name}: 计算前后 sha 不一致（{pre["bytes"]} -> {post["bytes"]}）')
-    print(f'[3b_n6] 前后 sha 不变：9 M1 输入 + 4 样本 + 3 只读参照', flush=True)
+    print(f'[3b_n6] 前后 sha 不变：9 pricing_gate 输入 + 4 样本 + 3 只读参照', flush=True)
 
     # ---------------- 共同窗口结论素材
     summary = {}
@@ -360,20 +360,20 @@ def main():
         'report_id': '3b_n6_common_window',
         'phase': '3B',
         'audit_item': 'N-6',
-        'task': '四列并报统一到 2018-05..2023-12 共同窗口重跑 S1（原窗口同报）',
+        'task': '四列并报统一到 2018-05..2023-12 共同窗口重跑 inventory（原窗口同报）',
         'generated_at_utc': datetime.now(timezone.utc).isoformat(timespec='seconds'),
         'script': {'path': _rel(SCRIPT), 'bytes': file_size(SCRIPT)},
         'spec': {
-            'id': 'S1', 'label': '登记全控制（8 controls）',
+            'id': 'inventory', 'label': '登记全控制（8 controls）',
             'formula': 'R_{i,t+1} = alpha_t + beta*PeerMAXraw + theta*OwnMAXraw + '
                        'phi*PeerReturn + Gamma*X + eps',
-            'x': S1, 'controls': CONTROLS, 'y': 'R_next',
+            'x': inventory, 'controls': CONTROLS, 'y': 'R_next',
             'estimator': '逐月横截面 OLS(EW) / WLS(VW, weight=market_equity) -> '
                          '系数序列 -> 均值 + Newey-West(lag=6, Bartlett)',
             'min_n': MIN_N, 'min_effective_month_count': MIN_MONTHS,
             'nw_lag': NW_LAG, 'winsorization_pct': WINSOR,
             'sample_version': SAMPLE_VERSION,
-            'fm_sample': 'm1_in_fm_sample == True（与 headline 主表同）',
+            'fm_sample': 'pricing_in_fm_sample == True（与 headline 主表同）',
             'common_window': [COMMON_START, COMMON_END],
             'original_sample_window': [SAMPLE_WINDOW_START, SAMPLE_WINDOW_END],
         },
@@ -396,19 +396,19 @@ def main():
         return readings[key]['common_window'][weight]['coefs'][var][stat]
 
     L = []
-    L.append('# Phase 3B / N-6（B2）：四列共同窗口 S1 重跑\n')
+    L.append('# Phase 3B / N-6（B2）：四列共同窗口 inventory 重跑\n')
     L.append(f'- 生成时间（UTC）：{counts["generated_at_utc"]}')
     L.append(f'- 脚本：`{counts["script"]["path"]}`（bytes `{counts["script"]["bytes"]}`）')
-    L.append('- 样本版本：`m1_s5_v2_2015_2023`（四列 v2 parquet，只读）')
-    L.append('- 规格：S1 = PeerMAXraw + OwnMAXraw + PeerReturn + 8 controls'
+    L.append('- 样本版本：`pricing_sample_v2_2015_2023`（四列 v2 parquet，只读）')
+    L.append('- 规格：inventory = PeerMAXraw + OwnMAXraw + PeerReturn + 8 controls'
              '（size / bm / mom / rev / turnover / illiq / AnalystCoverage / NetworkDegree）')
     L.append(f'- 估计器：逐月 EW OLS / VW WLS（weight=market_equity）→ 系数序列 → 均值 + '
              f'Newey-West(lag={NW_LAG}, Bartlett)；min_n={MIN_N}；y=`R_next`；'
-             f'FM 样本=`m1_in_fm_sample == True`')
+             f'FM 样本=`pricing_in_fm_sample == True`')
     L.append(f'- 共同窗口：**{COMMON_START}..{COMMON_END}**（含端点；事件月口径，68 个月）')
     L.append('- 原窗口：ma_teacher / mb_teacher = 2015-05..2023-12（104 月）；'
              'ma / mb = 2018-05..2023-12（68 月）')
-    L.append('- 只读约束：不重跑 M1 / PC / 网络；未改 headline / 系数 / gate / configs / '
+    L.append('- 只读约束：不重跑 pricing_gate / PC / 网络；未改 headline / 系数 / gate / configs / '
              'G0 / reports；输出仅 `artifacts/phase3b/3b_n6_*`\n')
 
     L.append('## 1. 共同窗口读数（2018-05..2023-12）\n')
@@ -424,7 +424,7 @@ def main():
                      f'({_fmt_t(cell(key, weight, "OwnMAXraw", "t_nw"))}) | '
                      f'{_fmt(cell(key, weight, "PeerReturn", "beta"))} '
                      f'({_fmt_t(cell(key, weight, "PeerReturn", "t_nw"))}) |')
-    L.append('\n> N = FM 样本行数（`m1_in_fm_sample=True` 且月 ∈ 共同窗口）；'
+    L.append('\n> N = FM 样本行数（`pricing_in_fm_sample=True` 且月 ∈ 共同窗口）；'
              'T = 实际进入系数序列的月份数。逐月 n 的最小/中位/最大见 CSV 与 JSON。\n')
 
     L.append('## 2. 原窗口读数（对照）\n')
@@ -438,7 +438,7 @@ def main():
                      f'{_fmt(c["PeerMAXraw"]["beta"])} ({_fmt_t(c["PeerMAXraw"]["t_nw"])}) | '
                      f'{_fmt(c["OwnMAXraw"]["beta"])} ({_fmt_t(c["OwnMAXraw"]["t_nw"])}) | '
                      f'{_fmt(c["PeerReturn"]["beta"])} ({_fmt_t(c["PeerReturn"]["t_nw"])}) |')
-    L.append('\n> 原窗口读数与 `reports/data_gates/G0/s3_m1_pricing_table_v2.json` 主表逐值一致：'
+    L.append('\n> 原窗口读数与 `reports/data_gates/G0/pricing_table_v2.json` 主表逐值一致：'
              f'beta / NW t 最大绝对差 = {recon["max_abs_diff"]:.3e}；'
              f'N / T / 窗口完全一致（{len(recon["checks"])} 项检查全 PASS）。\n')
 
@@ -526,7 +526,7 @@ def main():
              '但共同窗口**不能**把 ma 列变成「只差章节」——K 目标 56 vs 44、语料抽取差异、'
              'N 118,620 vs 120,370 仍在。要得到单维语料对照，仍需 K=44 的 ma 版本（N-6 处理项 ②，'
              '本轮未执行、未改任何现有网络/系数）。')
-    L.append('- 本报告为诊断读数，不构成 headline 变更；主表仍以原窗口 `m1_main_v1` 为准。\n')
+    L.append('- 本报告为诊断读数，不构成 headline 变更；主表仍以原窗口 `pricing_main_v1` 为准。\n')
 
     L.append('## 7. 复现命令\n')
     L.append('```bash')
@@ -539,10 +539,10 @@ def main():
     L.append(f'- `{_rel(OUT_MD)}`（本文件）')
 
     L.append('\n## 8. 输入 bytes（计算前 / 计算后）\n')
-    L.append('### 9 个 M1 主输入\n')
+    L.append('### 9 个 pricing_gate 主输入\n')
     L.append('| 输入 | 文件 | bytes（前=后） |')
     L.append('|---|---|---|')
-    for x in pre_m1:
+    for x in pre_inputs:
         L.append(f'| {x["input"]} | `{x["file"]}` | `{x["bytes"]}` |')
     L.append('\n### 4 个 v2 样本（只读）\n')
     L.append('| 列 | 文件 | bytes（前=后） |')
@@ -555,7 +555,7 @@ def main():
     for k, v in pre_refs.items():
         L.append(f'| `{v["path"]}` | `{v["bytes"]}` |')
     L.append(f'\n> 计算前后逐项比对：{len(sha_ledger["checks"])} 项全部不变；'
-             f'9 个 M1 输入均与 `configs/version_manifest.yaml` 锚一致。')
+             f'9 个 pricing_gate 输入均与 `configs/version_manifest.yaml` 锚一致。')
     OUT_MD.write_text('\n'.join(L) + '\n', encoding='utf-8')
 
     print(f'[3b_n6] 写出：{_rel(OUT_CSV)} / {_rel(OUT_JSON)} / '

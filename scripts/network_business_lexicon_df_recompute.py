@@ -145,18 +145,21 @@ def main():
     by_year.to_csv(byp, index=False, encoding='utf-8')
 
     # ---- 与原口径比对 ----
+    # 原口径 = 基表上的业务描述语料 df 列；基表为 v1（无 df 列，词集与 v2 相同）时不存在可比对象
+    has_biz_df = {'keep_df25', 'doc_count', 'df_ratio'} <= set(lex.columns)
     orig = pd.read_csv(args.lexicon, dtype={'term': str})
-    orig_drop = set(orig.loc[orig['keep_df25'].astype(str) != '1', 'term'])
     new_drop = set(out.loc[out['keep_df25'] == 0, 'term'])
-    inter = orig_drop & new_drop
-    thr = args.df_max
-    # 命中量占比（口径：Σ doc_count 中，被剔词贡献的比例）
-    orig_hits = orig['doc_count'].astype(float)
-    mass_orig_drop = float(orig_hits[orig['term'].isin(orig_drop)].sum() / max(1.0, orig_hits.sum()))
-    new_hits = out['doc_count_pooled'].astype(float)
-    mass_new_drop = float(new_hits[out['term'].isin(new_drop)].sum() / max(1.0, new_hits.sum()))
     nzero_ratio = float(zero_hit.sum() / max(1, n_docs.sum()))
-    cmp_block = {
+    if has_biz_df:
+        orig_drop = set(orig.loc[orig['keep_df25'].astype(str) != '1', 'term'])
+        inter = orig_drop & new_drop
+        thr = args.df_max
+        # 命中量占比（口径：Σ doc_count 中，被剔词贡献的比例）
+        orig_hits = orig['doc_count'].astype(float)
+        mass_orig_drop = float(orig_hits[orig['term'].isin(orig_drop)].sum() / max(1.0, orig_hits.sum()))
+        new_hits = out['doc_count_pooled'].astype(float)
+        mass_new_drop = float(new_hits[out['term'].isin(new_drop)].sum() / max(1.0, new_hits.sum()))
+        cmp_block = {
         'criterion_2_hit_mass_share': {
             'rule': '被剔词贡献的词命中量占比（Σdoc_count 口径）',
             'original_business_corpus_dropped_share': round(mass_orig_drop, 6),
@@ -176,14 +179,20 @@ def main():
             'pass': bool(len(inter) / max(1, len(orig_drop | new_drop)) >= 0.90),
         },
     }
-    if not (cmp_block['criterion_3_dropped_list_overlap']['pass']):
-        cmp_block['criterion_3_dropped_list_overlap']['manual_signoff_required'] = True
+        if not (cmp_block['criterion_3_dropped_list_overlap']['pass']):
+            cmp_block['criterion_3_dropped_list_overlap']['manual_signoff_required'] = True
+    else:
+        cmp_block = {'skipped': '基表无业务描述语料 df 列（以 v1 为基表：词集与历史 v2 相同，'
+                                'df 全部来自本语料重算；business_texts.csv 原语料不在盘上，无可比对象）'}
 
     # ---- 被剔词逐条记录（向量化预取：原实现把 pd.to_numeric 放进列表推导里，
     # 每个被剔词重算一次全表 1.35M 行，1,758 词 ⇒ ~1.5 h 静默计算；此处预取一次，
     # 数值与排序完全不变）----
-    biz_df = pd.to_numeric(lex['df_ratio'], errors='coerce').to_numpy(dtype=float)
-    biz_df = np.where(np.isnan(biz_df), 0.0, biz_df)
+    biz_df = (pd.to_numeric(lex['df_ratio'], errors='coerce').to_numpy(dtype=float)
+              if has_biz_df else None)
+    if biz_df is not None:
+        biz_df = np.where(np.isnan(biz_df), 0.0, biz_df)
+    biz_ratio = pd.to_numeric(lex['df_ratio'], errors='coerce') if has_biz_df else None
     sogou_col = out['in_sogou'].to_numpy(dtype=object) if 'in_sogou' in out.columns else None
     em_col = out['in_em'].to_numpy(dtype=object) if 'in_em' in out.columns else None
     dropped_idx = np.flatnonzero(~keep)
@@ -191,17 +200,23 @@ def main():
                      'doc_count': int(doc_count_max[i]), 'df_year': int(years[argmax[i]]),
                      'in_sogou': str(sogou_col[i]) if sogou_col is not None else '',
                      'in_em': str(em_col[i]) if em_col is not None else '',
-                     'df_ratio_business': round(float(biz_df[i]), 6),
+                     'df_ratio_business': round(float(biz_df[i]), 6) if biz_df is not None else None,
                      'per_year_df': {str(y): round(float(df_t[i, j]), 6) for j, y in enumerate(years)}}
              for i in dropped_idx}
     top_dropped = [drec[i] for i in sorted(dropped_idx.tolist(), key=lambda i: -df_max_col[i])[:50]]
+
+    def rel(p) -> str:
+        try:
+            return str(Path(p).resolve().relative_to(ROOT))
+        except ValueError:
+            return str(Path(p).resolve())
 
     rep = {
         'step': 'Phase B″1 词库 df 重算',
         'run_at': datetime.now(timezone.utc).isoformat(),
         'corpus': args.corpus,
-        'corpus_path': str(CORPORA[args.corpus]['path'].relative_to(ROOT)).replace('\\', '/'),
-        'lexicon_path': str(Path(args.lexicon).relative_to(ROOT)).replace('\\', '/'),
+        'corpus_path': rel(CORPORA[args.corpus]['path']),
+        'lexicon_path': rel(args.lexicon),
         'df_max': args.df_max,
         'aggregation_rule': ('df_ratio = max_t df_ratio_t（逐年独立的上确界；doc_count 取 argmax 年计数，'
                              '故 df_ratio = doc_count / N_docs(df_year)）；对照列 df_ratio_pooled = Σdoc_count / ΣN_docs'),
@@ -229,16 +244,16 @@ def main():
                 [(t, df_max_col[i], doc_count_max[i], years[argmax[i]],
                   out['in_sogou'].iloc[i] if 'in_sogou' in out.columns else '',
                   out['in_em'].iloc[i] if 'in_em' in out.columns else '',
-                  float(pd.to_numeric(lex['df_ratio'], errors='coerce').iloc[i] or 0))
+                  float(biz_ratio.iloc[i] or 0) if biz_ratio is not None else 0.0)
                  for i, t in enumerate(terms) if not keep[i]],
                 key=lambda x: -x[1])[:50]],
         'dropped_terms_detail': [
             {'term': t, 'df_ratio': round(float(df_max_col[i]), 6), 'df_year': int(years[argmax[i]]),
-             'df_ratio_business': round(float(pd.to_numeric(lex['df_ratio'], errors='coerce').iloc[i] or 0), 6),
+             'df_ratio_business': round(float(biz_ratio.iloc[i] or 0), 6) if biz_ratio is not None else None,
              'per_year_df': {str(y): round(float(df_t[i, j]), 6) for j, y in enumerate(years)}}
             for i, t in enumerate(terms) if not keep[i]],
-        'dropped_only_in_original': sorted(orig_drop - new_drop),
-        'dropped_only_in_teacher': sorted(new_drop - orig_drop),
+        'dropped_only_in_original': sorted(orig_drop - new_drop) if has_biz_df else [],
+        'dropped_only_in_teacher': sorted(new_drop - orig_drop) if has_biz_df else [],
         'comparison_with_original': cmp_block,
         'outputs': {
             'lexicon': str(outp.relative_to(ROOT)).replace('\\', '/'),
@@ -250,7 +265,8 @@ def main():
         'elapsed_sec': round(time.time() - t_all, 1),
     }
     rep['status'] = ('PASS' if (rep['stop_condition']['pass']
-                                and cmp_block['criterion_2_hit_mass_share']['pass']) else 'FAIL')
+                                and (not has_biz_df
+                                     or cmp_block['criterion_2_hit_mass_share']['pass'])) else 'FAIL')
     rp = Path(args.out_report)
     rp.parent.mkdir(parents=True, exist_ok=True)
     rp.write_text(json.dumps(rep, ensure_ascii=False, indent=1), encoding='utf-8')

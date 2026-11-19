@@ -45,17 +45,18 @@ import sys
 from pathlib import Path
 import numpy as np
 import pandas as pd
-from peermax_max_build import LIMIT_CHINEXT_STAR, LIMIT_MAIN, LIMIT_MAIN_ST, board_of, load_st_flags, resolve_tie_rule
+from peermax_max_build import board_of, load_st_flags, resolve_limit_thresholds, resolve_tie_rule
 
 
 from pathlib import Path
-from peermax_max_build import LIMIT_CHINEXT_STAR, LIMIT_MAIN, LIMIT_MAIN_ST, board_of, load_st_flags, resolve_tie_rule
+from peermax_max_build import board_of, load_st_flags, resolve_limit_thresholds, resolve_tie_rule
 import csv
 import math
 import numpy as np
 import os
 import pandas as pd
-from fileio import write_json_atomic
+from fileio import write_json_atomic, file_size
+from fmt import fmt_float, fmt_int
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -73,7 +74,7 @@ LIMIT_DOWN_FLAG = ROOT / "data/raw/drive/daily_limit_down_flag_20260630.pkl"
 
 MONTHLY_RETURNS = ROOT / "data/processed/monthly_returns_clean_v2.csv"
 
-CONTRACTS = ROOT / "configs/m1_contracts.yaml"
+CONTRACTS = ROOT / "configs/pricing_inputs.yaml"
 
 SHADOW_DIR = ROOT / "data/processed/phase2_shadow"
 
@@ -109,7 +110,7 @@ EXPECTED_SOURCE_SHA = "944adbbab95a7b30d858f2943c8ec2844a852a9551b06224b21147d3c
 
 WINDOW_CAL = ("2015-01", "2023-12")
 
-WINDOW_M1 = ("2015-05", "2023-12")
+WINDOW_HISTORIC = ("2015-05", "2023-12")
 
 NEW_COLS = [
     "n_valid_days_p2shadow",
@@ -199,10 +200,10 @@ def load_contracts(path: Path = CONTRACTS) -> dict:
 
 def anchor_snapshot(contracts: dict) -> dict:
     snap = {}
-    for key, meta in contracts["m1_inputs"].items():
+    for key, meta in contracts["pricing_inputs"].items():
         p = ROOT / meta["file"]
         if not p.is_file():
-            raise SystemExit(f"[P2.2] headline 锚缺失: {p}")
+            raise SystemExit(f"[shadow-max] headline 锚缺失: {p}")
         h = file_size(p)
         snap[key] = {
             "file": meta["file"],
@@ -216,23 +217,23 @@ def anchor_snapshot(contracts: dict) -> dict:
 def assert_anchors_unchanged(before: dict, after: dict) -> None:
     for key in before:
         if not before[key]["sha_match"]:
-            raise SystemExit(f"[P2.2] 起始锚已不一致: {key}")
+            raise SystemExit(f"[shadow-max] 起始锚已不一致: {key}")
         if before[key]["bytes"] != after[key]["bytes"]:
-            raise SystemExit(f"[P2.2] headline 锚在运行中变化: {key}")
+            raise SystemExit(f"[shadow-max] headline 锚在运行中变化: {key}")
 
 def protected_paths(contracts: dict) -> set[Path]:
-    return {(ROOT / m["file"]).resolve() for m in contracts["m1_inputs"].values()}
+    return {(ROOT / m["file"]).resolve() for m in contracts["pricing_inputs"].values()}
 
 def build_market_calendar(panel_dir: Path, years: range) -> list[str]:
     dates: set[str] = set()
     for y in years:
         p = Path(panel_dir) / f"{y}.csv"
         if not p.is_file():
-            raise SystemExit(f"[P2.2] daily_panel 缺文件: {p}")
+            raise SystemExit(f"[shadow-max] daily_panel 缺文件: {p}")
         d = pd.read_csv(p, usecols=["date"], dtype={"date": str})
         dates.update(d["date"].dropna().astype(str).tolist())
     if not dates:
-        raise SystemExit("[P2.2] daily_panel 日期为空")
+        raise SystemExit("[shadow-max] daily_panel 日期为空")
     return sorted(dates)
 
 def compute_resume_flags(frame: pd.DataFrame, calendar_index: dict[str, int],
@@ -247,12 +248,12 @@ def compute_resume_flags(frame: pd.DataFrame, calendar_index: dict[str, int],
     required = {"code", "date", "rraw"}
     missing = required - set(frame.columns)
     if missing:
-        raise SystemExit(f"[P2.2] 日频输入缺列: {sorted(missing)}")
+        raise SystemExit(f"[shadow-max] 日频输入缺列: {sorted(missing)}")
     d = frame.copy()
     d["_ci"] = d["date"].map(calendar_index)
     if d["_ci"].isna().any():
         bad = d.loc[d["_ci"].isna(), "date"].head(3).tolist()
-        raise SystemExit(f"[P2.2] 日期不在市场日历: {bad}")
+        raise SystemExit(f"[shadow-max] 日期不在市场日历: {bad}")
     d["_ci"] = d["_ci"].astype("int32")
     d = d.sort_values(["code", "date"], kind="mergesort").reset_index(drop=True)
     g = d.groupby("code", sort=False)
@@ -291,7 +292,7 @@ def _argmax_rows(df: pd.DataFrame, keys: list[str], rule: str) -> pd.DataFrame:
         dates = tie.groupby(keys, sort=False)["date"].max().rename("date").reset_index()
         sub = df.merge(dates, on=keys + ["date"], how="inner").drop_duplicates(keys)
         return sub.set_index(keys)
-    raise SystemExit(f"[P2.2] 未支持的 tie_rule: {rule}")
+    raise SystemExit(f"[shadow-max] 未支持的 tie_rule: {rule}")
 
 def aggregate_year_months(flagged: pd.DataFrame, rule: str) -> pd.DataFrame:
     """单年日频 -> 每 (code, month) 的 MAX/argmax/复牌计数。"""
@@ -367,7 +368,7 @@ def compute_month_aggregates(panel_dir: Path, years: range, rule: str):
             resume_parts.append(res[[
                 "code", "date", "_prev_date", "gap_td", "rraw", "month",
                 "cross_year", "cross_month"]])
-        print(f"[P2.2] {y}: daily={len(d):,} resume={int(flagged['resume_flag'].sum()):,}",
+        print(f"[shadow-max] {y}: daily={len(d):,} resume={int(flagged['resume_flag'].sum()):,}",
               flush=True)
         del d, flagged
     agg = pd.concat(agg_parts, ignore_index=True, sort=False)
@@ -378,7 +379,7 @@ def compute_month_aggregates(panel_dir: Path, years: range, rule: str):
 def load_bool_panel(path: Path) -> pd.DataFrame:
     d = pd.read_pickle(path)
     if not isinstance(d, pd.DataFrame):
-        raise SystemExit(f"[P2.2] flag pkl 不是 DataFrame: {path}")
+        raise SystemExit(f"[shadow-max] flag pkl 不是 DataFrame: {path}")
     if not isinstance(d.index, pd.DatetimeIndex):
         d.index = pd.to_datetime(d.index)
     d.index = d.index.strftime("%Y-%m-%d")
@@ -406,18 +407,19 @@ def lookup_panel(panel: pd.DataFrame, dates: pd.Series,
 def code_column(code: str) -> str:
     return code[2:] + (".SH" if code.startswith("sh") else ".SZ")
 
-def threshold_limit_hit(code: str, maxv: float, st_val) -> tuple[int, bool]:
-    """Phase 1 阈值口径（与 peermax_max_build 一致）；返回 (hit, unknown)。"""
+def threshold_limit_hit(code: str, maxv: float, st_val, limits: dict | None = None) -> tuple[int, bool]:
+    """Phase 1 阈值口径（阈值唯一来源 registry.limit_thresholds）；返回 (hit, unknown)。"""
+    limits = resolve_limit_thresholds() if limits is None else limits
     board = board_of(code)
     if board in ("chinext", "star"):
-        thr = LIMIT_CHINEXT_STAR
+        thr = limits["chinext_star"]
     elif st_val is True:
-        thr = LIMIT_MAIN_ST
+        thr = limits["main_st"]
     elif st_val is False:
-        thr = LIMIT_MAIN
+        thr = limits["main"]
     else:
-        thr = LIMIT_MAIN
-        if 0.05 <= maxv < LIMIT_MAIN:
+        thr = limits["main"]
+        if 0.05 <= maxv < limits["main"]:
             return 0, True
     return (1 if maxv >= thr else 0), False
 
@@ -455,7 +457,7 @@ def build_shadow_panel(source: pd.DataFrame, agg: pd.DataFrame, resume: pd.DataF
     old_cols = list(source.columns)
     collisions = [c for c in NEW_COLS if c in old_cols]
     if collisions:
-        raise SystemExit(f"[P2.2] 输入已含 shadow 列，拒绝覆盖: {collisions}")
+        raise SystemExit(f"[shadow-max] 输入已含 shadow 列，拒绝覆盖: {collisions}")
 
     agg = agg.rename(columns={"code": "source_id"})
     out = source.copy()
@@ -463,11 +465,11 @@ def build_shadow_panel(source: pd.DataFrame, agg: pd.DataFrame, resume: pd.DataF
     out = out.merge(agg, on=["source_id", "month"], how="left",
                     validate="one_to_one", indicator=True)
     if (out["_merge"] == "right_only").any():
-        raise SystemExit("[P2.2] 月度聚合存在 source 面板外键")
+        raise SystemExit("[shadow-max] 月度聚合存在 source 面板外键")
     out = out.sort_values("_row", kind="mergesort").reset_index(drop=True)
     covered = out["_merge"].eq("both")
     if int(covered.sum()) != len(agg):
-        raise SystemExit("[P2.2] 日频覆盖行数与聚合行数不一致")
+        raise SystemExit("[shadow-max] 日频覆盖行数与聚合行数不一致")
 
     n_valid_legacy = pd.to_numeric(out["n_valid_days"], errors="coerce")
     max_legacy = pd.to_numeric(out["MAXraw"], errors="coerce")
@@ -490,7 +492,7 @@ def build_shadow_panel(source: pd.DataFrame, agg: pd.DataFrame, resume: pd.DataF
     argmax_mismatch = int((covered & (out["argmax_all"] != out["argmax_date"])).sum())
     if nvalid_mismatch or max_mismatch or argmax_mismatch:
         raise SystemExit(
-            f"[P2.2] headline 对齐失败: n_valid={nvalid_mismatch}, "
+            f"[shadow-max] headline 对齐失败: n_valid={nvalid_mismatch}, "
             f"MAX={max_mismatch}, argmax={argmax_mismatch}")
 
     # ---- 复牌审计 + legacy argmax 标记
@@ -666,7 +668,7 @@ def build_shadow_panel(source: pd.DataFrame, agg: pd.DataFrame, resume: pd.DataF
         if d and (code, d) in resume_pairs))
     if nonresume_change or gt_legacy or shadow_argmax_resume:
         raise SystemExit(
-            f"[P2.2] 硬验收失败: nonresume_change={nonresume_change}, "
+            f"[shadow-max] 硬验收失败: nonresume_change={nonresume_change}, "
             f"gt_legacy={gt_legacy}, shadow_argmax_resume={shadow_argmax_resume}")
 
     verification = {
@@ -899,7 +901,7 @@ import pandas as pd
 
 
 # 只复用 Phase 1 已登记实现：tie rule / ST / 板块 / limit 阈值（不复制逻辑）。
-from peermax_max_build import LIMIT_CHINEXT_STAR, LIMIT_MAIN, LIMIT_MAIN_ST, board_of, load_st_flags, resolve_tie_rule
+from peermax_max_build import board_of, load_st_flags, resolve_limit_thresholds, resolve_tie_rule
 
 
 # 追加列（旧列顺序不变，新列只追加在末尾）。
@@ -968,50 +970,50 @@ def main(argv=None) -> int:
                      ("counts-out", counts_p), ("resume-audit", resume_p),
                      ("tail-out", tail_p)):
         if p in protected:
-            raise SystemExit(f"[P2.2] {label} 指向 headline 路径，拒绝写出: {p}")
+            raise SystemExit(f"[shadow-max] {label} 指向 headline 路径，拒绝写出: {p}")
     if out_p.parent != shadow_dir or meta_p.parent != shadow_dir:
-        raise SystemExit(f"[P2.2] shadow 输出必须位于 {shadow_dir}")
+        raise SystemExit(f"[shadow-max] shadow 输出必须位于 {shadow_dir}")
     if any(p.parent != artifacts_dir for p in (counts_p, resume_p, tail_p)):
-        raise SystemExit("[P2.2] 审计输出必须位于 artifacts/phase2/")
+        raise SystemExit("[shadow-max] 审计输出必须位于 artifacts/phase2/")
 
     anchors_before = anchor_snapshot(contracts)
     if not all(v["sha_match"] for v in anchors_before.values()):
         bad = [k for k, v in anchors_before.items() if not v["sha_match"]]
-        raise SystemExit(f"[P2.2] headline 锚起始不一致: {bad}")
+        raise SystemExit(f"[shadow-max] headline 锚起始不一致: {bad}")
 
     source = pd.read_csv(src_p, dtype=str, keep_default_na=False)
     if len(source) != args.expected_rows:
-        raise SystemExit(f"[P2.2] source 行数 {len(source)} != {args.expected_rows}")
+        raise SystemExit(f"[shadow-max] source 行数 {len(source)} != {args.expected_rows}")
     if source.duplicated(["source_id", "month"]).any():
-        raise SystemExit("[P2.2] source 键 (source_id, month) 不唯一")
+        raise SystemExit("[shadow-max] source 键 (source_id, month) 不唯一")
     src_sha_before = file_size(src_p)
     if src_sha_before != EXPECTED_SOURCE_SHA:
         raise SystemExit(
-            f"[P2.2] headline source panel sha 与登记不一致: {src_sha_before}")
+            f"[shadow-max] headline source panel sha 与登记不一致: {src_sha_before}")
 
     tie = resolve_tie_rule(args.registry)
     tie_rule = tie["id"]
-    print(f"[P2.2] tie_rule={tie_rule} source={tie['source']}", flush=True)
+    print(f"[shadow-max] tie_rule={tie_rule} source={tie['source']}", flush=True)
 
     years = range(args.start_year, args.end_year + 1)
-    print(f"[P2.2] 读 daily_panel {args.start_year}-{args.end_year} …", flush=True)
+    print(f"[shadow-max] 读 daily_panel {args.start_year}-{args.end_year} …", flush=True)
     agg, resume, calendar = compute_month_aggregates(panel_dir, years, tie_rule)
-    print(f"[P2.2] 月度聚合 {len(agg):,} 行；复牌行 {len(resume):,}；"
+    print(f"[shadow-max] 月度聚合 {len(agg):,} 行；复牌行 {len(resume):,}；"
           f"交易日历 {len(calendar):,}", flush=True)
 
-    print("[P2.2] 载入官方 limit flags …", flush=True)
+    print("[shadow-max] 载入官方 limit flags …", flush=True)
     up_panel = load_bool_panel(up_p) if up_p.is_file() else None
     down_panel = load_bool_panel(down_p) if down_p.is_file() else None
     limit_available = up_panel is not None and down_panel is not None
     if not limit_available:
-        print("[P2.2] WARN: 官方 limit pkl 缺失，limit_hit 用阈值回退", file=sys.stderr)
+        print("[shadow-max] WARN: 官方 limit pkl 缺失，limit_hit 用阈值回退", file=sys.stderr)
 
     out, resume, verification = build_shadow_panel(
         source, agg, resume, tie_rule, up_panel, down_panel,
         st_flag=ST_FLAG,
         min_trade_days=args.min_trade_days,
         sensitivity_days=args.sensitivity)
-    print(f"[P2.2] shadow 行数 {len(out):,}；覆盖 {verification['rows_daily_covered_2014_2025']:,}；"
+    print(f"[shadow-max] shadow 行数 {len(out):,}；覆盖 {verification['rows_daily_covered_2014_2025']:,}；"
           f"pre-2014 {verification['rows_pre_2014_passthrough']:,}", flush=True)
 
     write_shadow_csv(out, list(source.columns), out_p)
@@ -1019,19 +1021,19 @@ def main(argv=None) -> int:
 
     # ---- 窗口计数
     w_cal = _window(out[out["shadow_status"].eq("evaluable")], WINDOW_CAL)
-    w_m1 = _window(out[out["shadow_status"].eq("evaluable")], WINDOW_M1)
+    historic_window = _window(out[out["shadow_status"].eq("evaluable")], WINDOW_HISTORIC)
     cal_counts = _counts_for_window(w_cal)
-    m1_counts = _counts_for_window(w_m1)
+    pricing_counts = _counts_for_window(historic_window)
 
     monthly = pd.read_csv(monthly_p, usecols=["firm_id", "month", "complete_month"],
                           dtype={"firm_id": str, "month": str})
     monthly = monthly[(monthly["month"] >= WINDOW_CAL[0])
                       & (monthly["month"] <= WINDOW_CAL[1])]
     gate_cal = _gate_counts(w_cal, monthly, args.min_trade_days, args.sensitivity)
-    gate_m1 = _gate_counts(w_m1, monthly, args.min_trade_days, args.sensitivity)
+    historic_gate = _gate_counts(historic_window, monthly, args.min_trade_days, args.sensitivity)
 
     limit_cal = _limit_counts(w_cal)
-    limit_m1 = _limit_counts(w_m1)
+    historic_limit = _limit_counts(historic_window)
 
     # ---- 审计表
     resume_audit = _resume_audit_table(
@@ -1044,7 +1046,7 @@ def main(argv=None) -> int:
     assert_anchors_unchanged(anchors_before, anchors_after)
     src_sha_after = file_size(src_p)
     if src_sha_after != src_sha_before:
-        raise SystemExit("[P2.2] headline source panel 在运行中变化")
+        raise SystemExit("[shadow-max] headline source panel 在运行中变化")
 
     # ---- 与 2.0_plan 预期对账
     plan_expected = {
@@ -1052,10 +1054,10 @@ def main(argv=None) -> int:
         "calendar_2015_2023_argmax_resume": 2_886,
         "calendar_2015_2023_max_changed": 2_666,
         "calendar_2015_2023_limit_hit_at_resume": 1_724,
-        "gate_m1_source_n_valid_lt_15": 7_848,
-        "gate_m1_matchable_n_valid_lt_15": 5_964,
-        "gate_m1_source_n_max_lt_15": 8_576,
-        "gate_m1_matchable_n_max_lt_15": 6_692,
+        "gate_pricing_source_n_valid_lt_15": 7_848,
+        "gate_pricing_matchable_n_valid_lt_15": 5_964,
+        "gate_pricing_source_n_max_lt_15": 8_576,
+        "gate_pricing_matchable_n_max_lt_15": 6_692,
         "tail_raw_gt_0_44": 19,
         "tail_raw_gt_1_0": 6,
         "tail_shadow_gt_0_44": 17,
@@ -1066,10 +1068,10 @@ def main(argv=None) -> int:
         "calendar_2015_2023_argmax_resume": cal_counts["argmax_resume"],
         "calendar_2015_2023_max_changed": cal_counts["max_changed"],
         "calendar_2015_2023_limit_hit_at_resume": cal_counts["limit_hit_at_resume_legacy"],
-        "gate_m1_source_n_valid_lt_15": gate_m1["source_n_valid_lt_15"],
-        "gate_m1_matchable_n_valid_lt_15": gate_m1["monthly_matchable_n_valid_lt_15"],
-        "gate_m1_source_n_max_lt_15": gate_m1["source_n_max_lt_15"],
-        "gate_m1_matchable_n_max_lt_15": gate_m1["monthly_matchable_n_max_lt_15"],
+        "gate_pricing_source_n_valid_lt_15": historic_gate["source_n_valid_lt_15"],
+        "gate_pricing_matchable_n_valid_lt_15": historic_gate["monthly_matchable_n_valid_lt_15"],
+        "gate_pricing_source_n_max_lt_15": historic_gate["source_n_max_lt_15"],
+        "gate_pricing_matchable_n_max_lt_15": historic_gate["monthly_matchable_n_max_lt_15"],
         "tail_raw_gt_0_44": cal_counts["tail_raw"]["gt_0_44"],
         "tail_raw_gt_1_0": cal_counts["tail_raw"]["gt_1_0"],
         "tail_shadow_gt_0_44": cal_counts["tail_shadow_ungated"]["gt_0_44"],
@@ -1146,7 +1148,7 @@ def main(argv=None) -> int:
             "min_trade_days": args.min_trade_days,
             "sensitivity_days": args.sensitivity,
             "window_calendar": list(WINDOW_CAL),
-            "window_m1": list(WINDOW_M1),
+            "window_historic": list(WINDOW_HISTORIC),
         },
         "verification": verification,
         "resume_rows_2014_2025": int(len(resume)),
@@ -1156,11 +1158,11 @@ def main(argv=None) -> int:
             .value_counts().sort_index().items()
         },
         "calendar_2015_2023": cal_counts,
-        "m1_window_2015_05_2023_12": m1_counts,
+        "pricing_window_2015_05_2023_12": pricing_counts,
         "gate_counts_calendar_2015_2023": gate_cal,
-        "gate_counts_m1_window": gate_m1,
+        "gate_counts_pricing_window": historic_gate,
         "limit_flags_calendar_2015_2023": limit_cal,
-        "limit_flags_m1_window": limit_m1,
+        "limit_flags_pricing_window": historic_limit,
         "limit_source": ("official_daily_flag" if limit_available
                          else "threshold_fallback"),
         "plan_2_0_replication": replication,
@@ -1185,7 +1187,7 @@ def main(argv=None) -> int:
         "headline_source_panel_sha_match_registered": bool(
             src_sha_after == EXPECTED_SOURCE_SHA),
         "headline_files_modified": False,
-        "m1_rerun": False,
+        "pricing_rerun": False,
         "configs_modified": False,
     }
 
@@ -1228,22 +1230,22 @@ def main(argv=None) -> int:
     }
     write_json_atomic(counts, counts_p)
 
-    print(f"[P2.2] shadow -> {out_p.relative_to(ROOT)}  rows={len(out):,}  sha={out_bytes[:12]}…")
-    print(f"[P2.2] resume 2014–2025={len(resume):,}; "
+    print(f"[shadow-max] shadow -> {out_p.relative_to(ROOT)}  rows={len(out):,}  sha={out_bytes[:12]}…")
+    print(f"[shadow-max] resume 2014–2025={len(resume):,}; "
           f"calendar 2015–2023 argmax_resume={cal_counts['argmax_resume']:,} "
           f"max_changed={cal_counts['max_changed']:,} "
           f"limit_resume={cal_counts['limit_hit_at_resume_legacy']:,}")
-    print(f"[P2.2] tail calendar 2015–2023: raw max={cal_counts['tail_raw']['max']:.6f} "
+    print(f"[shadow-max] tail calendar 2015–2023: raw max={cal_counts['tail_raw']['max']:.6f} "
           f">.44={cal_counts['tail_raw']['gt_0_44']} >1={cal_counts['tail_raw']['gt_1_0']}; "
           f"shadow max={cal_counts['tail_shadow_ungated']['max']:.6f} "
           f">.44={cal_counts['tail_shadow_ungated']['gt_0_44']} "
           f">1={cal_counts['tail_shadow_ungated']['gt_1_0']}")
-    print(f"[P2.2] gate M1: n_valid<15 {gate_m1['source_n_valid_lt_15']:,}/"
-          f"{gate_m1['monthly_matchable_n_valid_lt_15']:,}; n_max<15 "
-          f"{gate_m1['source_n_max_lt_15']:,}/{gate_m1['monthly_matchable_n_max_lt_15']:,}")
-    print(f"[P2.2] 9 anchors unchanged: {counts['headline_anchors_match']}")
+    print(f"[shadow-max] gate pricing_gate: n_valid<15 {historic_gate['source_n_valid_lt_15']:,}/"
+          f"{historic_gate['monthly_matchable_n_valid_lt_15']:,}; n_max<15 "
+          f"{historic_gate['source_n_max_lt_15']:,}/{historic_gate['monthly_matchable_n_max_lt_15']:,}")
+    print(f"[shadow-max] 9 anchors unchanged: {counts['headline_anchors_match']}")
     if not counts["plan_2_0_all_match"]:
-        print("[P2.2] WARN: 与 2.0_plan 预期不完全一致（见 counts.plan_2_0_replication）",
+        print("[shadow-max] WARN: 与 2.0_plan 预期不完全一致（见 counts.plan_2_0_replication）",
               file=sys.stderr)
     return 0
 

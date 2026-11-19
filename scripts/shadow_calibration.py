@@ -2,8 +2,8 @@
 
 范围（`artifacts/phase3/3.0_plan.md` §2.2 + 项目 3.2 任务书）：
   - 只写 shadow：`data/processed/phase3_shadow/lexicon_p3ydf_{y}.csv`、
-    `data/processed/network_ma_teacher_p3{yt,ydf,yt_ydf,yt_latest}/*`、`artifacts/phase3/3.2_*`。
-  - **不改** headline 边表/样本/网络/M1/PC/gate/configs；不重跑 headline M1/PC；不写 G0；
+    `data/processed/network_ma_teacher_<变体>/*`、`artifacts/phase3/*`。
+  - **不改** headline 边表/样本/网络/pricing_gate/PC/gate/configs；不重跑 headline pricing_gate/PC；不写 G0；
     不碰 3.1 产物（`artifacts/phase3/3.1_*`、`network_ma_teacher_p3asof/`）——只读依赖。
 
 四个变体（两轴：词表 df × K 目标映射；矩阵见 `VARIANTS`）：
@@ -35,7 +35,7 @@
      目标，故本脚本另建扩展阶梯。
 
 步骤（`--steps`，缺省 all = preflight,lexicons,networks,ladder,select,rebuild,compare,postflight）：
-  preflight   9 个 M1 输入锚 + 额外只读输入 + headline 网络全文件 sha 台账（`3.2_anchor_pre.json`）
+  preflight   9 个 pricing_gate 输入锚 + 额外只读输入 + headline 网络全文件 sha 台账（`3.2_anchor_pre.json`）
   lexicons    逐年词表（`phase3_shadow/lexicon_p3ydf_{y}.csv`）+ 计数/命中质量 + `3.2_df_removed_terms.csv`
   networks    4 变体 × 9 年：复用 `network_business_cluster_freeze.py` / `network_business_edges_build.py`（**不改磁盘脚本**，
               运行时注入 shadow `ver_prefix` / K 规则标签 / shadow 默认输出路径）；可增量、可续跑
@@ -69,8 +69,8 @@ import time
 from datetime import datetime, timezone
 import numpy as np
 import pandas as pd
-import shadow_asof_industry as p31  # noqa: E402  （as-of 映射 / lift / 锚台账：3.1 交接件，只读复用）
-from pricing_lib import assert_m1_inputs, require, file_size
+import shadow_asof_industry as p31  # noqa: E402  （as-of 映射 / lift / 锚台账：as-of 交接件，只读复用）
+from pricing_lib import assert_pricing_inputs, require, file_size
 from peermax_panel_build import (
     NETWORK_AVAILABLE_AT_RULE, load_versions, select_version,
 )
@@ -161,7 +161,7 @@ VARIANTS = {
         'lexicon': 'headline', 'target_kind': 'asof_per_year', 'l2_mapping': 'asof',
         'isolated_effect': 'L-2 K 目标（逐年 as-of vs headline 池化 44）',
         'lexicon_desc': 'headline 词表（9 年上确界 df≤0.25）',
-        'target_desc': '逐年 as-of 目标 38/40/44/49/50/52/68/57/64（3.1 交接）',
+        'target_desc': '逐年 as-of 目标 38/40/44/49/50/52/68/57/64（as-of 交接）',
     },
     'p3ydf': {
         'dir': ROOT / 'data/processed/network_ma_teacher_p3ydf',
@@ -185,7 +185,7 @@ VARIANTS = {
         'lexicon': 'headline', 'target_kind': 'latest_per_year', 'l2_mapping': 'latest_static',
         'isolated_effect': '目标映射（逐年 latest vs 逐年 as-of；词表固定 headline）',
         'lexicon_desc': 'headline 词表（9 年上确界 df≤0.25）',
-        'target_desc': '逐年 latest 目标 26/27/30/38/37/46/52/58/62（3.1 交接对照）',
+        'target_desc': '逐年 latest 目标 26/27/30/38/37/46/52/58/62（as-of 交接对照）',
     },
 }
 
@@ -265,13 +265,13 @@ def log(msg: str) -> None:
     print(f'[{time.strftime("%H:%M:%S")}] {msg}', flush=True)
 
 def anchors_snapshot(tag: str) -> dict:
-    ledger = assert_m1_inputs()
+    ledger = assert_pricing_inputs()
     extra = {k: {'file': str(Path(v).relative_to(ROOT)).replace('\\', '/'), 'bytes': file_size(v)}
              for k, v in EXTRA_INPUTS.items()}
     snap = {
         'tag': tag, 'run_at': datetime.now(timezone.utc).isoformat(),
-        'm1_inputs_9': {r['input']: r['rows'] for r in ledger},
-        'm1_inputs_ledger': ledger,
+        'pricing_inputs_9': {r['input']: r['rows'] for r in ledger},
+        'pricing_inputs_ledger': ledger,
         'extra_inputs': extra,
         'headline_network_bytes': p31.sha_ledger_headline_net(),
         'shadow_net_dirs_sha_ledger_note': (
@@ -282,8 +282,8 @@ def anchors_snapshot(tag: str) -> dict:
     return snap
 
 def load_k_targets_3_1() -> dict:
-    """读 3.1 交接的 K 目标并逐值对账（容差 0）；不符 → 停机。"""
-    require(K_TARGETS_3_1.is_file(), f'缺 3.1 交接件 {K_TARGETS_3_1}；先跑 3.1')
+    """读 as-of 交接的 K 目标并逐值对账（容差 0）；不符 → 停机。"""
+    require(K_TARGETS_3_1.is_file(), f'缺 as-of 交接件 {K_TARGETS_3_1}；先跑 3.1')
     d = json.loads(K_TARGETS_3_1.read_text(encoding='utf-8'))
     got_asof = {int(p['text_year']): int(round(p['median_peer'])) for p in d['asof']['per_year']}
     got_latest = {int(p['text_year']): int(round(p['median_peer'])) for p in d['latest']['per_year']}
@@ -689,7 +689,7 @@ def step_ladder(years, lexicon_mode: str, window: int = LADDER_WINDOW,
                 m = float(np.median(peers))
                 med[K] = m
                 rows.append({'text_year': y, 'lexicon_mode': lexicon_mode, 'K': int(K), 'median_peer': m,
-                             'mean_peer': round(float(peers.mean()), 2), 'size_max': int(file_size()),
+                             'mean_peer': round(float(peers.mean()), 2), 'size_max': int(sizes.max()),
                              'n_clusters': int(len(sizes)),
                              'is_freeze_K_of': ';'.join(sorted(f'{v}={freeze_K[v]}' for v in vs
                                                               if freeze_K.get(v) == K)),
@@ -1295,7 +1295,7 @@ def step_postflight(counts) -> dict:
 # ---------------------------------------------------------------- 路径与常量
 
 
-# 3.1 交接的 K 目标（`3.1_k_targets.json` 逐值复核；容差 0）
+# as-of 交接的 K 目标（`3.1_k_targets.json` 逐值复核；容差 0）
 # headline 登记读数（只读对账；`3.0_plan.md` §1.1 / 3.1 §5）
 # 逐年 df 词表落盘（plan §2.2 R1 登记值：2014 多剔 560 词 = 0.66% 命中词 / 7.26% 命中质量；
 # 2015 = 819 词 / 0.99% / 12.08%）
@@ -1354,7 +1354,7 @@ def main():
 
     now = datetime.now(timezone.utc).isoformat()
     counts = {'run_at': now, 'steps': steps, 'years': years, 'variants': variants,
-              'shadow_version_tag': 'p3shadow_v1_p3yt|p3ydf|p3yt_ydf|p3yt_latest',
+              'shadow_version_tag': 'shadow_window_variants_v1',
               'run_history': []}
     prev = load_json_or(COUNTS_JSON, None)
     if isinstance(prev, dict):

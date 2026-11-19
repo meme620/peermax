@@ -1,4 +1,4 @@
-"""S3A Step 8：网络诊断汇总 + 验收检查。
+"""analyst-network Step 8：网络诊断汇总 + 验收检查。
 
 检查项:
   1. 月度累计指标（edges/degree/common_count/覆盖公司数）
@@ -33,7 +33,7 @@ summary = {
     'degree_p90_mean': round(st.mean(deg_p90), 1),
     'common_count_p50_mean': round(st.mean(cc_p50), 2),
 }
-# 密度/集中度诊断（三轮对抗 review S4 补充，2026-08-12）
+# 密度/集中度诊断（三轮对抗 review 补充项，2026-08-12）
 weak = [m['weak_edge_ratio'] for m in months if m.get('weak_edge_ratio') is not None]
 top1 = [m['top1_weight_p50'] for m in months if m.get('top1_weight_p50') is not None]
 hhi = [m['weight_hhi_p50'] for m in months if m.get('weight_hhi_p50') is not None]
@@ -86,13 +86,13 @@ for c in ['2018-06-30', '2021-06-30', '2024-06-30']:
 summary['quality_spotcheck'] = quality
 
 # 4. 映射失败率 + 姓名对齐率（验收第 3 条：A_code 拆分与姓名对齐率，来自 step2_audit.json）
-s3 = json.loads((ANAD / 'step3_clean.json').read_text(encoding='utf-8'))
-summary['mapping'] = {'ok': s3['mapped_ok'], 'total_split': s3['split_rows'],
-                      'fail_rate': round(1 - s3['mapped_ok'] / s3['split_rows'], 6)}
+step3_doc = json.loads((ANAD / 'step3_clean.json').read_text(encoding='utf-8'))
+summary['mapping'] = {'ok': step3_doc['mapped_ok'], 'total_split': step3_doc['split_rows'],
+                      'fail_rate': round(1 - step3_doc['mapped_ok'] / step3_doc['split_rows'], 6)}
 try:
-    s2 = json.loads((Path('data/raw/analyst') / 'step2_audit.json').read_text(encoding='utf-8'))
-    summary['mapping']['name_aligned_rate'] = s2['a_code']['name_aligned_rate']
-    summary['mapping']['a_code_with_slash'] = s2['a_code']['with_slash']
+    step2_doc = json.loads((Path('data/raw/analyst') / 'step2_audit.json').read_text(encoding='utf-8'))
+    summary['mapping']['name_aligned_rate'] = step2_doc['a_code']['name_aligned_rate']
+    summary['mapping']['a_code_with_slash'] = step2_doc['a_code']['with_slash']
 except (FileNotFoundError, KeyError):
     summary['mapping']['name_aligned_rate'] = None
     print('WARN: step2_audit.json 缺失或字段不存在，name_aligned_rate 未纳入', flush=True)
@@ -104,22 +104,22 @@ try:
     universe_firms = int(chars['firm_id'].nunique())
 except Exception:
     universe_firms = None
-s3_status = s3.get('status_counts', {})
-not_matched_records = sum(v for k, v in s3_status.items() if k.startswith('not_matched'))
+step3_status = step3_doc.get('status_counts', {})
+not_matched_records = sum(v for k, v in step3_status.items() if k.startswith('not_matched'))
 summary['missing_status_summary'] = {
     'note': '缺失状态在诊断层分开（规划验收第 9 条）：覆盖表无行=not_covered；records 层 mapping_status 区分 not_matched 子类；no-network-support=覆盖但无边',
     'covered_firms_monthly_mean': round(float(st.mean(covered_firms)), 1),
     'universe_firms': universe_firms,
     'not_matched_records': int(not_matched_records),
-    'not_matched_detail': {k: int(v) for k, v in s3_status.items() if k.startswith('not_matched')},
+    'not_matched_detail': {k: int(v) for k, v in step3_status.items() if k.startswith('not_matched')},
     'no_network_support_monthly_mean': summary['no_network_support_monthly_mean'],
 }
 
 # 6. 窗口覆盖率与状态字段（诊断 #6）：step5 的 coverage_window_incomplete + 覆盖表 flag/missing 分布
 try:
-    s5 = json.loads((ANAD / 'step5_snapshot.json').read_text(encoding='utf-8'))
-    n_cut = s5.get('cutoffs', len(months))
-    inc = s5.get('coverage_window_incomplete_count', 0)
+    spec_no_turnover = json.loads((ANAD / 'step5_snapshot.json').read_text(encoding='utf-8'))
+    n_cut = spec_no_turnover.get('cutoffs', len(months))
+    inc = spec_no_turnover.get('coverage_window_incomplete_count', 0)
     summary['window_coverage'] = {
         'cutoffs_total': n_cut,
         'coverage_window_incomplete_count': inc,

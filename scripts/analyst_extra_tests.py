@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
-"""S3A 补做检验 P2（对标 AH/蒋丹凌）：
+"""analyst-network 补做检验 B（对标 AH/蒋丹凌）：
 A. n_ij ~ 基本面相似度（蒋表 3 简化版）：同行业 + |Δsize| + |Δbm| + |Δgrowth| 的 FM 回归
 B. 关联复杂性交互（蒋表 10）：Ret_{t+1} ~ CF + NetworkDegree×CF + NetworkDegree + 控制
 C. 小盘连接→大盘焦点（AH p.17）：焦点 csi300 内，按连接公司市值分小/大两组 CF
 D. 基本面与收益（AH Table 12）：focal 收益 ~ peer 加权营收增速 + 控制
 
 输入: v3 边表 + 全期面板 + Drive（size/bm/turn/amt/ind_code/财务）
-输出: reports/data_gates/G0/s3a_9j_extra.json
+输出: reports/data_gates/G0/analyst_extra_tests.json
 """
 import json
 import sys
@@ -22,7 +22,7 @@ from analyst_meta import attach_meta
 from fileio import read_pickle
 
 DRIVE = Path('data/raw/drive')
-OUT = Path('reports/data_gates/G0/s3a_9j_extra.json')
+OUT = Path('reports/data_gates/G0/analyst_extra_tests.json')
 OUT.parent.mkdir(parents=True, exist_ok=True)
 
 
@@ -146,10 +146,10 @@ def main():
         # 基本面（peer 加权营收增速）：focal 最近公告增速
         fsub = fin[fin['notice_date'] <= cutoff].sort_values('notice_date')
         latest = fsub.drop_duplicates('firm_id', keep='last')[['firm_id', 'grow']]
-        m2 = edges.merge(latest, left_on='source_id', right_on='firm_id', how='inner')
-        m2['wgr'] = m2['grow'] * m2['weight']
-        gsum = m2.groupby('focal_id')['wgr'].sum()
-        gden = m2.groupby('focal_id')['weight'].sum()
+        merged_edges = edges.merge(latest, left_on='source_id', right_on='firm_id', how='inner')
+        merged_edges['wgr'] = merged_edges['grow'] * merged_edges['weight']
+        gsum = merged_edges.groupby('focal_id')['wgr'].sum()
+        gden = merged_edges.groupby('focal_id')['weight'].sum()
         peer_g = pd.DataFrame({'firm_id': gsum.index, 'peer_grow': (gsum / gden).to_numpy()})
         g = g.merge(peer_g, on='firm_id', how='left')
         g = g.merge(latest.rename(columns={'grow': 'focal_grow'}), on='firm_id', how='left')
@@ -260,7 +260,7 @@ def main():
         return out
 
     res = {
-        'note': '补做检验 P2：A n_ij~相似度(蒋表3，配对级不做 focal 样本过滤) / B 关联复杂性交互(蒋表10) / C 小盘连接→大盘(AH p.17，2026-09-01 R10 起 cf_small/cf_large 分列) / D 基本面与收益(AH Table 12)。B/C/D 已套主复刻 microcap+次新过滤(R5，2026-09-01)。',
+        'note': '补做检验 B：A n_ij~相似度(蒋表3，配对级不做 focal 样本过滤) / B 关联复杂性交互(蒋表10) / C 小盘连接→大盘(AH p.17，2026-09-01 R10 起 cf_small/cf_large 分列) / D 基本面与收益(AH Table 12)。B/C/D 已套主复刻 microcap+次新过滤(R5，2026-09-01)。',
         'A_nij_similarity': fm_summary(rows_a, ['beta_ind', 'beta_size', 'beta_bm']),
         'B_link_complexity': fm_summary(rows_b, ['beta_cf', 'beta_cfxdeg', 'beta_deg']),
         'C_small_link_large_focal': fm_summary_by_var(rows_c),

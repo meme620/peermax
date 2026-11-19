@@ -1,4 +1,4 @@
-"""S3A smoketest：网络中心性共线性检查（2026-08-14，纯 numpy 幂迭代版）。
+"""analyst-network smoketest：网络中心性共线性检查（2026-08-14，纯 numpy 幂迭代版）。
 
 对抗审查 B1：派生变量 NetworkDegree/AnalystNetworkMass/EffectivePeerCount/Top1Weight
 与文献化中心性度量（eigenvector centrality / Perron vector）的相关性。

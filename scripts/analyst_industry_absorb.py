@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""S3A Step 9H：CF vs 行业动量吸收回归（对标 AH Table 6 / 蒋丹凌 2023 表 5）。
+"""analyst-network Step 9H：CF vs 行业动量吸收回归（对标 AH Table 6 / 蒋丹凌 2023 表 5）。
 
 逻辑（对标蒋丹凌等 2023 表 5 列 1-3/11）：
   - 因变量：Ret_{i,t+1}（下月收益）
@@ -9,7 +9,7 @@
     IndRet 0.951***→0.433** 缩小约一半；CFRet 系数保持 0.92-1.21***）
 
 行业来源：Drive ind_code（30 类两位数，非申万二级，登记口径）；地区待数据源确认（本版仅行业）。
-输出: reports/data_gates/G0/s3a_9h_absorb.json
+输出: reports/data_gates/G0/analyst_industry_absorb.json
 用法: python scripts/analyst_industry_absorb.py
 """
 import json
@@ -25,7 +25,7 @@ from analyst_meta import attach_meta
 from fileio import read_pickle
 
 DRIVE = Path('data/raw/drive')
-OUT = Path('reports/data_gates/G0/s3a_9h_absorb.json')
+OUT = Path('reports/data_gates/G0/analyst_industry_absorb.json')
 OUT.parent.mkdir(parents=True, exist_ok=True)
 
 
@@ -39,8 +39,8 @@ def load_ind():
     s = read_pickle(DRIVE / 'ind_code.pkl')
     # index '000001.SZ' -> 6 位码（与 ret 清洗后的 firm_id 对齐）
     firm = s.index.astype(str).str.split('.').str.get(0)
-    s2 = pd.Series(s.values, index=firm, name='ind')
-    return s2[~s2.index.duplicated(keep='first')]
+    industry_series = pd.Series(s.values, index=firm, name='ind')
+    return industry_series[~industry_series.index.duplicated(keep='first')]
 
 
 def main():
@@ -162,8 +162,8 @@ def main():
             except np.linalg.LinAlgError:
                 continue
             resid = yy - X @ beta
-            s2 = resid @ resid / max(len(yy) - X.shape[1], 1)
-            cov = s2 * np.linalg.inv(X.T @ X)
+            resid_cov = resid @ resid / max(len(yy) - X.shape[1], 1)
+            cov = resid_cov * np.linalg.inv(X.T @ X)
             se = np.sqrt(np.diag(cov))
             for k, x in enumerate(x_names):
                 coefs[x].append(beta[k + 1])

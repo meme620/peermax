@@ -1,4 +1,4 @@
-"""S3A smoketest B2：派生控制变量之间的冗余度（2026-08-14）。
+"""analyst-network smoketest B2：派生控制变量之间的冗余度（2026-08-14）。
 
 自设计：6 个控制变量（AnalystCoverage/BrokerCoverage/NetworkDegree/
 AnalystNetworkMass/EffectivePeerCount/Top1Weight）。

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""市值面板（S2.4 Size/BM 输入）：月末市值 = close × 月末前最新可得股本。
+"""市值面板（daily-panel.4 Size/BM 输入）：月末市值 = close × 月末前最新可得股本。
 
 口径（事件前规则）:
   默认 base = v2[year=t]（年末值）；t 年内送转（EX_DIVIDEND_DATE ≤ 月末 生效）已含在 v2[t]，
@@ -127,5 +127,57 @@ def main():
             print(f"茅台 2024-12-31: close={r[2]} share={r[3]} 市值={float(r[4])/1e8:.0f}亿", file=sys.stderr)
 
 
+DRIVE_MV = os.path.join(os.path.dirname(__file__), "..", "data", "raw", "drive",
+                        "daily_a_share_market_val_3_20260630.pkl")
+DRIVE_CLOSE = os.path.join(os.path.dirname(__file__), "..", "data", "raw", "drive",
+                           "daily_close_none_20260630.pkl")
+
+
+def run_drive():
+    """从 Drive 面板直接产出市值面板（tencent/股本历史不可得时的替代源）。
+
+    Drive 的 daily_a_share_market_val_3 已是总市值（元）；月末取最后一行即可，
+    不需要 close × 股本还原。end_share 用 market_equity / close 反推，仅作审计列。
+    """
+    import pandas as pd
+
+    mv = pd.read_pickle(DRIVE_MV)
+    close = pd.read_pickle(DRIVE_CLOSE).reindex(index=mv.index, columns=mv.columns)
+    me_m = mv.resample("ME").last()
+    px_m = close.resample("ME").last()
+    rows = []
+    for dt, me_row in me_m.iterrows():
+        d = dt.strftime("%Y-%m-%d")
+        for col, val in me_row.items():
+            if pd.isna(val):
+                continue
+            num, _, mkt = str(col).partition(".")
+            code = num
+            c = px_m.at[dt, col] if dt in px_m.index else None
+            c = None if (c is None or pd.isna(c) or c <= 0) else float(c)
+            share = (float(val) / c) if c else None
+            rows.append([code, d, "" if c is None else round(c, 6),
+                         "" if share is None else round(share, 6),
+                         round(float(val), 2),
+                         "market_val_drive" if c else "no_close"])
+    out = os.path.join(OUT, "market_equity_panel.csv")
+    with open(out, "w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow(["firm_id", "date", "close", "end_share", "market_equity", "missing_reason"])
+        w.writerows(rows)
+    print(f"市值面板（drive）: {len(rows):,} 行 -> {out}", file=sys.stderr)
+
+
+def _main_drive():
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--source", choices=["tencent", "drive"], default="tencent")
+    args = ap.parse_args()
+    if args.source == "drive":
+        run_drive()
+    else:
+        main()
+
+
 if __name__ == "__main__":
-    main()
+    _main_drive()

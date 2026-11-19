@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""S3 第一梯队 ④：2021 断点分段稳健性（结构层）。
+"""network 第一梯队 ④：2021 断点分段稳健性（结构层）。
 
 **只读复算**：不重估 K、不重建网络、不碰面板/回归、不改任何 headline_value / 冻结参数；只新建
 `reports/data_gates/G0/network_business_segment_robustness.{json,md}`。复用 `network_business_chapter_cross_audit.py`
 的纯函数（read_edges / read_support / load_sw2 / peer_stats / sw2_lift / isolation / corpus_richness）。
 
 口径真源：
-  - `reports/audits/s3_remaining_workplan_20261011.md` 第一梯队 4
+  - `reports/audits/network_remaining_workplan_20261011.md` 第一梯队 4
   - 主仓库 methodology_execution_plan §8 B″11-3
-  - `reports/audits/s3_network_open_items_plan_20261006.md` §3-①A（含 2026-10-06 二修：两版本切分、
+  - `reports/audits/network_open_items_plan_20261006.md` §3-①A（含 2026-10-06 二修：两版本切分、
     版本 2 后段 2 年停机例外、下游只能 2018–2020 vs 2021–2023、措辞「两网下游未反向（描述性）」）
 
 切分（网络年；段内用各自年度 K，不重估、不重建）：
@@ -23,7 +23,7 @@
 base = Σ_k n_k(n_k−1)/(N(N−1))）、段间边 Jaccard（共同节点集内外各一）、`mean_terms`、隔离率、K。
 
 下游段对照：**只能 2018–2020 vs 2021–2023**，且只作描述性（措辞「两网下游未反向（描述性）」）；
-数值直接引用既有 `s3_ma_downstream_consistency.json → segments`，本步不重算。
+数值直接引用既有 `network_business_downstream_consistency.json → segments`，本步不重算。
 
 停机：某段 <3 个网络年（版本 2 后段按登记例外除外），或段内隔离率跳变 >2 倍 → 停，先定位语料。
 用法：python scripts/network_business_segment_robustness.py
@@ -44,7 +44,7 @@ import network_business_chapter_cross_audit as CA  # noqa: E402
 
 REPD = ROOT / 'reports/data_gates/G0'
 TEACH_DIR = ROOT / 'data/processed/network_ma_teacher'
-DOWNSTREAM = REPD / 's3_ma_downstream_consistency.json'
+DOWNSTREAM = REPD / 'network_business_downstream_consistency.json'
 TEXT_YEARS = list(range(2014, 2023))         # 主口径 9 年：文本年 2014–2022 → 网络年 2015–2023
 SEG_V1 = {'2015_2020': [2015, 2016, 2017, 2018, 2019, 2020], '2021_2023': [2021, 2022, 2023]}
 SEG_V2 = {'text_2014_2020': [2015, 2016, 2017, 2018, 2019, 2020, 2021], 'text_2021_2022': [2022, 2023]}
@@ -144,7 +144,7 @@ def downstream_block() -> dict:
     """下游段对照（只作描述性；直接引用既有产物，不重算）。"""
     if not DOWNSTREAM.exists():
         return {'status': 'pending', 'gating': False,
-                'note': '下游对照报告缺失（reports/data_gates/G0/s3_ma_downstream_consistency.json）'}
+                'note': '下游对照报告缺失（reports/data_gates/G0/network_business_downstream_consistency.json）'}
     d = json.loads(DOWNSTREAM.read_text(encoding='utf-8'))
     h = d.get('cross_audit_handoff', {})
     segs = d.get('segments', {})
@@ -163,7 +163,7 @@ def downstream_block() -> dict:
             'reading': ('逐段看（**日历月段**，非文本年/网络年）：2018-01–2020-12 两网多空同为正'
                         '（+0.004149 / +0.004202），2021-01–2023-12 两网多空同为负'
                         '（−0.009676 / −0.007864）→ **两网（主口径 ↔ 文本稳健性）在段内方向一致、未反向**；'
-                        '跨段符号翻转属描述性事实，**不得**据此写成「分段稳健性通过」，亦不得作 M1/M2 '
+                        '跨段符号翻转属描述性事实，**不得**据此写成「分段稳健性通过」，亦不得作 定价 gate / 机制层 '
                         '输入合格性证据（ⓔ 类探索性/事后对照）'),
             'note': '本块为 post hoc 描述性对照（非 outcome-blind 预登记、非闸门）；数值原样引用既有产物，'
                     '本步未重算任何下游量'}
@@ -173,8 +173,8 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument('--net-dir', default=str(TEACH_DIR))
     ap.add_argument('--text-years', type=int, nargs='*', default=TEXT_YEARS)
-    ap.add_argument('--out-json', default=str(REPD / 's3_ma_segment_robustness.json'))
-    ap.add_argument('--out-md', default=str(REPD / 's3_ma_segment_robustness.md'))
+    ap.add_argument('--out-json', default=str(REPD / 'network_business_segment_robustness.json'))
+    ap.add_argument('--out-md', default=str(REPD / 'network_business_segment_robustness.md'))
     args = ap.parse_args()
 
     net_dir = Path(args.net_dir)
@@ -443,7 +443,7 @@ def main() -> None:
             '断点机制检查：断点后段（网络年 2021–2023 = 文本年 2020–2022）mean_terms **未**高于前段'
             '（网络年 2015–2020 = 文本年 2014–2019），须登记说明（不得反向解读为「无断点」）')
     rep = {
-        'step': 'S3 第一梯队 ④ 断点分段稳健性（文本年 2021 语料断点；结构层；不重估 K、不重建网络）',
+        'step': 'network 第一梯队 ④ 断点分段稳健性（文本年 2021 语料断点；结构层；不重估 K、不重建网络）',
         'run_at': datetime.now(timezone.utc).isoformat(),
         'net_dir': str(net_dir.relative_to(ROOT)).replace('\\', '/'),
         'nature': '只读复算：不重估 K、不重建网络、不碰面板/回归、不改任何 headline_value / 冻结参数；'
@@ -502,7 +502,7 @@ def main() -> None:
     outp.parent.mkdir(parents=True, exist_ok=True)
     outp.write_text(json.dumps(rep, ensure_ascii=False, indent=2), encoding='utf-8')
 
-    md = ['# S3 断点分段稳健性（文本年 2021 语料断点；结构层；第一梯队 ④ / B″11-3、§3-①A）', '',
+    md = ['# network 断点分段稳健性（文本年 2021 语料断点；结构层；第一梯队 ④ / B″11-3、§3-①A）', '',
           f'生成时间：{rep["run_at"]}；网络目录：`{rep["net_dir"]}`（主口径，9 个网络年 2015–2023）', '',
           '**只读复算**：段内用各自年度 K、不重估、不重建网络；不改任何 headline_value / 冻结参数。', '',
           f'**年份轴（L-3）**：本文件除注明外，年份一律为**网络年（文本年 y−1）**（`text_years` 列与「文本年」'

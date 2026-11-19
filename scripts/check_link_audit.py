@@ -5,12 +5,12 @@
 读 scope_card.yaml + claim_registry.yaml + parameter_registry.yaml（name 列表），检查：
   1. 每个 claim 的 7 类连接齐全（treatment/outcome/unit/horizon/formula/input_field/required_gate）；
   2. formula_id 非空且无重复主版本（candidate 状态除外）；
-  3. scope_card 与 claim_registry 一致性（M1_headline 的 treatment/outcome 必须等于 scope_card 的 primary_treatment/primary_outcome）；
+  3. scope_card 与 claim_registry 一致性（pricing_headline_claim 的 treatment/outcome 必须等于 scope_card 的 primary_treatment/primary_outcome）；
   4. required_gates 均在 G1-G8 范围内；
   5. input_tables/input_fields 非空。
 输出 JSON 报告；exit code 0=PASS（无 FAIL），1=FAIL。
 
-用法: python scripts/check_link_audit.py [--out reports/execution/stage0/registry_link_audit_report.json]
+用法: python scripts/check_link_audit.py [--out reports/execution/registry_link_audit_report.json]
 """
 import argparse
 import json
@@ -91,7 +91,7 @@ def parse_claims(text):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--out", default=str(ROOT / "reports/execution/stage0/registry_link_audit_report.json"))
+    ap.add_argument("--out", default=str(ROOT / "reports/execution/registry_link_audit_report.json"))
     args = ap.parse_args()
 
     scope = read_yaml_flat(SCOPE_CARD)
@@ -142,14 +142,14 @@ def main():
         if not c.get("input_tables"):
             fails.append(f"{cid}: input_tables 为空")
 
-    # 5) scope_card 一致性（M1_headline ↔ primary_treatment/primary_outcome）
-    m1 = next((c for c in claims if c.get("claim_id") == "M1_headline"), None)
-    if m1:
-        if m1.get("treatment", "").strip() != scope.get("primary_treatment", "").strip():
-            fails.append("M1_headline.treatment 与 scope_card.primary_treatment 不一致")
-        if m1.get("outcome", "").strip() != scope.get("primary_outcome", "").strip():
-            fails.append("M1_headline.outcome 与 scope_card.primary_outcome 不一致")
-        add("M1_headline", "scope_card_link", "PASS", "treatment/outcome 一致")
+    # 5) scope_card 一致性（pricing_headline_claim ↔ primary_treatment/primary_outcome）
+    headline_claim = next((c for c in claims if c.get("claim_id") == "pricing_headline_claim"), None)
+    if headline_claim:
+        if headline_claim.get("treatment", "").strip() != scope.get("primary_treatment", "").strip():
+            fails.append("pricing_headline_claim.treatment 与 scope_card.primary_treatment 不一致")
+        if headline_claim.get("outcome", "").strip() != scope.get("primary_outcome", "").strip():
+            fails.append("pricing_headline_claim.outcome 与 scope_card.primary_outcome 不一致")
+        add("pricing_headline_claim", "scope_card_link", "PASS", "treatment/outcome 一致")
     # 6) registry 可读
     if not registry_names:
         fails.append("parameter_registry: 未解析到参数名")
@@ -165,7 +165,7 @@ def main():
         "n_links": len(links),
         "link_details": links,
         "failures": fails,
-        "next_step_allowed": "S1" if status == "PASS" else "S0（修复后重跑）",
+        "next_step_allowed": "inventory" if status == "PASS" else "S0（修复后重跑）",
     }
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""S3A 9K：不限 FY（Long 口径，本数据源下与蒋口径等值）对照网络构建（2026-09-01 登记）。
+"""analyst-network 9K：不限 FY（Long 口径，本数据源下与蒋口径等值）对照网络构建（2026-09-01 登记）。
 
 与 v3 唯一差异 = 去掉 FY 过滤（gap∈[0,1]）；窗口 (cutoff-12M, cutoff]、Anndats<=cutoff、
 mapping_ok、A_code ^A\\d{5}$、(firm,analyst,report) 去重语义、投影与行归一化权重全部同 step5/67。
@@ -20,7 +20,7 @@ from collections import defaultdict
 import numpy as np
 import pandas as pd
 
-SRC = 'data/processed/analyst/s3a_step3_clean.csv'
+SRC = 'data/processed/analyst/analyst_step3_clean.csv'
 OUTD = Path('data/processed/analyst')
 EDGED = OUTD / 'edges'
 WINDOW_MONTHS = 12

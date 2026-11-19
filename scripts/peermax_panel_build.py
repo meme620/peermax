@@ -1,4 +1,4 @@
-"""S4 Step 2 正式版：PeerMAXraw / OwnMAXraw / PeerReturn（P1.2-01 + P1.2-04 面板侧，2026-11-17）。
+"""panel Step 2 正式版：PeerMAXraw / OwnMAXraw / PeerReturn（面板侧，2026-11-17）。
 
 W1 bundle 口径（D-03=A / D-08=A+B / T-01）：
   1. **主列未归一化**（D-08 A）：`PeerMAXraw = Σ_j w_ij · MAXraw_jt`、`PeerReturn = Σ_j w_ij · R_jt`；
@@ -7,15 +7,15 @@ W1 bundle 口径（D-03=A / D-08=A+B / T-01）：
   2. **再归一化独立登记**（D-08 B）：`PeerMAXraw_renorm = pm / w_max`（pm = Σ_observed w·x），
      `formula_id_max_renorm=PEERMAX_RAW_RENORM_v1`，`allowed_use=robustness_only`、`gate_bearing=false`，
      不得覆盖写回主列。D-03=A 下**不产出** `PeerReturn_renorm` / `formula_id_ret_renorm`。
-  3. **peer R 质量（P1.2-04 面板侧）**：收益源切到 `monthly_returns_clean_v2.csv`；`nv==0` 的 peer R
+  3. **peer R 质量（面板侧）**：收益源切到 `monthly_returns_clean_v2.csv`；`nv==0` 的 peer R
      不进 `pr`（计 `n_ret_zero_trading_days` / `missing_mass_ret`）；D-03=A 下 `0<nv<15` 的 peer 也排除
      （计 `n_ret_incomplete` / `incomplete_mass_ret` / `missing_mass_ret`）。
-  4. **source-month 完整月 gate（P1.1-01）**：读 `complete_month`（缺列 → SystemExit(2)）；
+  4. **source-month 完整月 gate（口径更正）**：读 `complete_month`（缺列 → SystemExit(2)）；
      MAX 支持集 = `qualification_status` 已知且非 `limit_status_unknown` 且 `complete_month==1`；
      不完整 source 的观测 MAX 只进 partial；`OwnMAXraw` 在 focal `complete_month!=1` 时留空。
   5. **版本身份（T-01）**：`network_version` = 文本年（下游 `pd.to_numeric` 依赖）；
      `network_version_label` = `{year}_build_report.json:network_version`（完整标签；缺失/非字符串 → 停）。
-  6. **聚合唯一实现** = `pricing_lib.aggregate_stat`（P1.2-01 owner；P1.4-05/M2 复用，禁止第二套）。
+  6. **聚合唯一实现** = `pricing_lib.aggregate_stat`（唯一实现，禁止第二套）。
 
 输入：
   data/processed/source_month_argmax_panel.csv（MAXraw / qualification / complete_month）
@@ -23,13 +23,13 @@ W1 bundle 口径（D-03=A / D-08=A+B / T-01）：
   data/processed/network_{ma_teacher,mb_teacher,ma,mb}/{text_year}_similarity.csv（冻结边表）
 输出：
   data/processed/monthly_pricing_panel_{use_case}{suffix}.csv（--out 可覆盖）
-  reports/data_gates/G0/s4_step2_{corpus}_v4_report.json
+  reports/data_gates/G0/peermax_panel_build_{corpus}_v4_report.json
 用法：
   python scripts/peermax_panel_build.py --use-case ma \
     --net-dir data/processed/network_ma_teacher --corpus-id ma_teacher \
-    --panel-version s4_panel_ma_teacher_2015_01_2023_12_v1 \
+    --panel-version panel_ma_teacher_2015_01_2023_12_v1 \
     --out data/processed/monthly_pricing_panel_ma_teacher_v4.csv \
-    --report reports/data_gates/G0/s4_step2_ma_teacher_v4_report.json \
+    --report reports/data_gates/G0/peermax_panel_build_ma_teacher_v4_report.json \
     --start 2015-01 --end 2023-12
 """
 import argparse
@@ -47,7 +47,7 @@ import pandas as pd
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
-from pricing_lib import (aggregate_stat, assert_m1_inputs, assert_named_m1_input,
+from pricing_lib import (aggregate_stat, assert_pricing_inputs, assert_named_pricing_input,
                          param_value, sample_window_bounds, file_size)
 
 ARGMAX = ROOT / 'data/processed/source_month_argmax_panel.csv'
@@ -64,7 +64,7 @@ KNOWN_NET_DIRS = set(NET_DIR_SUFFIX) | {'network_ma', 'network_mb'}
 OUTD = ROOT / 'data/processed'
 REPD = ROOT / 'reports/data_gates/G0'
 SAMPLE_DIR = ROOT / 'data/processed'
-# 默认窗口 = registry sample_start/sample_end（2026-11-19 审核收口；原硬编码 2018-01..2025-12 与 M1 不一致）
+# 默认窗口 = registry sample_start/sample_end（2026-11-19 审核收口；原硬编码 2018-01..2025-12 与 pricing_gate 不一致）
 SAMPLE_START, SAMPLE_END = sample_window_bounds()
 EXCLUDE_QUAL = 'limit_status_unknown'
 AVAILABLE_AT_RULE = '{text_year+1}-04-30; missing=STOP'
@@ -74,7 +74,7 @@ NETWORK_AVAILABLE_AT_RULE = '(y+1)-04-30'
 _NETWORK_PREFIX_RE = re.compile(r'[a-z][a-z0-9_]*_v\d+\Z')
 _SIMILARITY_NAME_RE = re.compile(r'(\d{4})_similarity\.csv\Z')
 
-# P1.2-01 A1（43 列）+ D-08 B（PeerMAXraw_renorm / formula_id_max_renorm，追加表尾）
+# A1（43 列）+ D-08 B（PeerMAXraw_renorm / formula_id_max_renorm，追加表尾）
 COLS = ['focal_id', 'month', 'network_use_case', 'network_version',
         'network_version_label', 'corpus_id', 'panel_version', 'available_at',
         'PeerMAXraw', 'OwnMAXraw', 'PeerReturn', 'PeerMAXraw_partial',
@@ -89,7 +89,8 @@ COLS = ['focal_id', 'month', 'network_use_case', 'network_version',
         'network_support_status', 'data_status', 'coverage_flag',
         'missing_reason', 'formula_id_max', 'formula_id_ret',
         'source_version',
-        'PeerMAXraw_renorm', 'formula_id_max_renorm']
+        'PeerMAXraw_renorm', 'formula_id_max_renorm', 'PeerMAXraw_la', 'coverage_ratio_la',
+        'PeerMAXraw_incl_all']
 SOURCE_VERSION = 'MAXRAW_v1|monthly_returns_clean_v2'
 FORMULA_ID_MAX = 'PEERMAX_RAW_v1'
 FORMULA_ID_RET = 'PEER_RETURN_v1'
@@ -127,7 +128,7 @@ def resolve_outputs(args, netd):
     out = (ROOT / args.out) if args.out else OUTD / (
         f'monthly_pricing_panel_{args.use_case}{suffix}.csv')
     rp = (ROOT / args.report) if args.report else REPD / (
-        f's4_step2_{args.use_case}{suffix}_report.json')
+        f'peermax_panel_build_{args.use_case}{suffix}_report.json')
     return out, rp
 
 
@@ -319,6 +320,26 @@ def load_net(path, cache, key):
     return edges
 
 
+def load_support_status(similarity_path, cache, key):
+    """读同年 support.csv：focal_id -> network_support_status。
+
+    similarity.csv 只含"至少有 1 条边"的 focal，singleton 团（无同团成员）不出现在
+    边表里。不读 support.csv 时这些 focal-month 会静默消失，样本损失无法审计；
+    读进来后为它们补行并标 no-network-support。
+    """
+    if key in cache:
+        return cache[key]
+    p = Path(similarity_path).with_name(Path(similarity_path).name.replace(
+        '_similarity.csv', '_support.csv'))
+    out = {}
+    if p.is_file():
+        with open(p, encoding='utf-8', newline='') as f:
+            for r in csv.DictReader(f):
+                out[r['focal_id']] = r.get('network_support_status') or 'support'
+    cache[key] = out
+    return out
+
+
 def _num(v):
     """dict.get 值 -> float or None（空串/None/NaN → None）。"""
     if v is None:
@@ -376,7 +397,7 @@ def main(argv=None):
     ap.add_argument('--out', default=None,
                     help='显式输出 CSV 路径（缺省按 use-case + net_dir suffix 命名）')
     ap.add_argument('--report', default=None,
-                    help='缺省 reports/data_gates/G0/s4_step2_{use_case}{suffix}_report.json；'
+                    help='缺省 reports/data_gates/G0/peermax_panel_build_{use_case}{suffix}_report.json；'
                          '未登记 net_dir 必须显式给出')
     ap.add_argument('--start', default=SAMPLE_START)
     ap.add_argument('--end', default=SAMPLE_END)
@@ -384,16 +405,16 @@ def main(argv=None):
                     help='registry YAML（缺省 configs/parameter_registry.yaml；仅测试注入）')
     args = ap.parse_args(argv)
 
-    # 读取 M1 输入之前先核验锚（source-month 与 clean_v2 均在 manifest 登记）。
-    # 报告登记（07 §8.8）：input_anchors 记录本次实际核验的 9 个 M1 输入锚。
-    m1_ledger = assert_m1_inputs()
-    anchor_argmax = assert_named_m1_input('source_month_argmax_panel', ARGMAX)
-    anchor_returns = assert_named_m1_input('monthly_returns_clean_v2', RETURNS)
+    # 读取 pricing_gate 输入之前先核验锚（source-month 与 clean_v2 均在 manifest 登记）。
+    # 报告登记（07 §8.8）：input_anchors 记录本次实际核验的 9 个 pricing_gate 输入锚。
+    pricing_ledger = assert_pricing_inputs()
+    anchor_argmax = assert_named_pricing_input('source_month_argmax_panel', ARGMAX)
+    anchor_returns = assert_named_pricing_input('monthly_returns_clean_v2', RETURNS)
     input_anchors = [
         {'input': e['input'], 'file': e['file'], 'rows': e['rows'],
          'rows_registered': e['rows_registered'],
          'rows_match_registered': e['rows_match_registered']}
-        for e in m1_ledger
+        for e in pricing_ledger
     ]
 
     netd = (ROOT / args.net_dir) if args.net_dir else NETS[args.use_case]
@@ -418,9 +439,11 @@ def main(argv=None):
     missing_cols = sorted(required - set(header))
     if missing_cols:
         raise SystemExit(
-            f'[STOP] source_month_argmax_panel 缺 P1.1-01 字段 {missing_cols}；'
-            '不得默认 complete_month=1（先执行 P1.1-01）')
-    maxraw, qual, lim, complete = defaultdict(dict), defaultdict(dict), defaultdict(dict), defaultdict(dict)
+            f'[STOP] source_month_argmax_panel 缺 口径更正 字段 {missing_cols}；'
+            '不得默认 complete_month=1（先执行 口径更正）')
+    maxraw, maxraw_la, maxraw_all, qual, lim, complete = (
+        defaultdict(dict), defaultdict(dict), defaultdict(dict),
+        defaultdict(dict), defaultdict(dict), defaultdict(dict))
     with open(ARGMAX, encoding='utf-8', newline='') as f:
         for r in csv.DictReader(f):
             m = r['month']
@@ -428,6 +451,13 @@ def main(argv=None):
             mv = _num(r.get('MAXraw'))
             if mv is not None:
                 maxraw[m][mid] = mv
+            mv_la = _num(r.get('MAXraw_la'))
+            if mv_la is not None:
+                maxraw_la[m][mid] = mv_la
+            # 含全部交易日的 MAX（不剔涨跌停/复牌首日）：并列规格用
+            mv_all = _num(r.get('MAXraw_incl_all'))
+            if mv_all is not None:
+                maxraw_all[m][mid] = mv_all
             q = (r.get('qualification_status') or '').strip()
             if q:
                 qual[m][mid] = q
@@ -436,7 +466,7 @@ def main(argv=None):
                 lim[m][mid] = int(lv)
             complete[m][mid] = int(float(r['complete_month']))
 
-    # 月收益（v2；P1.2-04 切换）
+    # 月收益（v2；口径切换）
     rmap, nvmap, ret_complete = defaultdict(dict), {}, {}
     with open(RETURNS, encoding='utf-8', newline='') as f:
         for r in csv.DictReader(f):
@@ -480,6 +510,7 @@ def main(argv=None):
                 status_counts['no_available_network_version'] += 1
             continue
         edges = load_net(v['path'], cache, (args.use_case, v['text_year']))
+        sup_status = load_support_status(v['path'], cache, (args.use_case, v['text_year']))
         records = [(focal, src, w) for focal, lst in edges.items() for src, w in lst]
         edf = pd.DataFrame(records, columns=['focal_id', 'source_id', 'weight'])
         edf['month'] = month
@@ -489,9 +520,13 @@ def main(argv=None):
         ll = lim[month]
         cm = complete[month]
         rrm = rmap[month]
+        ml = maxraw_la[month]
+        mall = maxraw_all[month]
         src = pd.DataFrame({
             'source_id': sids,
             'MAXraw': sids.map(lambda s: mm.get(s)),
+            'MAXraw_la': sids.map(lambda s: ml.get(s)),
+            'MAXraw_incl_all': sids.map(lambda s: mall.get(s)),
             'R': sids.map(lambda s: rrm.get(s)),
             'q': sids.map(lambda s: qq.get(s)),
             'lim': sids.map(lambda s: ll.get(s)),
@@ -514,10 +549,20 @@ def main(argv=None):
         a_max = aggregate_stat(
             edf, src, 'MAXraw', elig_max, 'max', excluded_mask=is_excl,
             incomplete_mask=inc_max, extra_weight=extra_w)
+        # MAXraw_incl_all：含全部交易日的 MAX（不剔涨跌停/复牌首日）；并列规格用，不进 headline
+        a_all = aggregate_stat(
+            edf, src, 'MAXraw_incl_all', elig_max, 'max_all', excluded_mask=is_excl,
+            incomplete_mask=inc_max)
+        # MAXraw_la：额外剔除上市宽限窗口（新股无涨跌幅限制期），支持规则与主列一致
+        a_la = aggregate_stat(
+            edf, src, 'MAXraw_la', elig_max, 'max_la', excluded_mask=is_excl,
+            incomplete_mask=inc_max, extra_weight=extra_w)
         a_ret = aggregate_stat(
             edf, src, 'R', elig_ret, 'ret', zero_trading_days_mask=zero_ret,
             incomplete_mask=inc_ret)
-        agg = a_max.merge(a_ret, on=['month', 'focal_id'], how='outer')
+        agg = a_max.merge(a_la, on=['month', 'focal_id'], how='outer')
+        agg = agg.merge(a_all, on=['month', 'focal_id'], how='outer')
+        agg = agg.merge(a_ret, on=['month', 'focal_id'], how='outer')
         agg = agg.sort_values(['month', 'focal_id'], kind='stable').reset_index(drop=True)
 
         sup = agg['support_mass_max'].to_numpy(float)
@@ -547,6 +592,10 @@ def main(argv=None):
         peer_max_partial = np.where(np.isnan(v_max) & (wmax > 0), np.round(p_max, 8), '')
         peer_ret_partial = np.where(np.isnan(v_ret) & (wret > 0), np.round(p_ret, 8), '')
         renorm_out = np.where(wmax > 0, np.round(renorm, 8), '')
+        v_la = agg['weighted_value_max_la'].to_numpy(float)
+        wla = agg['covered_mass_max_la'].to_numpy(float)
+        peer_max_la = np.where(np.isnan(v_la), '', np.round(v_la, 8))
+        cov_la = np.where(sup > 0, wla / np.where(sup > 0, sup, 1.0), np.nan)
         fid_arr = agg['focal_id'].to_numpy()
         own = np.array([
             (mm[f] if (f in mm and f in cm and cm.get(f, 0) == 1) else np.nan)
@@ -593,12 +642,18 @@ def main(argv=None):
                 'support_status_ret': agg['support_status_ret'].iloc[i],
                 'missing_reason_max': agg['missing_reason_max'].iloc[i],
                 'missing_reason_ret': agg['missing_reason_ret'].iloc[i],
-                'network_support_status': 'support',
+                'network_support_status': sup_status.get(fid, 'support'),
                 'data_status': ds[i], 'coverage_flag': cov_flag[i],
                 'missing_reason': reason[i],
                 'formula_id_max': FORMULA_ID_MAX, 'formula_id_ret': FORMULA_ID_RET,
                 'source_version': SOURCE_VERSION,
                 'PeerMAXraw_renorm': renorm_out[i],
+            'PeerMAXraw_la': peer_max_la[i],
+            'PeerMAXraw_incl_all': (
+                '' if np.isnan(agg['weighted_value_max_all'].iloc[i])
+                else round(float(agg['weighted_value_max_all'].iloc[i]), 8)),
+            'coverage_ratio_la': (round(float(cov_la[i]), 8)
+                                  if np.isfinite(cov_la[i]) else ''),
                 'formula_id_max_renorm': FORMULA_ID_MAX_RENORM if renorm_out[i] != '' else '',
             })
             st['rows_support'] += 1
@@ -621,6 +676,38 @@ def main(argv=None):
             if own_inc[i]:
                 gate['rows_own_incomplete'] += 1
 
+        # singleton 团（无同团成员）补行：边表没有它们，support.csv 有。
+        # 不补则这些 focal-month 在面板里静默消失，样本损失不可审计。
+        have = set(agg['focal_id'].astype(str))
+        for fid, status in sup_status.items():
+            if fid in have or status == 'support':
+                continue
+            row = {c: '' for c in COLS}
+            row.update({
+                'focal_id': fid, 'month': month, 'network_use_case': args.use_case,
+                'network_version': str(v['text_year']),
+                'network_version_label': v['label'],
+                'corpus_id': corpus_id, 'panel_version': panel_version,
+                'available_at': v['available_at'],
+                'n_sources': 0, 'n_max_sources': 0, 'n_ret_sources': 0,
+                'n_max_incomplete': 0, 'n_ret_incomplete': 0,
+                'n_max_missing_statistic': 0, 'n_max_excluded_limit_unknown': 0,
+                'n_ret_missing_statistic': 0, 'n_ret_zero_trading_days': 0,
+                'support_mass': 0.0, 'covered_mass_max': 0.0, 'covered_mass_ret': 0.0,
+                'incomplete_mass_max': 0.0, 'incomplete_mass_ret': 0.0,
+                'missing_mass_max': 0.0, 'missing_mass_ret': 0.0,
+                'support_status_max': 'not_applicable',
+                'support_status_ret': 'not_applicable',
+                'network_support_status': status,
+                'data_status': 'no_network_support', 'coverage_flag': 'not_covered',
+                'missing_reason': status,
+                'formula_id_max': FORMULA_ID_MAX, 'formula_id_ret': FORMULA_ID_RET,
+                'source_version': SOURCE_VERSION,
+            })
+            rows.append(row)
+            status_counts['no_network_support'] += 1
+            st['rows_no_support'] += 1
+
         # 零交易日 R 权重（面板级 + FM 子集诊断；FM 子集在报告阶段计算）
         zero_mass = float(edf.loc[zero_ret.to_numpy(), 'weight'].sum())
         st['mass_ret_zero_td'] += zero_mass
@@ -634,14 +721,14 @@ def main(argv=None):
         w.writerows(rows)
     os.replace(tmp_out, out)
     mass_support = st['mass_support']
-    # nv0_ret_weight_share：06 证据口径 = FM 行（v3 m1_in_fm_sample=1，只读诊断；W1 不产 v4 样本）
+    # nv0_ret_weight_share：06 证据口径 = FM 行（v3 pricing_in_fm_sample=1，只读诊断；W1 不产 v4 样本）
     fm_keys = None
     fm_universe = 'panel_all_support_rows'
-    v3p = SAMPLE_DIR / f'm1_common_sample_{corpus_id}_v3.parquet'
+    v3p = SAMPLE_DIR / f'pricing_sample_{corpus_id}_v3.parquet'
     if v3p.is_file():
         try:
-            v3 = pd.read_parquet(v3p, columns=['focal_id', 'month', 'm1_in_fm_sample'])
-            _fm = v3.loc[v3['m1_in_fm_sample'].fillna(False).astype(bool)]
+            v3 = pd.read_parquet(v3p, columns=['focal_id', 'month', 'pricing_in_fm_sample'])
+            _fm = v3.loc[v3['pricing_in_fm_sample'].fillna(False).astype(bool)]
             fm_keys = set(zip(_fm['month'], _fm['focal_id']))
             fm_universe = 'v3_fm_rows_readonly_diagnostic'
         except Exception as exc:  # 诊断口径不可用时回退面板级并在报告标注
@@ -668,8 +755,9 @@ def main(argv=None):
             sum(rows_by_data_status.values()) == len(rows),
         'rows_by_data_status_support_sum_equals_rows_support':
             sum(rows_by_data_status_support.values()) == int(st['rows_support']),
-        'rows_support_plus_no_version_equals_rows_total':
-            int(st['rows_support']) + int(st['rows_no_network']) == len(rows),
+        'rows_support_plus_no_version_plus_no_support_equals_rows_total':
+            (int(st['rows_support']) + int(st['rows_no_network'])
+             + int(st['rows_no_support'])) == len(rows),
         'included_incomplete_sources_zero':
             int(gate['included_incomplete_sources']) == 0,
         'ok_rows_missing_reason_empty':
@@ -680,7 +768,7 @@ def main(argv=None):
     status_rows_contract = (
         'PASS' if (status_checks['rows_by_data_status_sum_equals_rows_total']
                    and status_checks['rows_by_data_status_support_sum_equals_rows_support']
-                   and status_checks['rows_support_plus_no_version_equals_rows_total'])
+                   and status_checks['rows_support_plus_no_version_plus_no_support_equals_rows_total'])
         else 'FAIL')
     status_complete_month_gate = (
         'PASS' if status_checks['included_incomplete_sources_zero'] else 'FAIL')
@@ -689,7 +777,7 @@ def main(argv=None):
                    and status_checks['non_ok_rows_missing_reason_nonempty'])
         else 'FAIL')
     rep = {
-        'report_id': f's4_step2_peermax_{args.use_case}',
+        'report_id': f'peermax_panel_build_peermax_{args.use_case}',
         'use_case': args.use_case, 'corpus_id': corpus_id,
         'panel_version': panel_version,
         'run_at': datetime.now(timezone.utc).isoformat(),
@@ -742,6 +830,18 @@ def main(argv=None):
         'weight_policy': WEIGHT_POLICY,
         'formula_ids': {'max': FORMULA_ID_MAX, 'ret': FORMULA_ID_RET,
                         'max_renorm': FORMULA_ID_MAX_RENORM},
+        'listing_grace_policy': {
+            'column': 'PeerMAXraw_la',
+            'rule': 'MAXraw_la 额外剔除上市后前 listing_grace_days 个交易日（新股无涨跌幅限制期）；'
+                    '支持分类与主列一致',
+            'grace_days_source': 'configs/parameter_registry.yaml:parameters[name=max_day_policy]'
+                                 '.headline_value.listing_grace_days',
+            'allowed_use': 'robustness_only', 'gate_bearing': False},
+        'rows_la_extra_missing': int(sum(1 for r in rows
+                                         if r.get('PeerMAXraw') != '' and r.get('PeerMAXraw_la') == '')),
+        'rows_where_la_differs': int(sum(1 for r in rows
+                                         if r.get('PeerMAXraw') != '' and r.get('PeerMAXraw_la') != ''
+                                         and r.get('PeerMAXraw') != r.get('PeerMAXraw_la'))),
         'renorm_policy': {'column': 'PeerMAXraw_renorm',
                           'formula': 'sum_observed w*x / covered_mass_max',
                           'allowed_use': 'robustness_only', 'gate_bearing': False,
@@ -752,7 +852,8 @@ def main(argv=None):
                   'aggregation': 'raw unnormalized complete-only weighted sum (Σ w·x); partial diagnostics separate',
                   'missing': 'no 0-fill; empty + data_status; missing_mass accumulated directly; partial never headline',
                   'source_qualification': f'exclude {EXCLUDE_QUAL} from MAX support set',
-                  'return_measure': 'monthly_returns_clean_v2 R (raw close, frozen primary); '
+                  'return_measure': 'monthly_returns_clean_v2 R（口径见 reports/data_gates/G0/return_convention.json；'
+                                    '当前为 post_adjusted 后复权）；'
                                     'zero-trading-day and incomplete-month peers excluded (D-03=A)',
                   'source_month_gate': 'MAX/R complete_month==1 required; incomplete peers counted separately'},
     }

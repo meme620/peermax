@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """B3（S-2）：VW 权重函数敏感性矩阵（Phase 3b，只读诊断，不改 headline）。
 
-问题：headline M1 的 EW PeerMAX = +0.03427（t=0.47）与 VW PeerMAX = −0.10996（t=−1.18）
+问题：headline pricing_gate 的 EW PeerMAX = +0.03427（t=0.47）与 VW PeerMAX = −0.10996（t=−1.18）
 符号相反。本脚本只改**回归权重函数**（firm-level WLS 权重），保持样本、outcome、
 控制集、FM/NW 口径完全不变，判断 PeerMAX 符号是否由 ME（market equity）水平值权重函数决定。
 
@@ -14,20 +14,20 @@
   5. me_w95    : ME 月度截面 winsorize [q0.05, q0.95]
   6. me_w99    : ME 月度截面 winsorize [q0.01, q0.99]
 
-规格 S1（与 pricing_fm_main.py 主规格逐项一致）：
+规格 inventory（与 pricing_fm_main.py 主规格逐项一致）：
   R_next ~ PeerMAXraw + OwnMAXraw + PeerReturn + size + bm + mom + rev + turnover
             + illiq + AnalystCoverage + NetworkDegree
   逐月横截面 WLS -> 系数序列 -> 均值 + Newey-West(lag=6)；min_n=100（registry）。
 
 只读边界：
-  - 输入只有 data/processed/m1_common_sample_ma_teacher_v2.parquet（只读）与 pricing_lib；
-  - 不重跑 M1 / PC / 网络，不写 configs / G0 / reports；
-  - 9 个 M1 主输入 bytes 在运行前后各校验一次（前后必须一致）。
+  - 输入只有 data/processed/pricing_sample_ma_teacher_v2.parquet（只读）与 pricing_lib；
+  - 不重跑 pricing_gate / PC / 网络，不写 configs / G0 / reports；
+  - 9 个 pricing_gate 主输入 bytes 在运行前后各校验一次（前后必须一致）。
 
-产物（仅 artifacts/phase3b/3b_s2_*）：
-  3b_s2_weight_matrix.csv
-  3b_s2_counts.json
-  3b_s2_execution.md
+产物（仅 artifacts/phase3b/*）：
+  shadow_weight_matrix.csv
+  shadow_weight_counts.json
+  shadow_weight_execution.md
 
 用法：python scripts/shadow_weight_matrix.py
 """
@@ -41,18 +41,18 @@ import numpy as np
 import pandas as pd
 
 from pricing_lib import (
-    ROOT, assert_m1_contract, assert_m1_inputs, fm_regression, param_value,
-    require, file_size, winsorize_bounds_by_month, write_json,
+    ROOT, assert_pricing_contract, assert_pricing_inputs, fm_regression, param_value,
+    require, file_size, shadow_sample_path, winsorize_bounds_by_month, write_json,
 )
 
-SAMPLE = ROOT / 'data/processed/m1_common_sample_ma_teacher_v2.parquet'
+SAMPLE = shadow_sample_path('ma_teacher')
 OUT_DIR = ROOT / 'artifacts/phase3b'
 SAMPLE_ROWS_TOTAL = 307503          # v2 样本登记行数
 SAMPLE_ROWS_FM = 181178             # v2 FM 样本登记行数
 SAMPLE_MONTHS = 104                 # v2 FM 登记月数（2015-05..2023-12）
-FM_FLAG = 'm1_in_fm_sample'
+FM_FLAG = 'pricing_in_fm_sample'
 
-P = param_value('m1_sample_and_spec_registry')
+P = param_value('sample_and_spec_registry')
 NW_LAG = int(param_value('nw_lag'))
 MIN_N = int(P['min_focal_count_per_month'])
 CONTROLS = ['size', 'bm', 'mom', 'rev', 'turnover', 'illiq', 'AnalystCoverage',
@@ -187,15 +187,15 @@ def build_md(meta: dict, rows: list, verdict: dict) -> str:
     lines.append(f"- 生成时间（UTC）：{meta['created_at_utc']}")
     lines.append(f"- 脚本：`scripts/shadow_weight_matrix.py`"
                  f"（bytes `{meta['script_bytes'][:16]}…`）")
-    lines.append(f"- 样本：`data/processed/m1_common_sample_ma_teacher_v2.parquet`"
+    lines.append(f"- 样本：`data/processed/pricing_sample_ma_teacher_v2.parquet`"
                  f"（bytes `{meta['sample_bytes'][:16]}…`）")
     lines.append(f"- FM 样本：{meta['fm_rows']:,} 行 / {meta['fm_months']} 月；"
-                 f"规格 S1（PeerMAX + OwnMAX + PeerReturn + 8 controls），"
+                 f"规格 inventory（PeerMAX + OwnMAX + PeerReturn + 8 controls），"
                  f"min_n={meta['min_n']}，NW lag={meta['nw_lag']}")
-    lines.append('- 边界：只改 firm-level WLS 权重函数；不重跑 M1/PC/网络，'
+    lines.append('- 边界：只改 firm-level WLS 权重函数；不重跑 pricing_gate/PC/网络，'
                  '不写 headline/系数/gate/configs/G0/reports。')
     lines.append('')
-    lines.append('## 1. 输入锚（9 个 M1 主输入，运行前后各一次）')
+    lines.append('## 1. 输入锚（9 个 pricing_gate 主输入，运行前后各一次）')
     lines.append('')
     lines.append('| 输入 | bytes（前=后） | before | after |')
     lines.append('| --- | --- | --- | --- |')
@@ -220,7 +220,7 @@ def build_md(meta: dict, rows: list, verdict: dict) -> str:
                  '95% = [q0.05, q0.95]，99% = [q0.01, q0.99]。'
                  '六种权重均逐月确认 >0、有限、无缺失。')
     lines.append('')
-    lines.append('## 3. 六权重 S1 结果')
+    lines.append('## 3. 六权重 inventory 结果')
     lines.append('')
     lines.append('| 权重 | N | T | Kish 有效 N（中位） | 有效 N / n | '
                  '单股最大权重份额（中位） | PeerMAX β | PeerMAX t | '
@@ -237,9 +237,9 @@ def build_md(meta: dict, rows: list, verdict: dict) -> str:
             f"{r['own_max_beta']:+.5f} | {r['own_max_t_nw']:+.2f} | "
             f"{r['peer_return_beta']:+.5f} | {r['peer_return_t_nw']:+.2f} |")
     lines.append('')
-    lines.append('EW 与 ME 两行逐值复现 headline M1 主规格'
+    lines.append('EW 与 ME 两行逐值复现 headline pricing_gate 主规格'
                  '（EW +0.03427 / t=+0.47；VW −0.10996 / t=−1.18），'
-                 '确认本矩阵与 S1 口径一致。')
+                 '确认本矩阵与 inventory 口径一致。')
     lines.append('')
     rmap = {r['weight_id']: r for r in rows}
     raw_max = '；'.join(
@@ -289,9 +289,9 @@ def build_md(meta: dict, rows: list, verdict: dict) -> str:
     lines.append('python scripts/shadow_weight_matrix.py')
     lines.append('```')
     lines.append('')
-    lines.append('- `artifacts/phase3b/3b_s2_weight_matrix.csv`')
-    lines.append('- `artifacts/phase3b/3b_s2_counts.json`')
-    lines.append('- `artifacts/phase3b/3b_s2_execution.md`（本文件）')
+    lines.append('- `artifacts/phase3b/shadow_weight_matrix.csv`')
+    lines.append('- `artifacts/phase3b/shadow_weight_counts.json`')
+    lines.append('- `artifacts/phase3b/shadow_weight_execution.md`（本文件）')
     lines.append('')
     lines.append('## 8. 解释边界')
     lines.append('')
@@ -302,7 +302,7 @@ def build_md(meta: dict, rows: list, verdict: dict) -> str:
                  '未对权重集中做额外推断修正。')
     lines.append('- winsor 口径固定为 [5%,95%] / [1%,99%]；'
                  '「保留 95% 中心区间 [2.5%,97.5%]」是另一种读法，未在本矩阵中运行。')
-    lines.append('- 所有输入只读；未重跑 M1/PC/网络，未改动任何既有产物。')
+    lines.append('- 所有输入只读；未重跑 pricing_gate/PC/网络，未改动任何既有产物。')
     lines.append('')
     return '\n'.join(lines)
 
@@ -311,14 +311,14 @@ def main() -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     created = datetime.now(timezone.utc).isoformat(timespec='seconds')
 
-    print('[S2] 校验 9 个 M1 主输入（运行前）…', flush=True)
-    sha_before = assert_m1_inputs()
+    print('[daily-panel] 校验 9 个 pricing_gate 主输入（运行前）…', flush=True)
+    sha_before = assert_pricing_inputs()
     require(all(x['match'] for x in sha_before), '运行前输入锚存在失败项')
 
-    print(f'[S2] 读取样本 {SAMPLE.name} …', flush=True)
+    print(f'[daily-panel] 读取样本 {SAMPLE.name} …', flush=True)
     df = pd.read_parquet(SAMPLE)
-    contract = assert_m1_contract(df, expected_rows=SAMPLE_ROWS_TOTAL, kind='sample',
-                                  where='p3b_s2:ma_teacher:v2')
+    contract = assert_pricing_contract(df, expected_rows=SAMPLE_ROWS_TOTAL, kind='sample',
+                                  where='shadow_weight_matrix:ma_teacher:v2')
     require(len(df) == SAMPLE_ROWS_TOTAL,
             f'样本行数 {len(df)} != {SAMPLE_ROWS_TOTAL}')
     fm = df[df[FM_FLAG].astype(bool)].copy()
@@ -333,7 +333,7 @@ def main() -> None:
 
     results = []
     for spec in WEIGHT_SPECS:
-        print(f'[S2] 运行 {spec["id"]} …', flush=True)
+        print(f'[daily-panel] 运行 {spec["id"]} …', flush=True)
         results.append(run_one(fm, spec))
 
     rows = []
@@ -404,7 +404,7 @@ def main() -> None:
 
     if steep_neg and flat_pos:
         answer = '是（条件性：由权重函数的 ME 梯度/集中度决定，而非「任何含 ME 的权重」）'
-        p1 = (f"所有**陡峭的 ME 递增权重**都把 PeerMAX 压成负号："
+        para_steep = (f"所有**陡峭的 ME 递增权重**都把 PeerMAX 压成负号："
               f"ME {me['peer_max_beta']:+.5f}（t={me['peer_max_t_nw']:+.2f}）、"
               f"sqrt(ME) {by_id['sqrt_me']['peer_max_beta']:+.5f}"
               f"（t={by_id['sqrt_me']['peer_max_t_nw']:+.2f}）、"
@@ -412,7 +412,7 @@ def main() -> None:
               f"（t={by_id['me_w95']['peer_max_t_nw']:+.2f}）、"
               f"ME winsor 1/99 {by_id['me_w99']['peer_max_beta']:+.5f}"
               f"（t={by_id['me_w99']['peer_max_t_nw']:+.2f}）。")
-        p2 = (f"而**压平或压缩 ME 的权重**保持正号：EW {ew['peer_max_beta']:+.5f}"
+        para_flat = (f"而**压平或压缩 ME 的权重**保持正号：EW {ew['peer_max_beta']:+.5f}"
               f"（t={ew['peer_max_t_nw']:+.2f}）、log(ME) "
               f"{by_id['log_me']['peer_max_beta']:+.5f}"
               f"（t={by_id['log_me']['peer_max_t_nw']:+.2f}）。"
@@ -420,7 +420,7 @@ def main() -> None:
               f"（Kish 有效 N {by_id['log_me']['kish_eff_n_median']:.0f}，"
               f"为 n 的 {by_id['log_me']['kish_eff_n_pct_of_n_median']:.1f}%），"
               f"因此回到 EW 的结果，而不是 VW 的负号。")
-        p3 = (f"权重集中度与符号翻转同步：EW 的 Kish 有效 N 中位 {kish_ew:.0f}"
+        para_conc = (f"权重集中度与符号翻转同步：EW 的 Kish 有效 N 中位 {kish_ew:.0f}"
               f"（=n）、单股最大权重份额 {share_ew:.2f}%；"
               f"ME 权重把有效 N 压到 {kish_me:.0f}"
               f"（仅 n 的 {me['kish_eff_n_pct_of_n_median']:.1f}%）、"
@@ -428,7 +428,7 @@ def main() -> None:
               f"{me['max_single_weight_share_max'] * 100:.2f}%）。"
               f"即负号来自少数大市值股票在每个月的横截面中占据过高权重，"
               f"而不是来自样本、控制集或 outcome 的任何变化（三者逐项未动）。")
-        p4 = (f"但**六种权重下 PeerMAX 全部不显著**（最大 |t|={max_abs_t:.2f}，"
+        para_insig = (f"但**六种权重下 PeerMAX 全部不显著**（最大 |t|={max_abs_t:.2f}，"
               f"5% 显著规格 {n_sig}/6；月度 β<0 的月份占比 "
               f"{min(r['peer_max_negative_month_share'] for r in rows) * 100:.0f}%–"
               f"{max(r['peer_max_negative_month_share'] for r in rows) * 100:.0f}%）。"
@@ -444,17 +444,17 @@ def main() -> None:
                       'headline 的 EW/VW 符号相反应如实保留为「不显著 + 权重敏感」，'
                       '不得择一解读。')
     elif steep_neg:
-        p1 = '所有陡峭 ME 权重为负号，但 EW/log 并未一致为正；符号翻转方向不完全对称。'
-        p2 = f'六种权重下 PeerMAX 最大 |t|={max_abs_t:.2f}，5% 显著规格 {n_sig}/6。'
-        p3 = ''
-        p4 = ''
+        para_steep = '所有陡峭 ME 权重为负号，但 EW/log 并未一致为正；符号翻转方向不完全对称。'
+        para_flat = f'六种权重下 PeerMAX 最大 |t|={max_abs_t:.2f}，5% 显著规格 {n_sig}/6。'
+        para_conc = ''
+        para_insig = ''
         conclusion = 'PeerMAX 符号随 ME 权重函数变化，且所有规格均不显著；符号不稳健。'
         answer = '部分（符号随 ME 权重梯度变化，但非干净二分）'
     else:
-        p1 = 'ME 系列权重并未一致为负号；符号不由 ME 水平值权重函数单向决定。'
-        p2 = f'六种权重下 PeerMAX 最大 |t|={max_abs_t:.2f}，5% 显著规格 {n_sig}/6。'
-        p3 = ''
-        p4 = ''
+        para_steep = 'ME 系列权重并未一致为负号；符号不由 ME 水平值权重函数单向决定。'
+        para_flat = f'六种权重下 PeerMAX 最大 |t|={max_abs_t:.2f}，5% 显著规格 {n_sig}/6。'
+        para_conc = ''
+        para_insig = ''
         conclusion = 'PeerMAX 符号与 ME 权重函数无一致关系；且所有规格不显著，符号不稳健。'
         answer = '否'
 
@@ -466,18 +466,18 @@ def main() -> None:
         'max_abs_t': float(max_abs_t),
         'steep_me_weights_all_negative': bool(steep_neg),
         'flat_weights_all_positive': bool(flat_pos),
-        'paragraphs': [p for p in (p1, p2, p3, p4) if p],
+        'paragraphs': [p for p in (para_steep, para_flat, para_conc, para_insig) if p],
         'conclusion': conclusion,
     }
 
     # ---- 写出 CSV
-    csv_path = OUT_DIR / '3b_s2_weight_matrix.csv'
+    csv_path = OUT_DIR / 'shadow_weight_matrix.csv'
     pd.DataFrame(rows).to_csv(csv_path, index=False, encoding='utf-8')
     print(f'  -> {csv_path.relative_to(ROOT)}', flush=True)
 
     # ---- 运行后输入锚
-    print('[S2] 校验 9 个 M1 主输入（运行后）…', flush=True)
-    sha_after = assert_m1_inputs()
+    print('[daily-panel] 校验 9 个 pricing_gate 主输入（运行后）…', flush=True)
+    sha_after = assert_pricing_inputs()
     unchanged = all(b['bytes'] == a['bytes'] for b, a in zip(sha_before, sha_after))
     require(unchanged, '运行前后输入 bytes 发生变化')
     require(all(a['match'] for a in sha_after), '运行后输入锚存在失败项')
@@ -487,7 +487,7 @@ def main() -> None:
     meta = {
         'created_at_utc': created,
         'agent': 'B3 (S-2)',
-        'purpose': 'VW 权重函数敏感性矩阵：六种 firm-level WLS 权重下 S1 PeerMAX/OwnMAX/PeerReturn',
+        'purpose': 'VW 权重函数敏感性矩阵：六种 firm-level WLS 权重下 inventory PeerMAX/OwnMAX/PeerReturn',
         'script_path': str(script_path.relative_to(ROOT)).replace('\\', '/'),
         'script_bytes': file_size(script_path),
         'sample_path': str(SAMPLE.relative_to(ROOT)).replace('\\', '/'),
@@ -495,7 +495,7 @@ def main() -> None:
         'fm_rows': int(len(fm)),
         'fm_months': int(fm['month'].nunique()),
         'fm_window': [str(fm['month'].min()), str(fm['month'].max())],
-        'spec': 'S1: R_next ~ PeerMAXraw + OwnMAXraw + PeerReturn + 8 controls',
+        'spec': 'inventory: R_next ~ PeerMAXraw + OwnMAXraw + PeerReturn + 8 controls',
         'controls': CONTROLS,
         'ycol': YCOL,
         'min_n': MIN_N,
@@ -544,18 +544,18 @@ def main() -> None:
         },
         'verdict': verdict,
         'outputs': [
-            'artifacts/phase3b/3b_s2_weight_matrix.csv',
-            'artifacts/phase3b/3b_s2_counts.json',
-            'artifacts/phase3b/3b_s2_execution.md',
+            'artifacts/phase3b/shadow_weight_matrix.csv',
+            'artifacts/phase3b/shadow_weight_counts.json',
+            'artifacts/phase3b/shadow_weight_execution.md',
         ],
     }
-    write_json(OUT_DIR / '3b_s2_counts.json', counts)
+    write_json(OUT_DIR / 'shadow_weight_counts.json', counts)
 
     md = build_md(meta, rows, verdict)
-    (OUT_DIR / '3b_s2_execution.md').write_text(md, encoding='utf-8')
-    print(f'  -> {(OUT_DIR / "3b_s2_execution.md").relative_to(ROOT)}', flush=True)
+    (OUT_DIR / 'shadow_weight_execution.md').write_text(md, encoding='utf-8')
+    print(f'  -> {(OUT_DIR / "shadow_weight_execution.md").relative_to(ROOT)}', flush=True)
 
-    print('[S2] 完成；六权重 PeerMAX β/t：', flush=True)
+    print('[daily-panel] 完成；六权重 PeerMAX β/t：', flush=True)
     for r in rows:
         print(f"  {r['weight_id']:8s} β={r['peer_max_beta']:+.5f} "
               f"t={r['peer_max_t_nw']:+.2f} "

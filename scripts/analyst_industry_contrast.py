@@ -1,4 +1,4 @@
-"""S3A 9B：行业网络对照（对标 AH 吸收检验）——分析师网络 vs 行业网络的边重叠率 + 行业动量 vs CF 相关性。"""
+"""analyst-network 9B：行业网络对照（对标 AH 吸收检验）——分析师网络 vs 行业网络的边重叠率 + 行业动量 vs CF 相关性。"""
 import pickle, warnings, json
 import pandas as pd, numpy as np
 from pathlib import Path
@@ -8,7 +8,7 @@ from fileio import read_pickle
 
 warnings.filterwarnings('ignore')
 
-SPEC = Path('configs/s3a_final_spec.yaml')
+SPEC = Path('configs/analyst_spec.yaml')
 _SPEC = yaml.safe_load(SPEC.read_text(encoding='utf-8'))
 RET = Path(_SPEC['inputs']['returns'])
 EDGE_DIR = Path('data/processed/analyst/edges')
@@ -78,6 +78,6 @@ out['cf_vs_industry_momentum'] = {
 out['note'] = ('lift>1 = 分析师网络边偏向同行业（早期 lift 低）；CF-行业动量 rank 相关=逐月同期网络全 241 月重算'
                '（2026-09-01 R7 修订，替换旧"2024-06 固定网络×4 抽查月"口径）')
 attach_meta(out, __file__)
-Path('reports/data_gates/G0/s3a_9b_industry_contrast.json').write_text(
+Path('reports/data_gates/G0/analyst_industry_contrast.json').write_text(
     json.dumps(out, ensure_ascii=False, indent=2), encoding='utf-8')
-print("DONE -> reports/data_gates/G0/s3a_9b_industry_contrast.json")
+print("DONE -> reports/data_gates/G0/analyst_industry_contrast.json")

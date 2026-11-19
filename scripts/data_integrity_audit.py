@@ -1,4 +1,4 @@
-"""S3 数据与口径对抗审计（R3，2026-09-14）。
+"""network 数据与口径对抗审计（R3，2026-09-14）。
 
 核验项：
   D1 文本年语义：business_texts / mda_texts 的 year 是否等于**年报所属财年**
@@ -8,7 +8,7 @@
   D4 源版本可追溯：边表 source_version 与构建报告一致
   D5 时点链：available_at 语义（次年 04-30）+ 消费侧 max{available_at < month}；C1 面板 PIT 违规 0
   D6 词库 PIT（已知限制）：词库与 df 过滤使用全期语料 → 记录影响面（被剔通用词条数）
-产物：reports/data_gates/G0/s3_data_integrity_audit.json
+产物：reports/data_gates/G0/data_integrity_audit.json
 """
 import csv
 import json
@@ -99,7 +99,7 @@ out['checks']['D4_source_version'] = res4
 
 # ---- D5 时点链 ----
 res5 = {'c1_pit': None, 'network_available_at': {}}
-acc = json.loads((REPD / 's4_c1_acceptance.json').read_text(encoding='utf-8'))
+acc = json.loads((REPD / 'peermax_panel_acceptance.json').read_text(encoding='utf-8'))
 res5['c1_pit'] = {'pit_violations': acc['panels']['ma'].get('pit_violations_strict_lt'),
                   'mb': acc['panels']['mb'].get('pit_violations_strict_lt'),
                   'pass': acc['panels']['ma'].get('pit_violations_strict_lt') == 0
@@ -126,6 +126,6 @@ out['checks']['D6_lexicon_pit'] = {
 ok = all(v.get('pass', True) if isinstance(v, dict) else all(x.get('pass', True) for x in v.values())
          for v in out['checks'].values())
 out['status'] = 'PASS' if ok else 'FAIL'
-(REPD / 's3_data_integrity_audit.json').write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding='utf-8')
+(REPD / 'data_integrity_audit.json').write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding='utf-8')
 print(json.dumps(out, ensure_ascii=False, indent=1)[:2600])
 print('status =', out['status'])

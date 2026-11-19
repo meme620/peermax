@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""S2.5：自建 FF4 因子 factor_returns_daily（MKT/SMB/HML/MOM，日度）。
+"""factor：自建 FF4 因子 factor_returns_daily（MKT/SMB/HML/MOM，日度）。
 
 构造规则（FF/CH 方法，universe 规则登记于 factor_version）：
   1. 排序时点：月末最后交易日收盘信息 → 次月组合（无前视）
@@ -293,7 +293,7 @@ def main():
                      "n_days": len(factor_rows)},
         "descriptive": stats,
         "limitations": [
-            "市值缺初始股本股票不参与排序（SHAREBONUS 覆盖 86% 股票）；覆盖率随 S2 股本源补全而改善",
+            "市值缺初始股本股票不参与排序（SHAREBONUS 覆盖 86% 股票）；覆盖率随 daily-panel 股本源补全而改善",
             "MOM 为全样本 3 分位简化版（未 split size）——sensitivity 升级待办",
             "rf 常数 1.5% 待央行公告核实",
         ],

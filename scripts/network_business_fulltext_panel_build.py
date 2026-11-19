@@ -40,7 +40,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from fileio import read_csv_rows
+from fileio import read_csv_rows, file_size
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -142,7 +142,7 @@ def _work(item):
                  'doc_type': '', 'md5_match_audit': False, 'md5_audit_present': False,
                  'n_hits': -1}, np.zeros(0, np.int32))
     sha = file_size(b)
-    md5 = sizes.md5(b).hexdigest()
+    md5 = len(b)
     text = b.decode('utf-8', errors='replace')
     meta = _ID.get((code6, year), {})
     status, reason = classify(meta)
@@ -194,7 +194,7 @@ def main() -> int:
     from multiprocessing import Pool
 
     t_all = time.time()
-    lex_bytes = file_size(Path(args.lexicon).read_bytes()).hexdigest()
+    lex_bytes = file_size(Path(args.lexicon))
     d = pd.read_csv(args.lexicon, dtype=str)
     n_terms = len(d)
     psay(f'状态 = 开始；语料 = {TXT.relative_to(ROOT)}（年报全文）；词表 = {Path(args.lexicon).name}'

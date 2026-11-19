@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""S2.5 因子全期化（2026-08-29）：
+"""factor 因子全期化（2026-08-29）：
 1. 用 Drive daily_close_none（2000 起）构造 daily_panel 2006-2013（close_raw + rraw 日收益），补全 2014 前的日面板
 2. 重跑 factor_build（FF4 全期 2006-2025）+ build_rev_factor（REV 全期）
 用法: python scripts/factor_full_period_build.py

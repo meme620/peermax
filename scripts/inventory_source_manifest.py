@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""S1 Step 2：来源登记 manifest（execution_protocol §2 Step 2）。
+"""inventory Step 2：来源登记 manifest（execution_protocol §2 Step 2）。
 
 6 源登记（字段 schema 见 guide §7 Step 4）；checksum 抽查 3 个文件 SHA-256；
 854.6 万行计数引用 tencent/MANIFEST.json 元数据，不重算。
@@ -57,7 +57,7 @@ def main():
                 "status": "available",
                 "owner": "peer_lottery_proposal",
                 "blocker": "limit_hit/valid_trade 需派生（无源字段）",
-                "next_action": "S1 Step3/4 三分类验收 + S2 收益构造",
+                "next_action": "inventory Step3/4 三分类验收 + daily-panel 收益构造",
                 "evidence_ref": "data/raw/tencent/MANIFEST.json",
             },
             {
@@ -81,7 +81,7 @@ def main():
                 "status": "available",
                 "owner": "peer_lottery_proposal",
                 "blocker": "板块日历起点=board_launch_date 派生（star 2019-07-22）",
-                "next_action": "S2 Step1 派生 board 日历",
+                "next_action": "daily-panel Step1 派生 board 日历",
                 "evidence_ref": "data/raw/baostock/calendar/trade_dates_2016_2026.csv",
             },
             {
@@ -105,7 +105,7 @@ def main():
                 "status": "available",
                 "owner": "peer_lottery_proposal",
                 "blocker": "ST 状态不在此表（禁止用 namechange 推断）",
-                "next_action": "S1 Step1 已用（expected universe）；S2 对齐 list/delist 日期",
+                "next_action": "inventory Step1 已用（expected universe）；daily-panel 对齐 list/delist 日期",
                 "evidence_ref": "data/raw/baostock/stock_basic/a_stocks.csv",
             },
             {
@@ -129,7 +129,7 @@ def main():
                 "status": "partial",
                 "owner": "peer_lottery_proposal",
                 "blocker": "975 天断档待续传（fetch_baostock_stocklist.py）",
-                "next_action": "后台续传；S1 Step4 三分类验收",
+                "next_action": "后台续传；inventory Step4 三分类验收",
                 "evidence_ref": "data/raw/baostock/stock_list/",
             },
             {
@@ -176,8 +176,8 @@ def main():
                 "evidence_type": "real",
                 "status": "available",
                 "owner": "peer_lottery_proposal",
-                "blocker": "NOTICE_DATE 需与事件时间对齐（S2 Step4）",
-                "next_action": "S2 Step4 控制变量构造（Size/BM/Turnover 分母替代源）",
+                "blocker": "NOTICE_DATE 需与事件时间对齐（daily-panel Step4）",
+                "next_action": "daily-panel Step4 控制变量构造（Size/BM/Turnover 分母替代源）",
                 "evidence_ref": "data/raw/eastmoney/finance/",
             },
             {
@@ -201,7 +201,7 @@ def main():
                 "status": "available",
                 "owner": "peer_lottery_proposal",
                 "blocker": "Similarity pipeline 未建（方法冻结待用户决策）",
-                "next_action": "S3 网络 pipeline",
+                "next_action": "network 网络 pipeline",
                 "evidence_ref": "data/raw/cninfo/",
             },
         ],

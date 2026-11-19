@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""S3 第一梯队 ①+②：pair-density 读数 + 密度对齐复算（`density_readouts` 块）。
+"""network 第一梯队 ①+②：pair-density 读数 + 密度对齐复算（`density_readouts` 块）。
 
 **只读复算**：不重建网络、不碰面板/回归、不改任何 headline_value / 冻结参数；只新建产物
-`reports/data_gates/G0/s3_lift_pair_density_{teacher,self}.json`（既有产物一律不覆盖）。
+`reports/data_gates/G0/network_pair_density_{teacher,self}.json`（既有产物一律不覆盖）。
 
 口径真源：
-  - `reports/audits/s3_remaining_workplan_20261011.md` 第一梯队 1–2
+  - `reports/audits/network_remaining_workplan_20261011.md` 第一梯队 1–2
   - 主仓库 methodology_execution_plan §8 B″11-1（pair-density）与 B″11-11（density_readouts）
-  - `reports/audits/s3_network_open_items_plan_20261006.md` §3-③、§4 序 1/1b
+  - `reports/audits/network_open_items_plan_20261006.md` §3-③、§4 序 1/1b
   - `configs/parameter_registry.yaml` → `lift_pair_density_readout`
 
 ① pair-density（HP 式随机配对概率并报读数）
@@ -17,8 +17,8 @@
   - **映射缺失处置**：分子分母同时只计**有申万映射者**（N = 可映射节点数；缺失不填 0、逐一报缺失计数）；
   - 配套 `same_sw2_share`（边层面：边表 focal→source 两端**均可映射**的边中同二级占比）与
     `lift = same_sw2_share / pair_density`；
-  - 与既有 `sw2_base_canonical`（= `Σ_k n_k(n_k−1)/(N(N−1))`，见 `s3_ma_chapter_cross_audit.json`
-    与 `s3_ma_weighting_cross_audit.json`）**逐值一致**：对比对象 = **全精度复算值**（rel ≤1e-12）；
+  - 与既有 `sw2_base_canonical`（= `Σ_k n_k(n_k−1)/(N(N−1))`，见 `network_business_chapter_cross_audit.json`
+    与 `network_business_weighting_cross_audit.json`）**逐值一致**：对比对象 = **全精度复算值**（rel ≤1e-12）；
     与 JSON **存储值**（5 位小数）差 ≤5.4e-6（不在 JSON 之间做 1e-12 级比较）。
 
 ② `density_readouts` 块（两字段，**各自验收、禁止互相等值对账**）
@@ -32,8 +32,8 @@
     **预期方向 > 35.4–42.0%**，**不得与 35.4–42.0% 做等值对账**。
   - 停机：① normalized_readout 不符（复算路径分叉，先修再报）；② 裁剪后密度偏差 >1%。
 
-产出（只新建）：`reports/data_gates/G0/s3_lift_pair_density_teacher.json`、
-              `reports/data_gates/G0/s3_lift_pair_density_self.json`
+产出（只新建）：`reports/data_gates/G0/network_pair_density_teacher.json`、
+              `reports/data_gates/G0/network_pair_density_self.json`
 用法：
   python scripts/network_pair_density.py
   python scripts/network_pair_density.py --teacher-years 2014 2015 ... 2022 --self-years 2017 ... 2025
@@ -56,8 +56,8 @@ REPD = ROOT / 'reports/data_gates/G0'
 TEACH_DIR = ROOT / 'data/processed/network_ma_teacher'
 SELF_DIR = ROOT / 'data/processed/network_ma'
 SW2 = ROOT / 'data/processed/sw2_industry_latest.csv'
-CHAPTER_JSON = REPD / 's3_ma_chapter_cross_audit.json'
-WEIGHT_JSON = REPD / 's3_ma_weighting_cross_audit.json'
+CHAPTER_JSON = REPD / 'network_business_chapter_cross_audit.json'
+WEIGHT_JSON = REPD / 'network_business_weighting_cross_audit.json'
 
 TEACHER_YEARS = list(range(2014, 2023))       # 文本年 → 网络年 2015–2023（主口径 9 年）
 SELF_YEARS = list(range(2017, 2026))          # 文本年 → 网络年 2018–2026（文本稳健性列现有年份）
@@ -754,7 +754,7 @@ def build_pending_decision(results: dict) -> dict:
         },
         'cross_column_note': ('self 列共用同一实现：self 列 dev vs 解析上界的 rel 亦 ≤1e-12、逐 focal '
                               '截断误差同样 ∈[0,1)，且其 ③ 同样因 ⌈⌉ 口径不通过（见 '
-                              's3_lift_pair_density_self.json.acceptance.checks.crop_density_deviation_le_1pct）'),
+                              'network_pair_density_self.json.acceptance.checks.crop_density_deviation_le_1pct）'),
         'no_change_this_round': ('本轮只改状态/注记：**不改判据、不改裁剪口径、不改 registry、不改任何数值'
                                  '读数**；status 由 PASS_WITH_REGISTERED_DEVIATION 改为 STOP_PENDING_DECISION，'
                                  '仅反映「③ 不通过 + 判据缺陷待拍板」'),
@@ -783,7 +783,7 @@ def main() -> None:
         g = gate_block(col)
         crop_check = g.pop('crop_density_deviation_check')   # ③ 独立登记块（并入 acceptance.checks）
         rep = {
-            'step': f'S3 第一梯队 ①② pair-density 读数 + 密度对齐复算（{label} 列）',
+            'step': f'network 第一梯队 ①② pair-density 读数 + 密度对齐复算（{label} 列）',
             'run_at': datetime.now(timezone.utc).isoformat(),
             'column': label,
             'net_dir': col['net_dir'],
@@ -952,7 +952,7 @@ def main() -> None:
     if 'teacher' in results:
         results['teacher']['pending_decision'] = build_pending_decision(results)
     for label in results:
-        p = outdir / f's3_lift_pair_density_{label}{args.tag}.json'
+        p = outdir / f'network_pair_density_{label}{args.tag}.json'
         p.write_text(json.dumps(results[label], ensure_ascii=False, indent=2), encoding='utf-8')
         print(f'[T1-①②] {label}: 产物写入 -> {p}', flush=True)
 

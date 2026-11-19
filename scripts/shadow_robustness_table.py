@@ -2,9 +2,9 @@
 """B5 / S-7: A9 全 20 行规格表 + gate MD 覆盖对照 + registry 登记核对.
 
 约束（本脚本硬性遵守）:
-  - 只读输入: reports/data_gates/G0/s3_m1_robustness_placebo.json,
-    reports/data_gates/G0/s3_m1_gate_report_v2.md, configs/parameter_registry.yaml
-  - 不重跑 M1 / PC / 网络; 不重估任何系数; 所有读数逐字取自 JSON.
+  - 只读输入: reports/data_gates/G0/pricing_robustness_placebo.json,
+    reports/data_gates/G0/pricing_gate_report_v2.md, configs/parameter_registry.yaml
+  - 不重跑 pricing_gate / PC / 网络; 不重估任何系数; 所有读数逐字取自 JSON.
   - 不改 headline / 系数 / gate / configs / G0 / reports.
   - 仅写 artifacts/phase3b/3b_s7_{a9_full.csv,counts.json,execution.md}.
 
@@ -24,8 +24,8 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 
-ROBUSTNESS_JSON = ROOT / "reports" / "data_gates" / "G0" / "s3_m1_robustness_placebo.json"
-GATE_MD = ROOT / "reports" / "data_gates" / "G0" / "s3_m1_gate_report_v2.md"
+ROBUSTNESS_JSON = ROOT / "reports" / "data_gates" / "G0" / "pricing_robustness_placebo.json"
+GATE_MD = ROOT / "reports" / "data_gates" / "G0" / "pricing_gate_report_v2.md"
 REGISTRY_YAML = ROOT / "configs" / "parameter_registry.yaml"
 
 OUT_DIR = ROOT / "artifacts" / "phase3b"
@@ -34,46 +34,46 @@ OUT_JSON = OUT_DIR / "3b_s7_counts.json"
 OUT_MD = OUT_DIR / "3b_s7_execution.md"
 
 FAMILY_PREFIXES = (
-    ("m1_rob_limit_", "m1_rob_limit"),
-    ("m1_rob_size_", "m1_rob_size"),
-    ("m1_rob_liq_", "m1_rob_liq"),
+    ("pricing_rob_limit_", "pricing_rob_limit"),
+    ("pricing_rob_size_", "pricing_rob_size"),
+    ("pricing_rob_liq_", "pricing_rob_liq"),
 )
 
 COLUMN_LABELS = ("ma_teacher", "mb_teacher", "ma", "mb")
 
 STRATUM_LABELS = {
-    "m1_rob_raw": "基准（raw 主口径）",
-    "m1_rob_postadj": "outcome 变体（后复权）",
-    "m1_rob_st": "ST 分层",
-    "m1_rob_non_st": "ST 分层",
-    "m1_rob_limit_all_limit": "limit-hit 分层",
-    "m1_rob_limit_all_non_limit": "limit-hit 分层",
-    "m1_rob_limit_mixed": "limit-hit 分层",
-    "m1_rob_size_low": "size 三分位分层",
-    "m1_rob_size_high": "size 三分位分层",
-    "m1_rob_liq_low": "liq 三分位分层",
-    "m1_rob_liq_high": "liq 三分位分层",
-    "m1_rob_col_ma_teacher": "四列并报",
-    "m1_rob_col_mb_teacher": "四列并报",
-    "m1_rob_col_ma": "四列并报",
-    "m1_rob_col_mb": "四列并报",
-    "m1_weight_equal": "权重规则",
-    "m1_weight_linear": "权重规则",
-    "m1_weight_logsim": "权重规则",
-    "m1_placebo_random": "placebo 网络",
-    "m1_placebo_timeshift": "placebo 网络",
+    "pricing_rob_raw": "基准（raw 主口径）",
+    "pricing_rob_postadj": "outcome 变体（后复权）",
+    "pricing_rob_st": "ST 分层",
+    "pricing_rob_non_st": "ST 分层",
+    "pricing_rob_limit_all_limit": "limit-hit 分层",
+    "pricing_rob_limit_all_non_limit": "limit-hit 分层",
+    "pricing_rob_limit_mixed": "limit-hit 分层",
+    "pricing_rob_size_low": "size 三分位分层",
+    "pricing_rob_size_high": "size 三分位分层",
+    "pricing_rob_liq_low": "liq 三分位分层",
+    "pricing_rob_liq_high": "liq 三分位分层",
+    "pricing_rob_col_ma_teacher": "四列并报",
+    "pricing_rob_col_mb_teacher": "四列并报",
+    "pricing_rob_col_ma": "四列并报",
+    "pricing_rob_col_mb": "四列并报",
+    "pricing_weight_equal": "权重规则",
+    "pricing_weight_linear": "权重规则",
+    "pricing_weight_logsim": "权重规则",
+    "pricing_placebo_random": "placebo 网络",
+    "pricing_placebo_timeshift": "placebo 网络",
 }
 
 STRATA_FOCUS = (
-    "m1_rob_liq_low",
-    "m1_rob_liq_high",
-    "m1_rob_size_low",
-    "m1_rob_size_high",
-    "m1_rob_limit_all_limit",
-    "m1_rob_limit_all_non_limit",
-    "m1_rob_limit_mixed",
-    "m1_rob_non_st",
-    "m1_rob_st",
+    "pricing_rob_liq_low",
+    "pricing_rob_liq_high",
+    "pricing_rob_size_low",
+    "pricing_rob_size_high",
+    "pricing_rob_limit_all_limit",
+    "pricing_rob_limit_all_non_limit",
+    "pricing_rob_limit_mixed",
+    "pricing_rob_non_st",
+    "pricing_rob_st",
 )
 
 
@@ -102,17 +102,17 @@ def registry_block(reg: dict, name: str) -> dict:
 
 
 def parse_registry(reg: dict) -> dict:
-    spec_block = registry_block(reg, "m1_sample_and_spec_registry")
+    spec_block = registry_block(reg, "sample_and_spec_registry")
     hv = spec_block["headline_value"]
     spec_ids = [s.strip() for s in str(hv["specification_ids"]).split("/") if s.strip()]
-    k_econ = as_float(registry_block(reg, "K_Econ_M1").get("headline_value"))
+    k_econ = as_float(registry_block(reg, "K_Econ_Pricing").get("headline_value"))
     return {
         "specification_ids": spec_ids,
         "min_focal_count_per_month": int(hv["min_focal_count_per_month"]),
         "min_effective_month_count": int(hv["min_effective_month_count"]),
         "nw_lag": int(hv["nw_lag"]),
         "iqr_scale_rule_id": hv.get("iqr_scale_rule_id"),
-        "K_Econ_M1": k_econ,
+        "K_Econ_Pricing": k_econ,
         "registry_version": reg.get("registry_version"),
     }
 
@@ -128,7 +128,7 @@ def parse_gate_md(text: str) -> dict:
     lines = text.splitlines()
     a9 = []
     for lineno, line in enumerate(lines, 1):
-        m = re.match(r"^- A9 (m1_[A-Za-z0-9_]+):", line)
+        m = re.match(r"^- A9 (pricing_[A-Za-z0-9_]+):", line)
         if m:
             a9.append({"spec_id": m.group(1), "line": lineno, "text": line})
     four_col = {}
@@ -168,7 +168,7 @@ def main() -> int:
     min_months = reg_info["min_effective_month_count"]
     min_focal = reg_info["min_focal_count_per_month"]
     nw_lag = reg_info["nw_lag"]
-    k_econ = reg_info["K_Econ_M1"]
+    k_econ = reg_info["K_Econ_Pricing"]
     iqr_pool = as_float(robustness.get("iqr_pool_registered"))
 
     rows = []
@@ -183,8 +183,8 @@ def main() -> int:
 
         literal = literal_lines(spec_id, gate["lines"])
         four_label = None
-        if spec_id.startswith("m1_rob_col_"):
-            candidate = spec_id[len("m1_rob_col_"):]
+        if spec_id.startswith("pricing_rob_col_"):
+            candidate = spec_id[len("pricing_rob_col_"):]
             if candidate in gate["four_column"]:
                 four_label = candidate
 
@@ -192,7 +192,7 @@ def main() -> int:
             coverage = "a9_spec_line"
         elif four_label:
             coverage = "four_column_table"
-        elif spec_id == "m1_rob_raw":
+        elif spec_id == "pricing_rob_raw":
             coverage = "headline_reference"
         else:
             coverage = "none"
@@ -210,10 +210,10 @@ def main() -> int:
             else:
                 reg_registration = "none"
                 reg_id = ""
-                if spec_id == "m1_rob_non_st":
-                    reg_note = "未登记：ST 族仅登记 m1_rob_st，无 non_st"
-                elif spec_id.startswith("m1_rob_col_"):
-                    reg_note = "未登记：registry 有「四列并报」设计说明，specification_ids 无 m1_rob_col_*"
+                if spec_id == "pricing_rob_non_st":
+                    reg_note = "未登记：ST 族仅登记 pricing_rob_st，无 non_st"
+                elif spec_id.startswith("pricing_rob_col_"):
+                    reg_note = "未登记：registry 有「四列并报」设计说明，specification_ids 无 pricing_rob_col_*"
                 else:
                     reg_note = "未登记"
 
@@ -276,7 +276,7 @@ def main() -> int:
                     else (f"四列并报表 {gate['four_column'][four_label]['line']} 行（列名 {four_label}）"
                           if four_label else
                           ("headline / A9 placebo 对照读数（未以 spec_id 形式列出）"
-                           if spec_id == "m1_rob_raw" else "无"))
+                           if spec_id == "pricing_rob_raw" else "无"))
                 ),
                 "registry_registration": reg_registration,
                 "registry_id_or_family": reg_id,
@@ -348,9 +348,9 @@ def main() -> int:
 
     four_pairs = []
     for r in rows:
-        if not r["spec_id"].startswith("m1_rob_col_"):
+        if not r["spec_id"].startswith("pricing_rob_col_"):
             continue
-        label = r["spec_id"][len("m1_rob_col_"):]
+        label = r["spec_id"][len("pricing_rob_col_"):]
         md_row = gate["four_column"].get(label)
         four_pairs.append(
             {
@@ -459,7 +459,7 @@ def main() -> int:
             "min_effective_month_count": min_months,
             "min_focal_count_per_month": min_focal,
             "nw_lag": nw_lag,
-            "K_Econ_M1": k_econ,
+            "K_Econ_Pricing": k_econ,
             "iqr_pool_registered": iqr_pool,
         },
         "total_specs": len(rows),
@@ -503,8 +503,8 @@ def main() -> int:
             "family_mapping": {sid: family_of(sid) for sid in family},
             "unregistered": unregistered,
             "note": (
-                "registry 的 m1_rob_limit / m1_rob_size / m1_rob_liq 为族级 id，"
-                "各覆盖 3/2/2 个层规格；m1_rob_non_st 与 m1_rob_col_* 未出现在 specification_ids。"
+                "registry 的 pricing_rob_limit / pricing_rob_size / pricing_rob_liq 为族级 id，"
+                "各覆盖 3/2/2 个层规格；pricing_rob_non_st 与 pricing_rob_col_* 未出现在 specification_ids。"
             ),
         },
         "strata_readings": {sid: reading(sid) for sid in STRATA_FOCUS},
@@ -513,8 +513,8 @@ def main() -> int:
             "beta": max_abs_econ["beta"],
             "t_nw": max_abs_econ["t_nw"],
             "economic_magnitude": max_abs_econ["economic_magnitude_beta_x_iqr"],
-            "K_Econ_M1": k_econ,
-            "abs_ge_K_Econ_M1": abs(max_abs_econ["economic_magnitude_beta_x_iqr"]) >= k_econ
+            "K_Econ_Pricing": k_econ,
+            "abs_ge_K_Econ_Pricing": abs(max_abs_econ["economic_magnitude_beta_x_iqr"]) >= k_econ
             if k_econ is not None else None,
             "sign": max_abs_econ["sign"],
             "coverage_flag": max_abs_econ["coverage_flag"],
@@ -524,8 +524,8 @@ def main() -> int:
             "beta": max_abs_econ_usable["beta"],
             "t_nw": max_abs_econ_usable["t_nw"],
             "economic_magnitude": max_abs_econ_usable["economic_magnitude_beta_x_iqr"],
-            "K_Econ_M1": k_econ,
-            "abs_ge_K_Econ_M1": abs(max_abs_econ_usable["economic_magnitude_beta_x_iqr"]) >= k_econ
+            "K_Econ_Pricing": k_econ,
+            "abs_ge_K_Econ_Pricing": abs(max_abs_econ_usable["economic_magnitude_beta_x_iqr"]) >= k_econ
             if k_econ is not None else None,
             "sign": max_abs_econ_usable["sign"],
             "coverage_flag": max_abs_econ_usable["coverage_flag"],
@@ -543,10 +543,10 @@ def main() -> int:
             "execution_md": str(OUT_MD.relative_to(ROOT)).replace("\\", "/"),
         },
         "constraints": [
-            "未重跑 M1 / PC / 网络",
+            "未重跑 pricing_gate / PC / 网络",
             "未重估任何系数或标准误",
             "未改 headline / 系数 / gate / configs / G0 / reports",
-            "所有读数逐字取自 s3_m1_robustness_placebo.json",
+            "所有读数逐字取自 pricing_robustness_placebo.json",
         ],
     }
 
@@ -609,18 +609,18 @@ def main() -> int:
     )
     md.append(
         f"- 门槛：min_effective_month_count = {min_months}；min_focal_count_per_month = {min_focal}；"
-        f"NW lag = {nw_lag}；K_Econ_M1 = {k_econ}"
+        f"NW lag = {nw_lag}；K_Econ_Pricing = {k_econ}"
     )
     md.append(
-        "- 约束：**未重跑 M1 / PC / 网络，未重估任何系数**；"
-        "所有 β / t / T / n_rows 逐字取自 `s3_m1_robustness_placebo.json`；"
+        "- 约束：**未重跑 pricing_gate / PC / 网络，未重估任何系数**；"
+        "所有 β / t / T / n_rows 逐字取自 `pricing_robustness_placebo.json`；"
         "未改 headline / 系数 / gate / configs / G0 / reports。"
     )
     md.append("")
     md.append("> T = `n_months_used`（FM 有效月份数，不是日历月）；n_rows = 该规格 FM 行集。")
     md.append(
-        "> A9 各规格的 `spec_beta` 为 PeerMAXraw 的 EW 系数（`m1_rob_raw` = 0.03427 与 headline EW 一致）；"
-        "该 JSON 未包含各 A9 规格的 VW 对应读数，VW 并报见 gate MD 的 M1-1 / M1-4 / 四列表。"
+        "> A9 各规格的 `spec_beta` 为 PeerMAXraw 的 EW 系数（`pricing_rob_raw` = 0.03427 与 headline EW 一致）；"
+        "该 JSON 未包含各 A9 规格的 VW 对应读数，VW 并报见 gate MD 的符号 / 组合 spread / 四列表。"
     )
     md.append("")
     md.append("## 1. 全 20 行规格表")
@@ -656,27 +656,27 @@ def main() -> int:
     md.append("| spec_id | 层 | β | t(NW) | T | n_rows | β·IQR | sign | 单侧 p | 读法 |")
     md.append("|---|---|---:|---:|---:|---:|---:|---|---:|---|")
     readings_text = {
-        "m1_rob_liq_low": "负号、t=-1.26、单侧 p=0.1035；T=89（<104，仍 ≥60，无 low_coverage_warning）。",
-        "m1_rob_liq_high": (
-            "唯一可用月份 ≥60 且 abs(β·IQR) ≥ K_Econ_M1 的规格（0.00303 vs 0.003；"
+        "pricing_rob_liq_low": "负号、t=-1.26、单侧 p=0.1035；T=89（<104，仍 ≥60，无 low_coverage_warning）。",
+        "pricing_rob_liq_high": (
+            "唯一可用月份 ≥60 且 abs(β·IQR) ≥ K_Econ_Pricing 的规格（0.00303 vs 0.003；"
             "all_limit 的 0.01687 因 T=2 退化不计），"
             "但符号为**正**（与登记方向 β<0 相反）、t=1.58、单侧 p=0.9426"
-            "→ 只作异质性描述，**不得**当作 M1-3 通过或用于补救 M1。"
+            "→ 只作异质性描述，**不得**当作经济量级门通过或用于补救 pricing_gate。"
         ),
-        "m1_rob_size_low": "正向、t=1.02；小市值层点估计更大但未显著。",
-        "m1_rob_size_high": "正向、t=0.49。",
-        "m1_rob_limit_all_limit": (
+        "pricing_rob_size_low": "正向、t=1.02；小市值层点估计更大但未显著。",
+        "pricing_rob_size_high": "正向、t=0.49。",
+        "pricing_rob_limit_all_limit": (
             "**T=2 退化**：T < min_effective_month_count=60 且 T ≤ NW lag=6，"
             "β=0.72073 / t=36.50 由退化协方差给出，不可作推断依据；"
             "JSON 已带 low_coverage_warning。"
         ),
-        "m1_rob_limit_all_non_limit": "T=96；可用月份 ≥60，是 all_non_limit 层的唯一读数，β=0.01934。",
-        "m1_rob_limit_mixed": "T=104；β=0.02592，与 raw 同号同量级。",
-        "m1_rob_non_st": (
+        "pricing_rob_limit_all_non_limit": "T=96；可用月份 ≥60，是 all_non_limit 层的唯一读数，β=0.01934。",
+        "pricing_rob_limit_mixed": "T=104；β=0.02592，与 raw 同号同量级。",
+        "pricing_rob_non_st": (
             "β=0.03457 vs raw 0.03427（Δ=+0.00030）；n=180,108 = raw 181,178 的 99.41%；"
             "ST 剔除对 headline 无实质影响。"
         ),
-        "m1_rob_st": (
+        "pricing_rob_st": (
             "**NOT_COMPUTABLE**：T=0，n_rows=1,070（层内月样本中位 9 < min_focal_count_per_month=100）；"
             "status_reason=ALL_MONTHS_BELOW_MIN_FOCAL_COUNT。"
         ),
@@ -690,7 +690,7 @@ def main() -> int:
         )
     md.append("")
     md.append(
-        "符号口径：登记方向为 β<0（M1-1 要求 EW 与 VW 同为负）。`sign` 只记读数正负，"
+        "符号口径：登记方向为 β<0（符号门要求 EW 与 VW 同为负）。`sign` 只记读数正负，"
         "`vs 登记方向` 的 same/opposite 是符号台账，不是新的统计判定。"
     )
     md.append("")
@@ -698,12 +698,12 @@ def main() -> int:
     md.append("## 3. T 退化规格")
     md.append("")
     md.append(
-        f"- `m1_rob_st`：T=0，spec_status=NOT_COMPUTABLE，n_rows=1,070。"
+        f"- `pricing_rob_st`：T=0，spec_status=NOT_COMPUTABLE，n_rows=1,070。"
         f"原因见 status_reason：ALL_MONTHS_BELOW_MIN_FOCAL_COUNT"
         f"（min_focal_count_per_month={min_focal}；层内月样本中位 9；n_usable_months=0）。"
     )
     md.append(
-        f"- `m1_rob_limit_all_limit`：T=2，**低于 min_effective_month_count={min_months}，"
+        f"- `pricing_rob_limit_all_limit`：T=2，**低于 min_effective_month_count={min_months}，"
         f"也低于 NW lag={nw_lag}**。JSON 的 t=36.50 是退化 NW 协方差的产物，不是可信推断；"
         "该规格只能作为样本覆盖率记录。"
     )
@@ -720,14 +720,14 @@ def main() -> int:
         f"{len(a9_not_computable)} 条 NOT_COMPUTABLE），不是 6 条。**"
         f"gate MD 第 {min(a['line'] for a in gate['a9'])}–{max(a['line'] for a in gate['a9'])} 行逐条列出："
         + "、".join(f"`{sid}`(L{counts['gate_md']['a9_line_numbers'][sid]})" for sid in a9_ids)
-        + "。6 个「picks」是其中的 COMPUTED 子集，NOT_COMPUTABLE 的 `m1_rob_st` 也占一行。"
+        + "。6 个「picks」是其中的 COMPUTED 子集，NOT_COMPUTABLE 的 `pricing_rob_st` 也占一行。"
     )
     md.append("")
     md.append(
         f"按 spec_id 逐字 grep：**{len(in_md)} 条出现、{len(not_in_md_literal)} 条未出现**。"
         f"未出现的 {len(not_in_md_literal)} 条中："
         f"{len(four_col_covered)} 条四列规格由 MD 的四列并报表（L59–62）以列名覆盖且 β 对得上；"
-        f"{len(headline_ref)} 条 `m1_rob_raw` 的 β 作为 headline / placebo 对照读数出现（但未以 spec_id 形式列出）；"
+        f"{len(headline_ref)} 条 `pricing_rob_raw` 的 β 作为 headline / placebo 对照读数出现（但未以 spec_id 形式列出）；"
         f"剩余 **{len(true_gap)} 条为真实报告覆盖缺口**（无 spec id 行，也无对应表格行）。"
     )
     md.append("")
@@ -752,15 +752,15 @@ def main() -> int:
     md.append("")
     md.append(
         "**这是报告覆盖问题，不是重算问题。** 上述 13 条的读数本来就写在 "
-        "`s3_m1_robustness_placebo.json` 里；gate MD 只是没有逐条列出。"
-        "本表不改变任何 gate 判定、headline 或 S5_status；也不把未列出的规格读作「通过」。"
+        "`pricing_robustness_placebo.json` 里；gate MD 只是没有逐条列出。"
+        "本表不改变任何 gate 判定、headline 或 pricing_gate_status；也不把未列出的规格读作「通过」。"
     )
     md.append("")
 
     md.append("## 5. Registry 登记核对")
     md.append("")
     md.append(
-        f"`m1_sample_and_spec_registry.headline_value.specification_ids` 共 "
+        f"`sample_and_spec_registry.headline_value.specification_ids` 共 "
         f"{len(reg_info['specification_ids'])} 个 id。20 个 A9 规格的登记状态："
     )
     md.append("")
@@ -772,12 +772,12 @@ def main() -> int:
     md.append(f"- **未登记（{len(unregistered)}）**：" + "、".join(f"`{x}`" for x in unregistered))
     md.append("")
     md.append(
-        "- 族级问题：`m1_rob_limit` / `m1_rob_size` / `m1_rob_liq` 各只登记一个族 id，"
+        "- 族级问题：`pricing_rob_limit` / `pricing_rob_size` / `pricing_rob_liq` 各只登记一个族 id，"
         "但实际产物有 3 / 2 / 2 个层规格；层 id 无法从 `specification_ids` 直接追溯到产物。"
     )
     md.append(
-        "- ST 族只登记 `m1_rob_st`，没有 `m1_rob_non_st`；"
-        "四列规格（`m1_rob_col_*`）在 registry 文本中有「四列并报」设计说明，但 `specification_ids` 无对应 id。"
+        "- ST 族只登记 `pricing_rob_st`，没有 `pricing_rob_non_st`；"
+        "四列规格（`pricing_rob_col_*`）在 registry 文本中有「四列并报」设计说明，但 `specification_ids` 无对应 id。"
     )
     md.append(
         "- 本核对只读 registry，未改任何登记；上述缺口属登记粒度/收录问题，需另行裁定，不在本任务改动范围。"
@@ -787,21 +787,21 @@ def main() -> int:
     md.append("## 6. 最值得补报的 3 条")
     md.append("")
     md.append(
-        "1. **`m1_rob_liq_low` / `m1_rob_liq_high`（符号分裂 + 量级阈值边缘）**："
+        "1. **`pricing_rob_liq_low` / `pricing_rob_liq_high`（符号分裂 + 量级阈值边缘）**："
         "liq_low β=-0.09948（t=-1.26，T=89），liq_high β=+0.12940（t=1.58，T=104）；"
-        "liq_high 的 abs(β·IQR)=0.00303 是可用月份 ≥60 的规格中唯一 ≥ K_Econ_M1=0.003 的读数"
+        "liq_high 的 abs(β·IQR)=0.00303 是可用月份 ≥60 的规格中唯一 ≥ K_Econ_Pricing=0.003 的读数"
         "（all_limit 的 0.01687 因 T=2 退化不计），"
-        "但符号为正、单侧 p=0.9426。补报时必须同时写符号与「不得当作 M1-3 通过/补救」，"
+        "但符号为正、单侧 p=0.9426。补报时必须同时写符号与「不得当作经济量级门通过/补救」，"
         "否则容易被 abs() 规则误读。"
     )
     md.append(
-        "2. **`m1_rob_limit_all_limit`（T=2 退化）**：β=0.72073、t=36.50、T=2、n_rows=2,303。"
+        "2. **`pricing_rob_limit_all_limit`（T=2 退化）**：β=0.72073、t=36.50、T=2、n_rows=2,303。"
         "T 既低于 min_effective_month_count=60，也低于 NW lag=6；"
         "当前 MD 未列它，等于默认不引用——安全但无记录。补一行标注「退化、不可推断」，"
         "可防止后续有人从 JSON 里单独捞出这个 t=36.50 当作强证据。"
     )
     md.append(
-        "3. **`m1_rob_non_st`（ST 剔除的无关性检查）**：β=0.03457 vs raw 0.03427"
+        "3. **`pricing_rob_non_st`（ST 剔除的无关性检查）**：β=0.03457 vs raw 0.03427"
         "（Δ=+0.00030），T=104，n_rows=180,108（raw 的 99.41%）。"
         "该读数直接回答「ST 分层处理是否驱动 headline」，且与 raw 几乎相同，"
         "适合作为一行 coverage check 补进 MD。"
@@ -817,7 +817,7 @@ def main() -> int:
         f"`{counts['max_abs_economic_magnitude_usable']['spec_id']}`"
         f"（{f5(counts['max_abs_economic_magnitude_usable']['economic_magnitude'])}，"
         f"sign={counts['max_abs_economic_magnitude_usable']['sign']}，"
-        f"abs ≥ K_Econ_M1 = {counts['max_abs_economic_magnitude_usable']['abs_ge_K_Econ_M1']}）。"
+        f"abs ≥ K_Econ_Pricing = {counts['max_abs_economic_magnitude_usable']['abs_ge_K_Econ_Pricing']}）。"
     )
     md.append("")
 

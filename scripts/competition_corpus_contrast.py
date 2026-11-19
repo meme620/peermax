@@ -4,20 +4,20 @@
 
 问题（registry `ma_fulltext_text_corpus`，2026-10-19 F0 前置登记）：
   既有对表（语料 = 老师 MD&A 章节）在旧符号判据下记为 **复现不成功（符号相反）**，而原文语料 = **年报全文**；
-  **2026-10-27 口径更正（V-P1-2 / N-2）**：项目对手集合 = 同团成员、原文 = 相似度 > 团内最小相似度（字面含团外），
+  **2026-10-27 口径更正（口径复核）**：项目对手集合 = 同团成员、原文 = 相似度 > 团内最小相似度（字面含团外），
   二者不可比 → 对外判定统一为「不可比/未复现（对手集合口径不同）」；旧标签只作历史读数。
   故做一次语料敏感性（把语料贴回原文口径）并回答：**语料差异是否解释反号？**
 
 三方：
   ① 原文 = 刘亚辉等（2021）表 2 / 表 3 / 表 4（字面量，来自对表脚本 `TARGETS`，不重录）；
   ② MD&A 版 = `reports/data_gates/G0/competition_pricing_correspondence.{json,md}`（主口径，2026-10-16）；
-  ③ 全文版 = `reports/data_gates/G0/s3_pc_pricing_correspondence_fulltext.{json,md}`（本列，2026-10-19）。
+  ③ 全文版 = `reports/data_gates/G0/competition_pricing_correspondence_fulltext.{json,md}`（本列，2026-10-19）。
 
 判据（**沿用既有、一字不改**）：符号一致 + 显著性同向（t 同号且 |t| > 1.96）→ 成功；
 符号一致不显著 → 部分；反号 → 不成功。**本脚本不做任何统计估计**（纯读数并列表），
 不覆盖既有产物、不改任何冻结值；结论句由「三层符号判定是否随语料切换而改变」机械推出。
 
-产物：`reports/data_gates/G0/s3_pc_corpus_contrast_fulltext.{json,md}`
+产物：`reports/data_gates/G0/competition_corpus_contrast_fulltext.{json,md}`
 用法：python scripts/competition_corpus_contrast.py
 """
 from __future__ import annotations
@@ -29,10 +29,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 REPD = ROOT / 'reports/data_gates/G0'
-MD_A = REPD / 's3_pc_pricing_correspondence.json'
-FT = REPD / 's3_pc_pricing_correspondence_fulltext.json'
-OUT_JSON = REPD / 's3_pc_corpus_contrast_fulltext.json'
-OUT_MD = REPD / 's3_pc_corpus_contrast_fulltext.md'
+MD_A = REPD / 'competition_pricing_correspondence.json'
+FT = REPD / 'competition_pricing_correspondence_fulltext.json'
+OUT_JSON = REPD / 'competition_corpus_contrast_fulltext.json'
+OUT_MD = REPD / 'competition_corpus_contrast_fulltext.md'
 PROGRESS = ROOT / 'artifacts/tmp/fulltext_corr_progress.md'
 
 
@@ -132,13 +132,13 @@ def main() -> int:
     # --- 假设 1（可选层）---
     ha, hb = a.get('L4_hypothesis1_optional'), b.get('L4_hypothesis1_optional')
     if ha and hb:
-        def _s1(d, key):
+        def _sigma(d, key):
             s = d.get(key) or {}
             return (f'{f(s.get("beta_sigma_in_1e8cny"))}（t_cl = {f(s.get("t_cluster_firm"))}）'
                     if s else 'NA')
         add('假设 1（PC → 业绩波动率，可选；σSale）', 'PC 系数均为正',
-            f'β {_s1(ha, "sigma_sale")}；n = {ha.get("n_firm_year")}',
-            f'β {_s1(hb, "sigma_sale")}；n = {hb.get("n_firm_year")}',
+            f'β {_sigma(ha, "sigma_sale")}；n = {ha.get("n_firm_year")}',
+            f'β {_sigma(hb, "sigma_sale")}；n = {hb.get("n_firm_year")}',
             (ha.get('sigma_sale') or {}).get('verdict', 'NA'),
             (hb.get('sigma_sale') or {}).get('verdict', 'NA'), note='可选层')
 
@@ -284,7 +284,7 @@ def main() -> int:
     HIST_NOTE = ('本文件判定列/结论为 2026-10-19/2026-10-20 历史标签；自 2026-10-27 起统一读作'
                  '「不可比/未复现（对手集合口径不同）」；表内数值与符号变化仍有效，但只描述项目自建 PC 的语料敏感性，'
                  '不构成对原文的复现或证伪。')
-    out = {'artifact': 's3_pc_corpus_contrast_fulltext', 'run_at': datetime.now(timezone.utc).isoformat(),
+    out = {'artifact': 'competition_corpus_contrast_fulltext', 'run_at': datetime.now(timezone.utc).isoformat(),
            'purpose': 'F5：对表语料三方并列表（原文 × MD&A 主口径 × 年报全文敏感性列）',
            'historical_label_note': HIST_NOTE,
            'comparability': {
@@ -315,19 +315,19 @@ def main() -> int:
                       '③ 五分位 VW 的 raw 与十分位 EW 的 raw。',
                'fix': '新增 census_rows（全层 × 全子统计逐格判定，纯读数不重估）与 verdict_changes_full（全量判定变化清单），'
                       '结论句改为准确版本；数值读数与判据零改动。',
-               'reference': 'reports/audits/s3_fulltext_correspondence_review_20261020.md'},
+               'reference': 'reports/audits/network_fulltext_correspondence_review_20261020.md'},
            'rows': rows, 'conclusion': conclusion,
            'historical_overall': hist_overall}
 
     OUT_JSON.write_text(json.dumps(out, ensure_ascii=False, indent=1), encoding='utf-8')
 
-    L = ['# S3 对表语料三方并列表：原文 × 主口径（老师 MD&A）× 全文语料（年报全文）', '',
+    L = ['# network 对表语料三方并列表：原文 × 主口径（老师 MD&A）× 全文语料（年报全文）', '',
          f'- 原文 = {a["paper"]["citation"]}（{a["paper"]["file"]}）',
          f'- MD&A 版 = `{out["sources"]["mda_version"]["file"]}`（{a.get("generated_at")}，总判定 = {hist_src["mda"]}（历史标签））',
          f'- 全文版 = `{out["sources"]["fulltext_version"]["file"]}`（{b.get("generated_at")}，总判定 = {hist_src["fulltext"]}（历史标签））',
          f'- 判据（先登记，未改）：{a["pre_registered_criteria"]["rule"]}',
          '',
-         '> **2026-10-27 口径更正（Phase 0.2 / V-P1-2 + N-2）**：本表判定列与结论为 2026-10-19/2026-10-20 历史标签；'
+         '> **2026-10-27 口径更正（Phase 0.2 口径复核）**：本表判定列与结论为 2026-10-19/2026-10-20 历史标签；'
          '自 2026-10-27 起统一读作**不可比/未复现（对手集合口径不同）**（项目 = 同团成员；原文 = 相似度 > 团内最小相似度，'
          '字面含团外；`methodology_execution_plan.md:2290` 已登记偏离）。表内数值与符号变化仍有效，但只描述项目自建 PC '
          '的语料敏感性，不构成对原文的复现或证伪。',
@@ -361,18 +361,18 @@ def main() -> int:
           '**修正说明（2026-10-20 复核）**：本并列表原自述「唯一层级变化 = 表 3 十分位市值加权 α3」**不完整**——'
           '该表述只遍历上表 8 行、且每行仅以 α3 作判定，漏掉 ① 原文最近似样本（paper_like）同层、② 同层 H−L raw 与 α4。'
           '今补齐为上述全清单（**数值读数与判据零改动**，仅新增普查与措辞修正）；复核证据见 '
-          '`reports/audits/s3_fulltext_correspondence_review_20261020.md`。',
+          '`reports/audits/network_fulltext_correspondence_review_20261020.md`。',
           '', '## 样本量 / 月数', '',
-          f'- MD&A 版：S1 原文最近似 {samples["mda"]["S1_paper_like"]["rows"]:,} 行 / '
-          f'{samples["mda"]["S1_paper_like"]["months"]} 月（{samples["mda"]["S1_paper_like"]["first_month"]}..'
-          f'{samples["mda"]["S1_paper_like"]["last_month"]}）；S1 登记样本 {samples["mda"]["S1_registered"]["rows"]:,} 行 / '
-          f'{samples["mda"]["S1_registered"]["months"]} 月；S2 原文最近似 {samples["mda"]["S2_paper_like"]["rows"]:,}；'
-          f'S2 登记样本 {samples["mda"]["S2_registered"]["rows"]:,}',
-          f'- 全文版：S1 原文最近似 {samples["fulltext"]["S1_paper_like"]["rows"]:,} 行 / '
-          f'{samples["fulltext"]["S1_paper_like"]["months"]} 月（{samples["fulltext"]["S1_paper_like"]["first_month"]}..'
-          f'{samples["fulltext"]["S1_paper_like"]["last_month"]}）；S1 登记样本 {samples["fulltext"]["S1_registered"]["rows"]:,} 行 / '
-          f'{samples["fulltext"]["S1_registered"]["months"]} 月；S2 原文最近似 {samples["fulltext"]["S2_paper_like"]["rows"]:,}；'
-          f'S2 登记样本 {samples["fulltext"]["S2_registered"]["rows"]:,}',
+          f'- MD&A 版：原文最近似样本 {samples["mda"]["paper_like"]["rows"]:,} 行 / '
+          f'{samples["mda"]["paper_like"]["months"]} 月（{samples["mda"]["paper_like"]["first_month"]}..'
+          f'{samples["mda"]["paper_like"]["last_month"]}）；登记样本 {samples["mda"]["registered"]["rows"]:,} 行 / '
+          f'{samples["mda"]["registered"]["months"]} 月；加控制原文最近似样本 {samples["mda"]["with_controls_paper_like"]["rows"]:,}；'
+          f'加控制登记样本 {samples["mda"]["with_controls_registered"]["rows"]:,}',
+          f'- 全文版：原文最近似样本 {samples["fulltext"]["paper_like"]["rows"]:,} 行 / '
+          f'{samples["fulltext"]["paper_like"]["months"]} 月（{samples["fulltext"]["paper_like"]["first_month"]}..'
+          f'{samples["fulltext"]["paper_like"]["last_month"]}）；登记样本 {samples["fulltext"]["registered"]["rows"]:,} 行 / '
+          f'{samples["fulltext"]["registered"]["months"]} 月；加控制原文最近似样本 {samples["fulltext"]["with_controls_paper_like"]["rows"]:,}；'
+          f'加控制登记样本 {samples["fulltext"]["with_controls_registered"]["rows"]:,}',
           '', '## 结论', '', conclusion, '',
           '> 量级差异按期间/语料差异解释；本表只做读数并列与符号判定，**不做事后样本挑选、不做任何调参**。']
     OUT_MD.write_text('\n'.join(L) + '\n', encoding='utf-8')

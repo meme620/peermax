@@ -1,11 +1,11 @@
-"""S3A Gate 1 参数入口审计：静态扫描 + 非法组合报错证据。
+"""analyst-network Gate 1 参数入口审计：静态扫描 + 非法组合报错证据。
 
 对应验收矩阵 Gate 1.2：
 - 主运行只接受统一 spec 或显式命令参数；
-- 禁止 S3A_RET_FILE / S3A_MEQ_FILE / S3A_NET_VER / H12_MIN_AVAIL / S3A_OUT_SUFFIX 静默改变主规格；
+- 禁止任何 LEGACY_ENV 环境变量静默改变主规格；
 - 变体必须显式命名并写入元数据。
 
-产出 JSON：reports/data_gates/G0/s3a_gate1_entry_audit.json
+产出 JSON：reports/data_gates/G0/analyst_gate1_entry_audit.json
 """
 import json
 import re
@@ -13,13 +13,14 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from fileio import file_size
 
 ROOT = Path(__file__).resolve().parents[1]
-SPEC = ROOT / 'configs/s3a_final_spec.yaml'
+SPEC = ROOT / 'configs/analyst_spec.yaml'
 MAIN_SCRIPTS = ['analyst_cf_mom_replication.py', 'analyst_npm_replication.py']
 LEGACY_ENV_NAMES = ['S3A_RET_FILE', 'S3A_MEQ_FILE', 'S3A_NET_VER', 'H12_MIN_AVAIL', 'S3A_OUT_SUFFIX']
 ENV_READ_RE = re.compile(r'os\.environ|os\.getenv|getenv\(')
-SPEC_REF_RE = re.compile(r"s3a_final_spec\.yaml")
+SPEC_REF_RE = re.compile(r"analyst_spec\.yaml")
 PATH_LITERAL_RE = re.compile(r"['\"](data/[^'\"]+\.(?:pkl|csv))['\"]")
 PKL_NAME_RE = re.compile(r"['\"]([a-z0-9_]+\.pkl)['\"]")
 
@@ -99,7 +100,7 @@ NINE_X_SCRIPTS = (
 
 
 def check_9x_paths(spec_paths, spec_names):
-    """9A–9M 入口审计：名单与 spec/stages.yaml 的 S3A 阶段一致。"""
+    """9A–9M 入口审计：名单与 spec/stages.yaml 的 analyst-network 阶段一致。"""
     out = []
     for name in NINE_X_SCRIPTS:
         f = ROOT / 'scripts' / name
@@ -145,7 +146,7 @@ def main():
     spec, spec_paths, spec_names = spec_inputs()
     report = {
         'spec_id': spec['spec_id'],
-        'spec_hash': file_size(spec_bytes),
+        'spec_hash': len(spec_bytes),
         'run_at': datetime.now(timezone.utc).isoformat(),
         'command': ' '.join(sys.argv),
         'status': 'COMPUTED',
@@ -157,7 +158,7 @@ def main():
         'cli_guard_runtime_test': run_cli_guard_test(),
     }
     report['checks'] = {
-        'no_s3a_env_override': all('s3a' not in h['file'].lower() for h in report['env_reads']),
+        'no_legacy_env_override': all('s3a' not in h['file'].lower() for h in report['env_reads']),
         'no_live_legacy_names': len(report['legacy_param_name_hits']) == 0,
         'main_scripts_read_spec': all(x['reads_spec'] for x in report['main_script_entry']),
         'main_scripts_emit_metadata': all(x['emits_spec_metadata'] for x in report['main_script_entry']),
@@ -167,7 +168,7 @@ def main():
         'illegal_cli_combos_rejected': all(x['rejected'] for x in report['cli_guard_runtime_test']),
     }
     report['status'] = 'PASS' if all(report['checks'].values()) else 'FAIL'
-    out = ROOT / 'reports/data_gates/G0/s3a_gate1_entry_audit.json'
+    out = ROOT / 'reports/data_gates/G0/analyst_gate1_entry_audit.json'
     out.write_text(json.dumps(report, ensure_ascii=False, indent=1), encoding='utf-8')
     print(json.dumps(report['checks'], ensure_ascii=False, indent=1))
     print('status =', report['status'], '->', out.relative_to(ROOT))

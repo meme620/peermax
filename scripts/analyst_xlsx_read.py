@@ -1,4 +1,4 @@
-"""S3A Step 1 辅助：标准库流式解析 xlsx（零依赖）。
+"""analyst-network Step 1 辅助：标准库流式解析 xlsx（零依赖）。
 支持直接读外层 zip 内的 xlsx 成员。
 用法:
   python scripts/analyst_xlsx_read.py <zip路径> --inner 预测情况_1.xlsx [--max-rows N]

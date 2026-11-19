@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""S3 Phase B′ 主口径专项核验（老师 MD&A 语料网络，2026-09-22）。
+"""network Phase B′ 主口径专项核验（老师 MD&A 语料网络，2026-09-22）。
 
 替代"改造三个自建链审计脚本"的方案：对**新主口径**做等价核验，覆盖
 主仓库 methodology_execution_plan §8「Phase B′ 后续」第 1 项要求的层次（数据/公式/语义），
@@ -15,7 +15,7 @@
   D. 分层语义代理：按权重层（top1 / 高权 / 随机 / 中位）抽样，比较同申万二级边占比——
      高权层应显著高于随机层（"高相似度更像真竞争者"的代理证据，非人工 precision）。
 
-产物：reports/data_gates/G0/s3_bp_mainline_audit.json
+产物：reports/data_gates/G0/network_mainline_audit.json
 用法：python scripts/network_mainline_audit.py
 """
 from __future__ import annotations
@@ -111,7 +111,7 @@ def main() -> None:
               f"layer same_sw2={layers} ok={row['ok']}", flush=True)
 
     out = {
-        "step": "S3 Phase B′ 主口径专项核验",
+        "step": "network Phase B′ 主口径专项核验",
         "run_at": datetime.now(timezone.utc).isoformat(),
         "network_dir": str(NET.relative_to(ROOT)),
         "tau_registry": tau_reg,
@@ -136,7 +136,7 @@ def main() -> None:
         "status": "PASS" if not problems else "CHECK",
     }
     REPD.mkdir(parents=True, exist_ok=True)
-    (REPD / "s3_bp_mainline_audit.json").write_text(
+    (REPD / "network_mainline_audit.json").write_text(
         json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
     print("\nstatus =", out["status"], "|", out["summary"])
 

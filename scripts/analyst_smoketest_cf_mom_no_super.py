@@ -1,4 +1,4 @@
-"""S3A smoketest 补跑A：剔除超级分析师（跨月覆盖>300 家的 6 人）后 CF MOM 是否仍显著（2026-08-14）。
+"""analyst-network smoketest 补跑A：剔除超级分析师（跨月覆盖>300 家的 6 人）后 CF MOM 是否仍显著（2026-08-14）。
 
 问题：sens_specs 的 no_top1 变体只对比了网络统计（边数 −4.5%），没有对比 CF 动量。
 本脚本：①从 v2 覆盖表计算跨月覆盖>300 家的分析师（应=6）；②剔除后重建网络（不落盘边表，
@@ -140,11 +140,11 @@ def main():
     d5 = df.dropna(subset=['ew_ls', 'MKT', 'SMB', 'HML', 'MOM', 'REV'])
     y5 = d5['ew_ls'].values
     X5 = np.column_stack([np.ones(len(y5)), d5['MKT'], d5['SMB'], d5['HML'], d5['MOM'], d5['REV']])
-    b5, s5, t5 = nw_ols(X5, y5, L=1)
+    b5, spec_no_turnover, t5 = nw_ols(X5, y5, L=1)
     d4 = df.dropna(subset=['ew_ls', 'MKT', 'SMB', 'HML', 'MOM'])
     y4 = d4['ew_ls'].values
     X4 = np.column_stack([np.ones(len(y4)), d4['MKT'], d4['SMB'], d4['HML'], d4['MOM']])
-    b4, s4, t4 = nw_ols(X4, y4, L=1)
+    b4, se4, t4 = nw_ols(X4, y4, L=1)
 
     res = {
         'excluded_top_analysts': sorted(top),

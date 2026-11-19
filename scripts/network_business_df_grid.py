@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""S3 第一梯队 ⑤ / B″11-8：df 阈值网格 10%/25%/100%（`network_business_df_grid.{json,md}`）。
+"""network 第一梯队 ⑤ / B″11-8：df 阈值网格 10%/25%/100%（`network_business_df_grid.{json,md}`）。
 
 **只读复算 + 新建目录**：不重建主口径、不改任何 headline_value / 冻结参数；0.25 档（现状）的
 聚类与边表**落临时目录**（`artifacts/tmp/t1b/dfgrid/regr025/`），与 `data/processed/network_ma_teacher/`
 主口径产物做 **bytes 回归门**；10%/100% 两档落新目录 `data/processed/network_ma_teacher_df{10,100}/`。
 
 口径真源：
-  - `reports/audits/s3_remaining_workplan_20261011.md` 第一梯队 5
+  - `reports/audits/network_remaining_workplan_20261011.md` 第一梯队 5
   - 主仓库 methodology_execution_plan §8 B″11-8
   - registry：`ma_lexicon_df_max`（0.25，headline 不动）、`ma_k_target_teacher`（44）
 
@@ -114,8 +114,8 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument('--levels', type=float, nargs='*', default=[0.25, 0.10, 1.00],
                     help='df_max 档位（缺省 0.25 0.10 1.00；0.25 = 现状/回归门，产物落临时目录）')
-    ap.add_argument('--out-json', default=str(REPD / 's3_ma_df_grid.json'))
-    ap.add_argument('--out-md', default=str(REPD / 's3_ma_df_grid.md'))
+    ap.add_argument('--out-json', default=str(REPD / 'network_business_df_grid.json'))
+    ap.add_argument('--out-md', default=str(REPD / 'network_business_df_grid.md'))
     ap.add_argument('--years', type=int, nargs='*', default=TEXT_YEARS)
     ap.add_argument('--skip-run', action='store_true', help='跳过构网（只做指标/回归门，产物须已存在）')
     args = ap.parse_args()
@@ -246,7 +246,7 @@ def main() -> None:
                                                      'isolated_share', 'same_sw2_share', 'base_rate_canonical',
                                                      'lift', 'mean_terms', 'active_vocab', 'K')}})
     rep = {
-        'step': 'S3 第一梯队 ⑤ df 阈值网格 10%/25%/100%（B″11-8）',
+        'step': 'network 第一梯队 ⑤ df 阈值网格 10%/25%/100%（B″11-8）',
         'run_at': datetime.now(timezone.utc).isoformat(),
         'nature': ('只读复算 + 新建目录：不重建主口径、不改任何 headline_value / 冻结参数；'
                    '0.25 档产物落临时目录（不与主口径产物冲突）'),
@@ -295,7 +295,7 @@ def main() -> None:
     outp.parent.mkdir(parents=True, exist_ok=True)
     outp.write_text(json.dumps(rep, ensure_ascii=False, indent=2), encoding='utf-8')
 
-    md = ['# S3 第一梯队 ⑤ df 阈值网格 10%/25%/100%（B″11-8）', '',
+    md = ['# network 第一梯队 ⑤ df 阈值网格 10%/25%/100%（B″11-8）', '',
           f"- run_at：{rep['run_at']}",
           f"- 状态：**{rep['status']}**；回归门（0.25 档 vs 主口径 bytes）："
           f"**{'PASS' if reg_pass else reg_pass}**"

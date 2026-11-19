@@ -1,4 +1,4 @@
-"""S3-B1：τ 校准（申万二级中位 peer 数目标，2026-09-14）。
+"""network-B1：τ 校准（申万二级中位 peer 数目标，2026-09-14）。
 
 Plan §8 Phase B1 的可执行实现：
   1. 目标值：申万二级同行业 peer 数（组内 N-1）在**入网公司**上的**公司层面中位数**，
@@ -9,7 +9,7 @@ Plan §8 Phase B1 的可执行实现：
      「组层面中位规模」目标下的备选 τ（次级口径，供稳健性）。
 
 产物：
-  reports/data_gates/G0/s3_b1_tau_calibration.json
+  reports/data_gates/G0/network_tau_calibration.json
   data/processed/network_mb/tau_calibration_probe.csv（τ-中位 peer 曲线，抽稀存档）
 
 用法：
@@ -66,7 +66,7 @@ def sw2_target(years, corpus='self'):
             'text_year': int(y), 'network_year': int(y) + 1, 'firms': int(len(g)),
             'sw2_groups': int(sizes.size),
             'median_peer': float(peers.median()), 'mean_peer': round(float(peers.mean()), 2),
-            'group_size_median': float(file_size()),
+            'group_size_median': float(sizes.median()),
         })
         pooled.append(peers.values)
         pooled_group.append(sizes.values.astype(float))
@@ -207,7 +207,7 @@ def main():
     }
     REPD.mkdir(parents=True, exist_ok=True)
     suffix = '' if corpus == 'self' else '_' + corpus
-    out_json = REPD / ('s3_b1_tau_calibration' + suffix + '.json')
+    out_json = REPD / ('network_tau_calibration' + suffix + '.json')
     probe_fp = PROBE.with_name('tau_calibration_probe' + suffix + '.csv')
     out_json.write_text(json.dumps(rep, ensure_ascii=False, indent=2), encoding='utf-8')
     probe_fp.parent.mkdir(parents=True, exist_ok=True)

@@ -1,11 +1,11 @@
-"""S3-M-B 全期相似度矩阵（P1.2，2026-09-13）。
+"""network-M-B 全期相似度矩阵（2026-09-13）。
 
 在已冻结参数下（df_threshold=0.25、mda_text_extraction_rule=v2）对文本年 2017-2025
 （对应网络年 2018-2025）逐年计算 TF-IDF 余弦相似度分布，**不校准 τ**
-（τ 校准依赖申万二级行业数据，属 P2）。
+（τ 校准依赖申万二级行业数据，属待办项）。
 
 产出（每年一行统计）：
-  reports/data_gates/G0/s3_mb_full_matrix.json
+  reports/data_gates/G0/network_mda_full_matrix.json
 
 用法: python scripts/network_mda_full_matrix.py [--years 2017-2025] [--sample 600]
 """
@@ -18,11 +18,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
+from fileio import file_size
 
 ROOT = Path(__file__).resolve().parents[1]
 V2 = ROOT / "data/processed/mda_texts.csv"
-OUT = ROOT / "reports/data_gates/G0/s3_mb_full_matrix.json"
-SPEC = ROOT / "configs/s3a_final_spec.yaml"
+OUT = ROOT / "reports/data_gates/G0/network_mda_full_matrix.json"
+SPEC = ROOT / "configs/analyst_spec.yaml"
 DF_CUTOFF = 0.25          # registry: df_threshold（2026-09-13 冻结）
 PEER_TARGET = 10          # 占位目标（正式 τ 校准待申万二级）
 
@@ -131,12 +132,11 @@ def main():
     args = ap.parse_args()
     y0, y1 = [int(x) for x in args.years.split("-")]
 
-    import sizes, yaml
-    spec_hash = file_size(SPEC.read_bytes()).hexdigest() if SPEC.exists() else None
-    out = {"spec_id": "s3a_final_spec_20260909", "spec_hash": spec_hash,
+    spec_hash = file_size(SPEC) if SPEC.exists() else None
+    out = {"spec_id": "analyst_spec_20260909", "spec_hash": spec_hash,
            "run_at": datetime.now(timezone.utc).isoformat(),
            "df_threshold": DF_CUTOFF, "peer_target_placeholder": PEER_TARGET,
-           "note": ("M-B 全期相似度矩阵；τ 为占位（中位 peer≈10），正式校准待申万二级（P2）；"
+           "note": ("M-B 全期相似度矩阵；τ 为占位（中位 peer≈10），正式校准待申万二级数据到位；"
                     "文本年 y-1 → 网络年 y，故 2017-2025 文本年对应 2018-2026 网络年（2026 年无收益数据，仅作分布）"),
            "years": []}
     for y in range(y0, y1 + 1):

@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""S3 Phase B′4：换语料桥接对账（自建 MD&A vs 老师 MD&A，重叠年 2017–2022）。
+"""network Phase B′4：换语料桥接对账（自建 MD&A vs 老师 MD&A，重叠年 2017–2022）。
 
 目的：把"换语料"这件事本身量化为可登记的"语料版本效应"，而不是只看最终结果。
 输入：data/processed/network_mb/（自建，pm_mb_tfidf_v1_*）
       data/processed/network_mb_teacher/（老师语料，pm_mb_tfidf_teacher_v1_*）
       data/processed/sw2_industry_latest.csv（同申万二级占比）
-产物：reports/data_gates/G0/s3_corpus_bridge_report.json + .md
+产物：reports/data_gates/G0/corpus_bridge_report.json + .md
 
 指标（逐年，仅共同节点集）：
   1. 节点数：两网各自入网公司数、交集、仅自建、仅老师
@@ -122,7 +122,7 @@ def main() -> None:
 
     ok = [r for r in per_year if r.get("status") == "ok"]
     rep = {
-        "step": "S3 Phase B′4 换语料桥接对账",
+        "step": "network Phase B′4 换语料桥接对账",
         "run_at": datetime.now(timezone.utc).isoformat(),
         "years": args.years,
         "self_dir": str(SELF_DIR.relative_to(ROOT)),
@@ -140,10 +140,10 @@ def main() -> None:
         },
     }
     REPD.mkdir(parents=True, exist_ok=True)
-    (REPD / "s3_corpus_bridge_report.json").write_text(
+    (REPD / "corpus_bridge_report.json").write_text(
         json.dumps(rep, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    md = ["# S3 换语料桥接对账（B′4）", "",
+    md = ["# network 换语料桥接对账（B′4）", "",
           f"生成时间：{rep['run_at']}　重叠年：{args.years}", "",
           "| 文本年 | 节点(自建/老师/共) | 边(自建/老师) | peer中位(自建/老师) | 同申万二级(自建/老师) | 边Jaccard |",
           "|---|---|---|---|---|---|"]
@@ -158,7 +158,7 @@ def main() -> None:
     md += ["", f"汇总：边 Jaccard 中位 = {rep['summary']['edge_jaccard_median']}；"
                f"peer 中位（自建/老师）= {rep['summary']['peer_median_self_median']}/"
                f"{rep['summary']['peer_median_teacher_median']}"]
-    (REPD / "s3_corpus_bridge_report.md").write_text("\n".join(md), encoding="utf-8")
+    (REPD / "corpus_bridge_report.md").write_text("\n".join(md), encoding="utf-8")
     print(json.dumps(rep["summary"], ensure_ascii=False, indent=1))
 
 

@@ -1,9 +1,9 @@
-"""S3A Gate 1.6 收口一致性校验（第三轮机器对账）。
+"""analyst-network Gate 1.6 收口一致性校验（第三轮机器对账）。
 
 对账对象：registry ↔ spec ↔ 代码 ↔ 运行命令 ↔ 审计 JSON ↔ manifest ↔ 矩阵。
 低层哈希校验委托给三个 Gate 1 审计产物，避免重复计算大文件。
 
-产出 JSON：reports/data_gates/G0/s3a_gate1_consistency_check.json
+产出 JSON：reports/data_gates/G0/analyst_gate1_consistency_check.json
 """
 import json
 import sys
@@ -11,10 +11,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SPEC = ROOT / 'configs/s3a_final_spec.yaml'
+SPEC = ROOT / 'configs/analyst_spec.yaml'
 REG = ROOT / 'configs/parameter_registry.yaml'
 MAN = ROOT / 'configs/version_manifest.yaml'
-MATRIX = ROOT / 'reports/execution/s3a/s3a_final_acceptance_matrix.md'
+MATRIX = ROOT / 'reports/execution/analyst/analyst_acceptance_matrix.md'
 
 EXCLUDED_PROBES = []  # 供未来扩展
 
@@ -34,9 +34,10 @@ def registry_spec_reconciliation(spec, reg):
         if expect == 'equal':
             ok = spec_val == reg_val
         elif expect == 'semantic_equal':
-            # registry 为描述文本、spec 为机器码：以关键语义词是否出现为准
-            ok = all(tok in str(reg_val) for tok in
-                     {'month_end': ['月末'], 'raw_close_return': ['raw']}.get(spec_val, []))
+            # registry 为机器码或描述文本：机器码直接相等，描述文本按关键语义词出现为准
+            ok = spec_val == reg_val or all(
+                tok in str(reg_val) for tok in
+                {'month_end': ['月末'], 'raw_close_return': ['raw']}.get(spec_val, []))
         elif expect == 'deviation_registered':
             ok = name in dev_ids
         rows.append({'param': name, 'spec': spec_val, 'registry': reg_val,
@@ -53,9 +54,9 @@ def registry_spec_reconciliation(spec, reg):
         'deviation_registered', 'registry 冻结=流通市值，实现=总市值')
     row('st_exclusion', spec['sample_filters']['st_primary_current'],
         'exclude_st', 'deviation_registered', 'registry 冻结=排除 ST，实现=含 ST + 焦点侧敏感性')
-    row('sample_period_full', spec['samples']['s3a_signal_range'],
+    row('sample_period_full', spec['samples']['signal_range'],
         params['sample_start']['headline_value'] + '..' + params['sample_end']['headline_value'],
-        'deviation_registered', 'S3A 全期复刻 vs registry 主线样本 2018-2025')
+        'deviation_registered', 'analyst-network 全期复刻 vs registry 主线样本 2018-2025')
     return rows
 
 
@@ -82,14 +83,14 @@ def code_spec_reconciliation(spec):
     add('h12_min_available', spec['horizon']['h12_min_available_months'],
         "_SPEC['horizon']['h12_min_available_months']", "h12_min_available_months" in cf)
     add('main_scripts_read_spec', 'spec is single entry',
-        'SPEC = Path(configs/s3a_final_spec.yaml)', 'configs/s3a_final_spec.yaml' in cf)
+        'SPEC = Path(configs/analyst_spec.yaml)', 'configs/analyst_spec.yaml' in cf)
     return checks
 
 
 def audit_artifacts():
     out = {}
     for name in ['entry', 'provenance', 'metadata']:
-        p = ROOT / f'reports/data_gates/G0/s3a_gate1_{name}_audit.json'
+        p = ROOT / f'reports/data_gates/G0/analyst_gate1_{name}_audit.json'
         rec = {'exists': p.exists()}
         if p.exists():
             d = json.loads(p.read_text(encoding='utf-8'))
@@ -100,11 +101,11 @@ def audit_artifacts():
 
 
 def frozen_value_drift_check(spec):
-    """S3A 冻结值漂移检测：registry 其余条目可被并行工作流新增/修改，
-    但 S3A 冻结值一旦变化必须显式暴露，不能被锚点刷新掩盖。"""
+    """analyst-network 冻结值漂移检测：registry 其余条目可被并行工作流新增/修改，
+    但 analyst-network 冻结值一旦变化必须显式暴露，不能被锚点刷新掩盖。"""
     reg = load(REG)
     params = {it['name']: it for it in reg['parameters']}
-    expected = spec['governance'].get('s3a_frozen_values_recheck', {})
+    expected = spec['governance'].get('frozen_values_recheck', {})
     pairs = [
         ('coverage_window', params['coverage_window']['headline_value']),
         ('epsilon_weight', params['epsilon_weight']['headline_value']),
@@ -113,19 +114,19 @@ def frozen_value_drift_check(spec):
     ]
     rows = [{'param': k, 'expected': expected.get(k), 'actual': v,
              'ok': expected.get(k) == v} for k, v in pairs]
-    w = str(params['s3a_weight_rule']['headline_value'])
-    rows.append({'param': 's3a_weight_rule', 'expected': expected.get('s3a_weight_rule'),
-                 'actual': w, 'ok': expected.get('s3a_weight_rule') in w})
+    w = str(params['analyst_weight_rule']['headline_value'])
+    rows.append({'param': 'analyst_weight_rule', 'expected': expected.get('analyst_weight_rule'),
+                 'actual': w, 'ok': expected.get('analyst_weight_rule') in w})
     return rows
 
 
 def manifest_check(spec):
     man = load(MAN)
     files = [x['file'] for x in man['deliverables']]
-    need = ['configs/s3a_final_spec.yaml',
-            'reports/execution/s3a/s3a_final_acceptance_matrix.md',
-            'reports/execution/s3a/s3a_parameter_snapshot_20260906.yaml',
-            'reports/execution/s3a/s3a_three_person_cross_check_protocol.md',
+    need = ['configs/analyst_spec.yaml',
+            'reports/execution/analyst/analyst_acceptance_matrix.md',
+            'reports/execution/analyst/analyst_parameter_snapshot_20260906.yaml',
+            'reports/execution/analyst/analyst_cross_check_protocol.md',
             'scripts/analyst_meta.py']
     return {'registered': [f for f in need if f in files],
             'missing': [f for f in need if f not in files],
@@ -149,15 +150,15 @@ def main():
         'registry_spec_reconciled': all(r['ok'] for r in recon),
         'code_matches_spec': all(c['ok'] for c in code),
         'three_audits_pass': all(a.get('status') == 'PASS' for a in audits.values()),
-        'audits_pin_current_spec': all(a.get('spec_hash') == file_size(spec_bytes)
+        'audits_pin_current_spec': all(a.get('spec_hash') == len(spec_bytes)
                                        for a in audits.values()),
         'manifest_covers_governance_files': len(man['missing']) == 0,
         'registry_matches_spec_pin': man['registry_pinned_in_spec'],
-        's3a_frozen_values_unchanged': all(r['ok'] for r in drift),
+        'frozen_values_unchanged': all(r['ok'] for r in drift),
     }
     report = {
         'spec_id': spec['spec_id'],
-        'spec_hash': file_size(spec_bytes),
+        'spec_hash': len(spec_bytes),
         'run_at': datetime.now(timezone.utc).isoformat(),
         'command': ' '.join(sys.argv),
         'status': 'PASS' if all(checks.values()) else 'FAIL',
@@ -169,7 +170,7 @@ def main():
         'frozen_value_drift': drift,
         'matrix_present': MATRIX.exists(),
     }
-    out = ROOT / 'reports/data_gates/G0/s3a_gate1_consistency_check.json'
+    out = ROOT / 'reports/data_gates/G0/analyst_gate1_consistency_check.json'
     out.write_text(json.dumps(report, ensure_ascii=False, indent=1), encoding='utf-8')
     print(json.dumps(checks, ensure_ascii=False, indent=1))
     print('status =', report['status'], '->', out.relative_to(ROOT))

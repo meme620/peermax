@@ -1,9 +1,9 @@
-"""S3A Gate 2.4：三线对账（A 生产 / B 独立重实现 / C 审计重算）。
+"""analyst-network Gate 2.4：三线对账（A 生产 / B 独立重实现 / C 审计重算）。
 
 生成：
-  reports/execution/s3a/s3a_crosscheck_summary.md   三线并排表 + 差异追溯结论
-  reports/data_gates/G0/s3a_crosscheck_diff.csv     逐月逐指标相对差
-  reports/data_gates/G0/s3a_crosscheck_summary.json 机器可读汇总
+  reports/execution/analyst/analyst_crosscheck_summary.md   三线并排表 + 差异追溯结论
+  reports/data_gates/G0/analyst_crosscheck_diff.csv     逐月逐指标相对差
+  reports/data_gates/G0/analyst_crosscheck_summary.json 机器可读汇总
 
 验收规则（协议 §3）：
   - 结构指标（边数/degree/common 分布）：相对差 ≤0.5% 且可解释 -> 通过
@@ -19,13 +19,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import yaml
+from fileio import file_size
 
 ROOT = Path(__file__).resolve().parents[1]
-SPEC = ROOT / 'configs/s3a_final_spec.yaml'
-SPEC_HASH = file_size(SPEC.read_bytes()).hexdigest()
+SPEC = ROOT / 'configs/analyst_spec.yaml'
+SPEC_HASH = file_size(SPEC)
 DIAG = ROOT / 'data/processed/analyst/analyst_network_diagnostics.json'
-B_JSON = ROOT / 'artifacts/s3a_crosscheck_B.json'
-C_JSON = ROOT / 'artifacts/s3a_crosscheck_C.json'
+B_JSON = ROOT / 'artifacts/analyst_crosscheck_b.json'
+C_JSON = ROOT / 'artifacts/analyst_crosscheck_c.json'
 
 # 指标三线映射：(指标名, A 键, B 键, C 键, 相对容差, 绝对容差, 生产落盘小数位)
 METRICS = [
@@ -164,16 +165,16 @@ def main():
 
     # 写 CSV
     (ROOT / 'reports/data_gates/G0').mkdir(parents=True, exist_ok=True)
-    with open(ROOT / 'reports/data_gates/G0/s3a_crosscheck_diff.csv', 'w', newline='',
+    with open(ROOT / 'reports/data_gates/G0/analyst_crosscheck_diff.csv', 'w', newline='',
               encoding='utf-8') as f:
         w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
         w.writeheader()
         w.writerows(rows)
-    (ROOT / 'reports/data_gates/G0/s3a_crosscheck_summary.json').write_text(
+    (ROOT / 'reports/data_gates/G0/analyst_crosscheck_summary.json').write_text(
         json.dumps(result, ensure_ascii=False, indent=1), encoding='utf-8')
 
     # 写 Markdown
-    md = ['# S3A 三线对账汇总（Gate 2.4）\n',
+    md = ['# analyst-network 三线对账汇总（Gate 2.4）\n',
           f'- 规格：`{spec["spec_id"]}`，spec_hash `{SPEC_HASH}`',
           f'- 运行：{result["run_at"]}，命令 `{result["command"]}`',
           f'- 月份数：{len(cutoffs)}；逐月逐指标单元 {total}',
@@ -232,7 +233,7 @@ def main():
            '（无向边 49,719,505；覆盖记录 8,421,222），'
            '权重行和误差 ≤3.82e-6（阈值 1e-4），权重公式误差 ≤5e-9，自环与重复键均为 0。']
 
-    (ROOT / 'reports/execution/s3a/s3a_crosscheck_summary.md').write_text(
+    (ROOT / 'reports/execution/analyst/analyst_crosscheck_summary.md').write_text(
         '\n'.join(md) + '\n', encoding='utf-8')
 
     print(json.dumps({'status': result['status'], 'cells': total, 'pass': passed,

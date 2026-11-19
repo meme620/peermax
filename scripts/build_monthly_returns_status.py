@@ -4,8 +4,8 @@
 （firm_id, month, R），缺 plan §7.4 与 §5.6 Step 3 要求的质量字段：
 `n_valid_days` / `complete_month` / `return_status` / `month_start` / `month_end`。
 
-**关键约束**：主文件被 S3A spec 钉住 input hash（8715be47…），直接改写会破坏
-S3A 全链锚点。故本脚本**只读主文件、输出扩展版新文件**，主文件保持逐位不变。
+**关键约束**：主文件被 analyst-network spec 钉住 input hash（8715be47…），直接改写会破坏
+analyst-network 全链锚点。故本脚本**只读主文件、输出扩展版新文件**，主文件保持逐位不变。
 
 阈值（已在 execution_protocol_b0_5_to_s6a.md 冻结为 pilot_frozen）：
   min_valid_days = 15（月均 20.3 交易日，75%；Jansen 2021 / Hou 口径）
@@ -17,7 +17,7 @@ Phase 1 / I-1（2026-10-26）：
     `(code, month)` 统计 `volume > 0` 的天数（真实交易日；覆盖期外为 0）。
   - 旧列顺序/旧列值不变，新列只追加在末尾。
 
-P1-01（2026-11-15）：
+口径更正（2026-11-15）：
   - `n_valid_days` 语义改为**有效交易日**（`volume > 0` 天数），与 methodology
     plan L4830–4837 / L4507 一致；`complete_month` 与 `return_status` 同步改用
     `n_trade_days` 判定。
@@ -59,6 +59,7 @@ OUT = ROOT / "data/processed/monthly_returns_clean_v2.csv"
 REPORT = ROOT / "reports/data_gates/G0/monthly_returns_status_report.json"
 
 from pricing_lib import param_value
+from fileio import file_size
 
 MIN_VALID_DAYS = int(param_value('min_valid_days'))  # registry 唯一来源（原注释「待登记」已过时）
 SAMPLE_VERSION_RULE = "min(month)..max(month)"
@@ -156,7 +157,7 @@ def build_status(ship: pd.DataFrame, px: pd.DataFrame, panel_dir=PANEL_DIR,
                  min_valid_days: int = MIN_VALID_DAYS) -> pd.DataFrame:
     """构造月度质量表；n_valid_days/complete_month/return_status 按有效交易日判定。
 
-    P1-01：`n_valid_days = n_trade_days`（`volume>0` 天数），旧价格非空日数仅作
+    口径更正：`n_valid_days = n_trade_days`（`volume>0` 天数），旧价格非空日数仅作
     `n_price_obs` / `n_price_obs_legacy` 审计列保留。
     """
     q = price_obs_long(px)
@@ -168,7 +169,7 @@ def build_status(ship: pd.DataFrame, px: pd.DataFrame, panel_dir=PANEL_DIR,
     out = out.merge(td, on=["firm_id", "month"], how="left")
     out["n_trade_days"] = pd.to_numeric(out["n_trade_days"], errors="coerce").fillna(0).astype(int)
 
-    # P1-01：有效交易日口径；旧价格观测数只保留审计
+    # 口径更正：有效交易日口径；旧价格观测数只保留审计
     out["n_price_obs_legacy"] = out["n_price_obs"]
     out["n_valid_days"] = out["n_trade_days"]
     out["complete_month"] = (out["n_trade_days"] >= min_valid_days).astype(int)
@@ -198,13 +199,12 @@ def main() -> int:
     # 写出前补齐 I-17 追溯列（sample_version 已在 build_status 内按 min/max 计算）
     out = annotate_sample_version(out)
 
-    # P1-01：交付 CSV 保持 10 列；审计列只进报告
+    # 口径更正：交付 CSV 保持 10 列；审计列只进报告
     csv_out = out[OLD_COLS]
     Path(args.out).write_text("", encoding="utf-8")     # 确保可写
     csv_out.to_csv(args.out, index=False)
 
-    with open(args.out, "rb") as f:
-        csv_bytes = file_size(f.read()).hexdigest()
+    csv_bytes = file_size(args.out)
 
     cm = csv_out["complete_month"].astype(int)
     ntd = out["n_trade_days"].astype(int)
@@ -213,7 +213,7 @@ def main() -> int:
         "report_id": "monthly_returns_status_report",
         "run_at": pd.Timestamp.utcnow().isoformat(),
         "script": "scripts/build_monthly_returns_status.py",
-        "purpose": "P1-01: n_valid_days/complete_month 按有效交易日（volume>0）判定",
+        "purpose": "口径更正: n_valid_days/complete_month 按有效交易日（volume>0）判定",
         "csv_path": str(Path(args.out).relative_to(ROOT)),
         "csv_bytes": csv_bytes,
         "rows": int(len(csv_out)),
@@ -232,7 +232,7 @@ def main() -> int:
         "n_price_obs_ne_n_trade_days_rows": int((npo != ntd).sum()),
         "n_price_obs_and_n_trade_days_both_zero_rows": int(((npo == 0) & (ntd == 0)).sum()),
         "legacy_definition": {
-            "complete_month_rule": f"n_price_obs >= {MIN_VALID_DAYS}",
+            "complete_month_rule": f"n_trade_days >= {MIN_VALID_DAYS}",
             "complete_month_rows_legacy": int((npo >= MIN_VALID_DAYS).sum()),
             "disagreement_rows": int(((npo >= MIN_VALID_DAYS) != (ntd >= MIN_VALID_DAYS)).sum()),
         },

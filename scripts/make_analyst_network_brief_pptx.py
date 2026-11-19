@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
-"""生成 S3A 共同分析师网络汇报 PPTX（16:9，8 页，可编辑版）。
+"""生成 analyst-network 共同分析师网络汇报 PPTX（16:9，8 页，可编辑版）。
 
 用法: python scripts/make_analyst_network_brief_pptx.py
-输出: deliverables/presentation/peermax_s3a_report_20260901.pptx
-数字来源: reports/execution/stage0/s3a_report.md v2.0
-v1.1: 字号整体调大 1-2pt；修复 P7 右栏遗留项溢出卡片、P4 数字卡 note 位置。
+输出: deliverables/presentation/peermax_analyst_report_20260901.pptx
+数字来源: reports/execution/analyst_report.md v2.0
+v1.1: 字号整体调大 1-2pt；修复第 7 页右栏遗留项溢出卡片、第 4 页数字卡 note 位置。
 """
 from pptx import Presentation
 from pptx.util import Inches, Pt, Emu
@@ -135,25 +135,25 @@ def slide_cover(prs):
     s = prs.slides.add_slide(prs.slide_layouts[6])
     add_shape(s, MSO_SHAPE.RECTANGLE, 0, 0, PAGE_W, PAGE_H, fill=NAVY)
     add_shape(s, MSO_SHAPE.RECTANGLE, 0, 4.9, PAGE_W, 0.06, fill=ORANGE)
-    add_text(s, 1.0, 1.9, 11.3, 1.0, "S3A 共同分析师覆盖网络", size=46, bold=True, color=WHITE)
+    add_text(s, 1.0, 1.9, 11.3, 1.0, "analyst-network 共同分析师覆盖网络", size=46, bold=True, color=WHITE)
     add_text(s, 1.0, 3.0, 11.3, 0.7, "文献研读 · A 股构造 · 复现对照 · 六维证据",
              size=22, color=RGBColor(0xBD, 0xC7, 0xDC))
     add_text(s, 1.0, 5.2, 11.3, 0.55,
              "4,972 万条无向边  ·  241 个月度网络（全期 2006-2025）  ·  参数 5/5 冻结  ·  复现对照通过",
              size=16, bold=True, color=ORANGE)
-    add_text(s, 1.0, 6.6, 11.3, 0.4, "PeerMAX 项目 · 2026-08-29 · 详细版 s3a_report.md v2.0",
+    add_text(s, 1.0, 6.6, 11.3, 0.4, "PeerMAX 项目 · 2026-08-29 · 详细版 analyst_report.md v2.0",
              size=12.5, color=RGBColor(0x9D, 0xAB, 0xC4))
 
 
 def slide_position(prs):
     s = prs.slides.add_slide(prs.slide_layouts[6])
-    header(s, "项目定位：S3A 在执行链中的位置", 2)
+    header(s, "项目定位：analyst-network 在执行链中的位置", 2)
     blocks = [
         ("S0", "数据基座", NAVY, "收益 / 公告 / 文本"),
-        ("S2", "面板与因子", NAVY, "S2.5 自建 FF4 并行"),
-        ("S3A", "分析师网络", ORANGE, "本次汇报 · 已完成"),
-        ("S3", "产品市场网络", MGRAY, "等老师数据"),
-        ("S4", "PeerMAX 面板", NAVY, "依赖产品市场 S3"),
+        ("daily-panel", "面板与因子", NAVY, "factor 自建 FF4 并行"),
+        ("analyst-network", "分析师网络", ORANGE, "本次汇报 · 已完成"),
+        ("network", "产品市场网络", MGRAY, "等老师数据"),
+        ("panel", "PeerMAX 面板", NAVY, "依赖产品市场 network"),
     ]
     x, y, bw, bh, gap = 0.55, 2.0, 2.28, 1.3, 0.16
     arrow_w = (PAGE_W - 2 * x - 5 * bw - 4 * gap) / 4
@@ -173,15 +173,15 @@ def slide_position(prs):
         add_text(s, cx, y + bh + 0.14, bw, 0.6, note, size=12, color=GRAY,
                  align=PP_ALIGN.CENTER)
     add_text(s, 0.55, 4.35, 12.2, 1.5,
-             "S3A 是辅助网络（alternative network）：给主线提供控制变量、对照检验与机制证据，"
-             "不替代 S3 产品市场网络，不进入 headline PeerMAXraw。\n"
-             "主线当前状态：S0-S2.5 完成，S3 文本收口三项（2017 缺口 640 / 错位 1,775 / 408 假边）已执行完，"
-             "只等产品市场数据；S4 待 S3 数据到位后开跑。",
+             "analyst-network 是辅助网络（alternative network）：给主线提供控制变量、对照检验与机制证据，"
+             "不替代 network 产品市场网络，不进入 headline PeerMAXraw。\n"
+             "主线当前状态：S0-factor 完成，network 文本收口三项（2017 缺口 640 / 错位 1,775 / 408 假边）已执行完，"
+             "只等产品市场数据；panel 待 network 数据到位后开跑。",
              size=14, color=GRAY, line_spacing=1.35)
     add_shape(s, MSO_SHAPE.ROUNDED_RECTANGLE, 0.55, 5.95, 12.2, 0.8, fill=LGRAY,
               line_color=MGRAY)
     add_text(s, 0.75, 6.1, 11.8, 0.55,
-             "S3A 成果：5 项参数 FROZEN · 契约测试 7/7 · 分析师覆盖已写入主线控制变量表（49.7 万行）",
+             "analyst-network 成果：5 项参数 FROZEN · 契约测试 7/7 · 分析师覆盖已写入主线控制变量表（49.7 万行）",
              size=14, bold=True, color=NAVY)
 
 
@@ -189,7 +189,7 @@ def slide_literature(prs):
     s = prs.slides.add_slide(prs.slide_layouts[6])
     header(s, "文献研读：三方口径对照", 3)
     rows = [
-        ("维度", "本项目 S3A", "AH · 美股（IBES）", "Long · A 股（CSMAR）"),
+        ("维度", "本项目 analyst-network", "AH · 美股（IBES）", "Long · A 股（CSMAR）"),
         ("连接时点", "月末快照", "每月末", "每月末"),
         ("覆盖窗口", "12 个月", "12 个月", "12 个月"),
         ("预测期限定", "FY1 / FY2（A 股财年=日历年）", "FY1 / FY2", "不限定"),
@@ -365,7 +365,7 @@ def slide_governance(prs):
     left = [
         ("① 三人独立复现", "等同学各自实现后三方比对：\n节点/边数/degree/common-count/权重分布/CF-NPM 结果\n（外部依赖）", "外部依赖"),
         ("② 收益主口径", "主线现用 raw 价（不含分红）；\n后复权敏感性已出（CF 0.83/NPM 0.75）\n（换主线需老师拍板）", "请您决策"),
-        ("③ S3 产品市场数据", "文本收口三项已执行完，\n只等词库/相似度矩阵/申万数据到位开跑\n（外部依赖）", "外部依赖"),
+        ("③ network 产品市场数据", "文本收口三项已执行完，\n只等词库/相似度矩阵/申万数据到位开跑\n（外部依赖）", "外部依赖"),
     ]
     ly = 2.0
     for title, body, tag in left:
@@ -378,24 +378,24 @@ def slide_governance(prs):
 def slide_close(prs):
     s = prs.slides.add_slide(prs.slide_layouts[6])
     header(s, "收尾：对主线的意义与下一步", 8)
-    add_text(s, 0.55, 1.3, 12.2, 0.5, "S3A 对 PeerMAX 的三层价值", size=17, bold=True, color=NAVY)
+    add_text(s, 0.55, 1.3, 12.2, 0.5, "analyst-network 对 PeerMAX 的三层价值", size=17, bold=True, color=NAVY)
     add_shape(s, MSO_SHAPE.ROUNDED_RECTANGLE, 0.55, 1.9, 3.9, 1.75, fill=LGRAY, line_color=MGRAY)
     add_text(s, 0.73, 2.06, 3.55, 0.45, "控制变量", size=15, bold=True, color=NAVY)
-    add_text(s, 0.73, 2.55, 3.55, 1.0, "分析师覆盖已进主线控制变量表，M1/M2 回归可用（此前为空列）", size=12.5, color=GRAY)
+    add_text(s, 0.73, 2.55, 3.55, 1.0, "分析师覆盖已进主线控制变量表，定价 gate / 机制层 回归可用（此前为空列）", size=12.5, color=GRAY)
     add_shape(s, MSO_SHAPE.ROUNDED_RECTANGLE, 4.7, 1.9, 3.9, 1.75, fill=LGRAY, line_color=MGRAY)
     add_text(s, 4.88, 2.06, 3.55, 0.45, "对照检验", size=15, bold=True, color=NAVY)
-    add_text(s, 4.88, 2.55, 3.55, 1.0, "证明主线结果不是任何网络都能跑出来的（M2 对照）", size=12.5, color=GRAY)
+    add_text(s, 4.88, 2.55, 3.55, 1.0, "证明主线结果不是任何网络都能跑出来的（机制层对照）", size=12.5, color=GRAY)
     add_shape(s, MSO_SHAPE.ROUNDED_RECTANGLE, 8.85, 1.9, 3.9, 1.75, fill=LGRAY, line_color=MGRAY)
     add_text(s, 9.03, 2.06, 3.55, 0.45, "机制证据", size=15, bold=True, color=NAVY)
     add_text(s, 9.03, 2.55, 3.55, 1.0, "信息沿网络扩散的机制路径（S11 机制层）", size=12.5, color=GRAY)
     add_text(s, 0.55, 3.95, 12.2, 0.5, "方法学复用", size=17, bold=True, color=NAVY)
     add_text(s, 0.55, 4.45, 12.2, 1.1,
              "论文口径核对 → 网络构造 → 参数冻结 → 复现对照 → 扩展检验 的整条流水线在 A 股跑通，"
-             "S3 产品市场网络直接复用这套方法与检验范式。",
+             "network 产品市场网络直接复用这套方法与检验范式。",
              size=14, color=GRAY, line_spacing=1.35)
     add_text(s, 0.55, 5.75, 12.2, 0.5, "下一步", size=17, bold=True, color=NAVY)
     add_text(s, 0.55, 6.25, 12.2, 0.8,
-             "三人复现比对通过 → 数据门 G2 转「可得」；收益主口径待老师拍板；S3 数据到位即开跑产品市场网络。",
+             "三人复现比对通过 → 数据门 G2 转「可得」；收益主口径待老师拍板；network 数据到位即开跑产品市场网络。",
              size=14, color=GRAY, line_spacing=1.35)
 
 
@@ -411,7 +411,7 @@ def main():
     slide_evidence(prs)
     slide_governance(prs)
     slide_close(prs)
-    out = os.path.join("deliverables", "presentation", "peermax_s3a_report_20260901.pptx")
+    out = os.path.join("deliverables", "presentation", "peermax_analyst_report_20260901.pptx")
     prs.save(out)
     print(f"saved: {out} ({len(prs.slides._sldIdLst)} slides)")
 

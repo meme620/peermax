@@ -1,4 +1,4 @@
-"""S3A smoketest：REV 因子构造变体对 CF MOM alpha 的影响（2026-08-14）。
+"""analyst-network smoketest：REV 因子构造变体对 CF MOM alpha 的影响（2026-08-14）。
 
 对抗审查 P0-3：headline α=1.50%（t=4.00）依赖自建 REV 因子（10 组 EW，无过滤）。
 本脚本构造 4 个 REV 变体，逐一与 CF 多空月收益 + FF4 因子做回归（NW L=1），
@@ -99,15 +99,15 @@ def main():
             rows.append({'month': ret_m, 'REV': lr - wr})
         rev = pd.DataFrame(rows)
         rev_s = rev.set_index('month')['REV']
-        m2 = df.merge(rev, on='month', how='left')
-        d5 = m2.dropna(subset=['ew_ls', 'MKT', 'SMB', 'HML', 'MOM', 'REV'])
+        merged_rev = df.merge(rev, on='month', how='left')
+        d5 = merged_rev.dropna(subset=['ew_ls', 'MKT', 'SMB', 'HML', 'MOM', 'REV'])
         y = d5['ew_ls'].values
         X = np.column_stack([np.ones(len(y)), d5['MKT'], d5['SMB'], d5['HML'], d5['MOM'], d5['REV']])
         beta, se, t = nw_ols(X, y, L=1)
-        d4 = m2.dropna(subset=['ew_ls', 'MKT', 'SMB', 'HML', 'MOM'])
+        d4 = merged_rev.dropna(subset=['ew_ls', 'MKT', 'SMB', 'HML', 'MOM'])
         y4 = d4['ew_ls'].values
         X4 = np.column_stack([np.ones(len(y4)), d4['MKT'], d4['SMB'], d4['HML'], d4['MOM']])
-        b4, s4, t4 = nw_ols(X4, y4, L=1)
+        b4, se4, t4 = nw_ols(X4, y4, L=1)
         corr = float(rev_s.corr(rev_base.reindex(rev_s.index)))
         variants[name] = {
             'n_months': int(len(d5)),

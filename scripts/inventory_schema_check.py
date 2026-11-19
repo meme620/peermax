@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""S1 Step 3：schema/主键/代码映射抽检（execution_protocol §2 Step 3）。
+"""inventory Step 3：schema/主键/代码映射抽检（execution_protocol §2 Step 3）。
 
 3a 代码映射：腾讯目录名 vs a_stocks code 差集（零内容读取）
 3d 文件级行数统计：全量 88688 文件只数行数（不解析），Σ vs MANIFEST 8,546,009
 3c 主键/列数抽检：分层抽样 100 只 × 2 年文件，查 (code,date) 重复/列数/日期递增
 3f qfq/raw close 比值排查：抽样 50 只 × 2020 年，找比值跳变（除权事件）与非跳变区间 CV
 3e pct_chg 抽验：抽样 10 只 × 连续 3 天 vs eastmoney push2his K 线（urllib，标准库）
-产出：reports/data_gates/G0/s1_schema_check.json + field_mapping_manifest.json
+产出：reports/data_gates/G0/inventory_schema_check.json + field_mapping_manifest.json
 
 用法: python scripts/inventory_schema_check.py [--skip-net]
 """
@@ -22,7 +22,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 TENCENT = ROOT / "data/raw/tencent"
 A_STOCKS = ROOT / "data/raw/baostock/stock_basic/a_stocks.csv"
-OUT_SCHEMA = ROOT / "reports/data_gates/G0/s1_schema_check.json"
+OUT_SCHEMA = ROOT / "reports/data_gates/G0/inventory_schema_check.json"
 OUT_MAPPING = ROOT / "reports/data_gates/G0/field_mapping_manifest.json"
 EXPECTED_TOTAL_ROWS = 8546009  # MANIFEST.json rows（raw/qfq 各）
 SAMPLE_STOCKS = 100
@@ -274,7 +274,7 @@ def main():
             {"source_field": "extra2", "canonical": "unused", "type": "str", "note": "raw 版 0.00,0.00 / qfq 版空，弃用"},
         ],
         "code_mapping": "sh600000 -> firm_id（目录名）；board 派生：600/601/603/605=main(sh)，688/689=star，000/001/002/003=main(sz)，300/301/302=chinext",
-        "notes": ["北交所不在数据源（排除登记）", "qfq 前复权基准=2026-08-09 下载时点", "schema 检查详见 s1_schema_check.json"],
+        "notes": ["北交所不在数据源（排除登记）", "qfq 前复权基准=2026-08-09 下载时点", "schema 检查详见 inventory_schema_check.json"],
     }
     OUT_MAPPING.parent.mkdir(parents=True, exist_ok=True)
     OUT_MAPPING.write_text(json.dumps(mapping, ensure_ascii=False, indent=2), encoding="utf-8")

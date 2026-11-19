@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""S2.5 mv 交叉校验（mv_crosscheck_tolerance 补救链）。
+"""factor mv 交叉校验（mv_crosscheck_tolerance 补救链）。
 
 输入：
   data/processed/daily_panel/{year}.csv        （面板，close_raw/rraw）

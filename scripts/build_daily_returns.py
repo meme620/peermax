@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""S2 Step 2：日收益构造（rraw + 双源交叉 + 冲突标记）。
+"""daily-panel Step 2：日收益构造（rraw + 双源交叉 + 冲突标记）。
 
 输入: data/raw/tencent/daily_raw|daily_qfq/{sh|sz}{code6}/{year}.csv（只读）
 输出: data/processed/daily_returns_clean/{code6}.csv
       data/processed/daily_returns_clean/MANIFEST.json
 
-口径（execution_plan §5.4 S2 Step 2；2026-08-09 数据质量发现）:
+口径（execution_plan §5.4 daily-panel Step 2；2026-08-09 数据质量发现）:
   rraw_{i,d} = close_d / close_{d-1} - 1（不复权 close 链内前收；跨年用上年末收盘衔接）
   pct_chg 字段弃用（实测非收盘涨跌幅，语义不可靠）；qfq 链内收益与 raw 链不一致
   （腾讯前复权数据特性，非除权期亦不等）——双源交叉不成立，rraw_qfq 仅保留参考列，

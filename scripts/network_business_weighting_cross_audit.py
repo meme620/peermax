@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""S3 Phase B″10：**同语料权重对照审计（等权 0/1 ↔ IDF 加权）**，纯描述性、**非闸门**。
+"""network Phase B″10：**同语料权重对照审计（等权 0/1 ↔ IDF 加权）**，纯描述性、**非闸门**。
 
 目的：把「同一份老师 MD&A、同一词表、同一筛选、同一聚类算法，只把词向量元素由等权 1.0 换成
 smooth IDF」这件事量化为可登记的对照结论，并与主口径逐项并排：① 同申万二级边占比；
@@ -19,16 +19,16 @@ load_sw2/peer_stats/sw2_lift/isolation/cluster_consistency/density_diagnostics/c
   data/processed/network_ma_teacher/（主口径 EW，`pm_ma_ewcos_teacher_v1_{y}`，文本年 2014–2022）
   data/processed/network_ma_teacher_idf/（IDF 变体，`pm_ma_idf_teacher_v1_{y}`，同语料同参数）
   data/processed/sw2_industry_latest.csv（同申万二级基线）
-  可选 --downstream-report reports/data_gates/G0/s3_ma_downstream_consistency_idf.json（下游方向块）
+  可选 --downstream-report reports/data_gates/G0/network_business_downstream_consistency_idf.json（下游方向块）
 
 产物：--out-json / --out-md（一律显式给出；`reports/data_gates/G0/network_business_weighting_cross_audit.{json,md}`）
 用法：
   python scripts/network_business_weighting_cross_audit.py \
       --ew-dir data/processed/network_ma_teacher --idf-dir data/processed/network_ma_teacher_idf \
       --years 2014 2015 2016 2017 2018 2019 2020 2021 2022 \
-      --downstream-report reports/data_gates/G0/s3_ma_downstream_consistency_idf.json \
-      --out-json reports/data_gates/G0/s3_ma_weighting_cross_audit.json \
-      --out-md reports/data_gates/G0/s3_ma_weighting_cross_audit.md
+      --downstream-report reports/data_gates/G0/network_business_downstream_consistency_idf.json \
+      --out-json reports/data_gates/G0/network_business_weighting_cross_audit.json \
+      --out-md reports/data_gates/G0/network_business_weighting_cross_audit.md
 （`--self-dir` / `--teacher-dir` 为同一参数的历史兼容别名，语义 = 等权侧 / IDF 侧。）
 """
 from __future__ import annotations
@@ -182,14 +182,14 @@ def main() -> None:
     ap.add_argument('--idf-dir', '--teacher-dir', dest='idf_dir', default=str(IDF_DIR),
                     help='IDF 变体网络目录；--teacher-dir 为兼容别名')
     ap.add_argument('--years', type=int, nargs='*', default=YEARS, help='文本年（缺省 2014-2022）')
-    ap.add_argument('--downstream-report', default=str(REPD / 's3_ma_downstream_consistency_idf.json'),
+    ap.add_argument('--downstream-report', default=str(REPD / 'network_business_downstream_consistency_idf.json'),
                     help='④ 下游方向对照报告（network_business_downstream_consistency.py --out-json；缺失则记 pending）')
-    ap.add_argument('--ew-freeze', default=str(REPD / 's3_b3_ma_param_freeze_teacher.json'),
+    ap.add_argument('--ew-freeze', default=str(REPD / 'network_business_param_freeze_teacher.json'),
                     help='等权侧 K 冻结报告（仅用于 K_mode/命中精度实况，缺失则该项记 unavailable）')
-    ap.add_argument('--idf-freeze', default=str(REPD / 's3_b3_ma_param_freeze_teacher_idf.json'),
+    ap.add_argument('--idf-freeze', default=str(REPD / 'network_business_param_freeze_teacher_idf.json'),
                     help='IDF 侧 K 冻结报告（同上）')
-    ap.add_argument('--out-json', default=str(REPD / 's3_ma_weighting_cross_audit.json'))
-    ap.add_argument('--out-md', default=str(REPD / 's3_ma_weighting_cross_audit.md'))
+    ap.add_argument('--out-json', default=str(REPD / 'network_business_weighting_cross_audit.json'))
+    ap.add_argument('--out-md', default=str(REPD / 'network_business_weighting_cross_audit.md'))
     args = ap.parse_args()
 
     ew_dir = Path(args.ew_dir).resolve()
@@ -288,7 +288,7 @@ def main() -> None:
                    'note': h.get('e_semantics') or dd.get('status_semantics')}
 
     rep = {
-        'step': 'S3 Phase B″10 同语料权重对照审计（老师 MD&A：等权 0/1 ↔ IDF 加权）',
+        'step': 'network Phase B″10 同语料权重对照审计（老师 MD&A：等权 0/1 ↔ IDF 加权）',
         'audit_version': 'v2 (2026-10-05, 审查修订：结论口径收紧 + 结构差异实况 + 已知限制；数值未改)',
         'descriptive_only': True, 'gating': False,
         'note': NOT_A_GATE_NOTE,
@@ -315,7 +315,7 @@ def main() -> None:
     outp.parent.mkdir(parents=True, exist_ok=True)
     outp.write_text(json.dumps(rep, ensure_ascii=False, indent=2), encoding='utf-8')
 
-    md = ['# S3 Phase B″10 同语料权重对照（等权 0/1 ↔ IDF 加权，**描述性、非闸门**）', '',
+    md = ['# network Phase B″10 同语料权重对照（等权 0/1 ↔ IDF 加权，**描述性、非闸门**）', '',
           f'生成时间：{rep["run_at"]}　文本年：{rep["years_text"]}（网络年 {rep["years_network"]}）', '',
           f'- 等权侧（主口径）：`{rep["ew_dir"]}`（`pm_ma_ewcos_teacher_v1_{{y}}`）',
           f'- IDF 侧（对照变体）：`{rep["idf_dir"]}`（`pm_ma_idf_teacher_v1_{{y}}`）', '',
@@ -346,7 +346,7 @@ def main() -> None:
                '注：**逐年** K 校准目标均为 44（年际口径 = 逐年中位，非 pooled）。', '',
            '## ④ 下游方向（PeerMAXraw / PeerReturn；来自 network_business_downstream_consistency.py）', '']
     if e_block['status'] != 'available':
-        md += ['待产出：`reports/data_gates/G0/s3_ma_downstream_consistency_idf.json`。']
+        md += ['待产出：`reports/data_gates/G0/network_business_downstream_consistency_idf.json`。']
     else:
         pm, pr = e_block['peer_maxraw'], e_block['peer_return']
         q = e_block['quintile_agreement'] or {}

@@ -1,4 +1,4 @@
-"""S3A smoketest：no_top1 剔除口径对比（2026-08-14）。
+"""analyst-network smoketest：no_top1 剔除口径对比（2026-08-14）。
 
 对抗审查 A5：sens_specs 的 no_top1 用跨月 distinct 覆盖公司数 >300（v2 下 6 人），标签却是 exclude_top1pct。
 本脚本对比三种口径的逐月边数与 degree：

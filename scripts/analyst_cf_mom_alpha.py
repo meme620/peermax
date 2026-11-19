@@ -1,20 +1,22 @@
 """CF MOM 多空组合的因子 alpha 调整（对齐 Long et al. 2025 报告口径，2026-08-12）。
 
 输入: data/processed/analyst/cf_mom_replication_ln.json（ln 权重 1 个月口径，最优口径）
-      data/processed/factor_returns_daily.csv（FF4 日度因子，S2.5 自建）
+      data/processed/factor_returns_daily.csv（FF4 日度因子，factor 自建）
 回归: 多空月收益 ~ alpha + MKT + SMB + HML + MOM（FF4）
 输出: 月度 alpha（%）、Newey-West L=1 t 统计、因子暴露、年化 alpha
 """
 from statsutil import nw_ols
+from fileio import file_size
 
 import json
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 import pandas as pd
 import numpy as np
 import yaml
 
-SPEC = Path('configs/s3a_final_spec.yaml')
+SPEC = Path('configs/analyst_spec.yaml')
 _SPEC = yaml.safe_load(SPEC.read_text(encoding='utf-8'))
 DEFAULT_CF = 'data/processed/analyst/cf_mom_replication_ln_h1.json'
 FAC = 'data/processed/factor_returns_daily.csv'
@@ -77,10 +79,10 @@ def main():
 
     res.update({
         'spec_id': _SPEC['spec_id'],
-        'spec_hash': __import__('sizes').file_size(SPEC.read_bytes()).hexdigest(),
+        'spec_hash': file_size(SPEC),
         'input_hashes': _SPEC['provenance']['input_hashes'],
         'input_cf': str(cf_path),
-        'run_at': __import__('datetime').datetime.now(__import__('datetime').timezone.utc).isoformat(),
+        'run_at': datetime.now(timezone.utc).isoformat(),
         'command': ' '.join(sys.argv),
         'status': 'GENERATED',
     })

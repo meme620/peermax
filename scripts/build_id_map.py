@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""S2 Step 1：ID 标准化与交易日连接。
+"""daily-panel Step 1：ID 标准化与交易日连接。
 
 输出:
   data/processed/firm_id_map.csv          (firm_id, code6, name, board, ipo_date, out_date)

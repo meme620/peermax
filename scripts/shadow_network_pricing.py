@@ -1,13 +1,13 @@
-"""Phase 3.6：shadow 网络 M1 对比 + 推广决策（默认 HOLD）。
+"""Phase 3.6：shadow 网络 pricing_gate 对比 + 推广决策（默认 HOLD）。
 
 范围（3.0_plan §2.6 + 3.6 任务书）：
   - 只读 headline 样本 / headline 网络 / 5 个 shadow 网络 / pricing_lib；
   - 在**同一固定样本**（headline FM 181,178 行、104 月）上重算 shadow 网络 treatment；
-  - 逐变体 × 规格（S1 登记全控制 / S5 无 turnover / S6 无 rev+无 turnover）× EW/VW 跑 FM；
+  - 逐变体 × 规格（spec_full_controls 登记全控制 / spec_no_turnover 无 turnover / spec_no_rev_no_turnover 无 rev+无 turnover）× EW/VW 跑 FM；
   - 网络层读数：边 Jaccard、边权相关、treatment 相关、覆盖/样本损失；
-  - 只写 `artifacts/phase3/3.6_*` 与 `data/processed/phase3_shadow/p3_6_shadow_treat_*.parquet`。
+  - 只写 `artifacts/phase3/3.6_*` 与 `data/processed/phase3_shadow/shadow_treat_*.parquet`。
 
-不重跑 headline M1/PC/网络，不写 G0/reports/configs，不自动推广。
+不重跑 headline pricing_gate/PC/网络，不写 G0/reports/configs，不自动推广。
 
 用法：
   python scripts/shadow_network_pricing.py"""
@@ -26,8 +26,8 @@ from datetime import datetime, timezone
 import numpy as np
 import pandas as pd
 from pricing_lib import (
-    assert_m1_inputs, fm_regression, param_value, require, file_size,
-    winsor_bounds, winsorize_by_month,
+    assert_pricing_inputs, fm_regression, param_value, require, file_size,
+    shadow_sample_path, winsor_bounds, winsorize_by_month,
 )
 from peermax_panel_build import (
     NETWORK_AVAILABLE_AT_RULE, load_versions, select_version,
@@ -42,7 +42,7 @@ SHADOW_DATA = ROOT / 'data/processed/phase3_shadow'
 
 HEADLINE_NET = ROOT / 'data/processed/network_ma_teacher'
 
-SAMPLE_PATH = ROOT / 'data/processed/m1_common_sample_ma_teacher_v2.parquet'
+SAMPLE_PATH = shadow_sample_path('ma_teacher')
 
 COMPARISON_CSV = ART / '3.6_network_comparison.csv'
 
@@ -81,17 +81,17 @@ HEADLINE_VW_T = -1.1812
 CONTROLS = ['size', 'bm', 'mom', 'rev', 'turnover', 'illiq',
             'AnalystCoverage', 'NetworkDegree']
 
-S1 = ['PeerMAXraw', 'OwnMAXraw', 'PeerReturn'] + CONTROLS
+spec_full_controls = ['PeerMAXraw', 'OwnMAXraw', 'PeerReturn'] + CONTROLS
 
-S5 = ['PeerMAXraw', 'OwnMAXraw', 'PeerReturn'] + [c for c in CONTROLS if c != 'turnover']
+spec_no_turnover = ['PeerMAXraw', 'OwnMAXraw', 'PeerReturn'] + [c for c in CONTROLS if c != 'turnover']
 
-S6 = ['PeerMAXraw', 'OwnMAXraw', 'PeerReturn'] + [
+spec_no_rev_no_turnover = ['PeerMAXraw', 'OwnMAXraw', 'PeerReturn'] + [
     c for c in CONTROLS if c not in ('rev', 'turnover')]
 
 SPECS = [
-    ('S1', '登记全控制（8 controls）', S1),
-    ('S5', '无 turnover', S5),
-    ('S6', '无 rev + 无 turnover', S6),
+    ('spec_full_controls', '登记全控制（8 controls）', spec_full_controls),
+    ('spec_no_turnover', '无 turnover', spec_no_turnover),
+    ('spec_no_rev_no_turnover', '无 rev + 无 turnover', spec_no_rev_no_turnover),
 ]
 
 VARIANTS = [
@@ -124,7 +124,7 @@ FM_VARIANTS = VARIANTS + [{'id': 'headline_recompute',
 Q4_JACCARD_MIN = {'p3asof': 0.4, 'p3yt': 0.4, 'p3ydf': 0.7,
                   'p3yt_ydf': 0.4, 'p3yt_latest': 0.4}
 
-MIN_N = int(param_value('m1_sample_and_spec_registry')['min_focal_count_per_month'])
+MIN_N = int(param_value('sample_and_spec_registry')['min_focal_count_per_month'])
 
 NW_LAG = int(param_value('nw_lag'))
 
@@ -133,7 +133,7 @@ WINSOR = winsor_bounds()
 _TEE = None
 
 def assert_output_path_guard(path) -> Path:
-    """只允许 `artifacts/phase3/3.6_*` 与 `phase3_shadow/p3_6_shadow_treat_*`。"""
+    """只允许 `artifacts/phase3/3.6_*` 与 `phase3_shadow/shadow_treat_*`。"""
     p = Path(path).resolve()
     art = ART.resolve()
     sd = SHADOW_DATA.resolve()
@@ -143,8 +143,8 @@ def assert_output_path_guard(path) -> Path:
             raise SystemExit(2)
         return p
     if sd in p.parents:
-        if not (p.name.startswith('p3_6_shadow_treat_') and p.suffix == '.parquet'):
-            print(f'[HARD-GATE] phase3_shadow 只允许 p3_6_shadow_treat_*.parquet: {p}',
+        if not (p.name.startswith('shadow_treat_') and p.suffix == '.parquet'):
+            print(f'[HARD-GATE] phase3_shadow 只允许 shadow_treat_*.parquet: {p}',
                   file=sys.stderr, flush=True)
             raise SystemExit(2)
         return p
@@ -203,13 +203,13 @@ def _net_files(net_dir: Path) -> list:
     return out
 
 def snapshot_anchors(tag: str) -> dict:
-    log(f'锚快照 {tag}：9 个 M1 输入 + headline 样本/网络 + shadow 网络 sha')
-    ledger = assert_m1_inputs()
+    log(f'锚快照 {tag}：9 个 pricing_gate 输入 + headline 样本/网络 + shadow 网络 sha')
+    ledger = assert_pricing_inputs()
     return {
         'tag': tag,
         'run_at': datetime.now(timezone.utc).isoformat(),
-        'm1_inputs': {r['input']: r['rows'] for r in ledger},
-        'm1_ledger': ledger,
+        'pricing_inputs': {r['input']: r['rows'] for r in ledger},
+        'pricing_ledger': ledger,
         'headline_sample': {'path': str(SAMPLE_PATH.relative_to(ROOT)).replace('\\', '/'),
                             'bytes': file_size(SAMPLE_PATH)},
         'headline_net': _sha_map(_net_files(HEADLINE_NET)),
@@ -220,7 +220,7 @@ def snapshot_anchors(tag: str) -> dict:
 def compare_anchors(pre: dict, post: dict) -> dict:
     blocks = {}
     diffs = []
-    for key in ('m1_inputs', 'headline_net', 'shadow_net'):
+    for key in ('pricing_inputs', 'headline_net', 'shadow_net'):
         a, b = pre[key], post[key]
         if isinstance(a, dict) and a and isinstance(next(iter(a.values())), dict):
             # shadow_net: variant -> {file: sha}
@@ -290,7 +290,7 @@ def check_sample_mapping(sample: pd.DataFrame, mapping: dict) -> dict:
     mapped_rows = sample['month'].map(mapping)
     unmapped = sample.loc[mapped_rows.isna()]
     # 事件窗首月（2015-05）之前无网络版本；这些行不在 FM 样本内，treatment 保持 NaN。
-    bad_unmapped_fm = int(unmapped['m1_in_fm_sample'].astype(bool).sum())
+    bad_unmapped_fm = int(unmapped['pricing_in_fm_sample'].astype(bool).sum())
     bad_unmapped_version = int(unmapped['network_version'].notna().sum())
     require(bad_unmapped_fm == 0,
             f'FM 样本存在未映射月份 {bad_unmapped_fm} 行')
@@ -460,14 +460,14 @@ def attach_treatment(sample: pd.DataFrame, raw: pd.DataFrame) -> pd.DataFrame:
     key = sample[['focal_id', 'month']].copy()
     key = key.merge(raw, on=['focal_id', 'month'], how='left')
     require(len(key) == len(sample), 'treatment 合并改变行数（键重复）')
-    # n_sources 是网络元数据：无网络版本/孤立节点按 0 记（与 s4 面板一致）；treatment 仍为 NaN。
+    # n_sources 是网络元数据：无网络版本/孤立节点按 0 记（与面板层一致）；treatment 仍为 NaN。
     key['n_sources'] = key['n_sources'].fillna(0).astype(int)
     key = winsorize_by_month(key, ['PeerMAXraw', 'PeerReturn'],
                              lo=WINSOR[0], hi=WINSOR[1])
     return key
 
 def coverage_stats(sample: pd.DataFrame, treat: pd.DataFrame) -> dict:
-    fm = sample['m1_in_fm_sample'].astype(bool)
+    fm = sample['pricing_in_fm_sample'].astype(bool)
     h_pm = sample['PeerMAXraw']
     h_pr = sample['PeerReturn']
     t_pm = treat['PeerMAXraw']
@@ -509,13 +509,13 @@ def _summarise_fm(res: dict, per: list, spec: str, weight: str) -> dict:
         out[f'beta_{key}'] = s.get('beta')
         out[f'se_{key}'] = s.get('se_nw')
         out[f't_{key}'] = s.get('t_nw')
-        out[f'p2_{key}'] = s.get('p_two_sided')
+        out[f'shadow_{key}'] = s.get('p_two_sided')
         out[f'ci_low_{key}'] = s.get('ci95_low')
         out[f'ci_high_{key}'] = s.get('ci95_high')
     return out
 
 def run_fm_matrix(sample: pd.DataFrame, treatments: dict) -> list:
-    fm_mask = sample['m1_in_fm_sample'].astype(bool)
+    fm_mask = sample['pricing_in_fm_sample'].astype(bool)
     rows = []
     for v in FM_VARIANTS:
         vid = v['id']
@@ -554,12 +554,12 @@ def enrich_fm_rows(rows: list) -> pd.DataFrame:
     df['delta_beta_vs_headline'] = df['beta_peermax'] - df['beta_headline']
     df['delta_t_vs_headline'] = df['t_peermax'] - df['t_headline']
     # R1 校验：headline_recompute 已另存，这里只做 headline 登记值门
-    s1ew = df[(df['variant'] == 'headline') & (df['spec'] == 'S1') & (df['weight'] == 'EW')].iloc[0]
-    s1vw = df[(df['variant'] == 'headline') & (df['spec'] == 'S1') & (df['weight'] == 'VW')].iloc[0]
+    s1ew = df[(df['variant'] == 'headline') & (df['spec'] == 'spec_full_controls') & (df['weight'] == 'EW')].iloc[0]
+    s1vw = df[(df['variant'] == 'headline') & (df['spec'] == 'spec_full_controls') & (df['weight'] == 'VW')].iloc[0]
     require(abs(s1ew['beta_peermax'] - HEADLINE_EW_BETA) <= 1e-8,
-            f"headline S1 EW beta={s1ew['beta_peermax']} != {HEADLINE_EW_BETA}")
+            f"headline spec_full_controls EW beta={s1ew['beta_peermax']} != {HEADLINE_EW_BETA}")
     require(abs(s1vw['beta_peermax'] - HEADLINE_VW_BETA) <= 1e-6,
-            f"headline S1 VW beta={s1vw['beta_peermax']} != {HEADLINE_VW_BETA}")
+            f"headline spec_full_controls VW beta={s1vw['beta_peermax']} != {HEADLINE_VW_BETA}")
     require(int(s1ew['T']) == FM_MONTHS, f"headline T={s1ew['T']} != {FM_MONTHS}")
     # R1：headline_recompute（同一聚合器复算）逐规格复现 headline
     for spec_id, _, _ in SPECS:
@@ -579,7 +579,7 @@ def enrich_fm_rows(rows: list) -> pd.DataFrame:
     return df
 
 def treatment_correlations(sample: pd.DataFrame, treatments: dict) -> dict:
-    fm = sample['m1_in_fm_sample'].astype(bool)
+    fm = sample['pricing_in_fm_sample'].astype(bool)
     idx = pd.MultiIndex.from_arrays([sample.loc[fm, 'focal_id'].to_numpy(),
                                      sample.loc[fm, 'month'].to_numpy()])
     blocks = {}
@@ -607,7 +607,7 @@ def evaluate_q_status(rows: pd.DataFrame, coverage: dict, net_metrics: dict,
                        '阈值仍未由项目裁定（3.1 §2），故 Q1 不能无条件 PASS；词表/K 目标/映射的 '
                        'R1 证据引自 3.1/3.2，本脚本未重跑构造。'}
     q['Q2'] = {'status': 'PASS' if anchor_cmp['status'] == 'MATCH' else 'FAIL',
-               'note': '9 个 M1 输入 + headline 样本 + headline 网络全文件 sha pre/post；'
+               'note': '9 个 pricing_gate 输入 + headline 样本 + headline 网络全文件 sha pre/post；'
                        f"n_diff={anchor_cmp['n_diff']}"}
     # Q3
     shadow = rows[~rows['variant'].isin(['headline', 'headline_recompute'])]
@@ -729,13 +729,13 @@ class _Tee:
 # ------------------------------------------------------------------ 主流程
 def main() -> int:
     global _TEE
-    ap = argparse.ArgumentParser(description='Phase 3.6 shadow 网络 M1 对比')
+    ap = argparse.ArgumentParser(description='Phase 3.6 shadow 网络 pricing_gate 对比')
     ap.add_argument('--skip-anchor-pre', action='store_true',
                     help='调试用：跳过 pre 锚快照（正式运行不要用）')
     args = ap.parse_args()
     t0 = time.time()
     _TEE = _Tee(RUN_LOG)
-    log('Phase 3.6 shadow 网络 M1 对比开始')
+    log('Phase 3.6 shadow 网络 pricing_gate 对比开始')
     log(f'registry: min_n={MIN_N} nw_lag={NW_LAG} winsor={WINSOR}')
 
     pre = None if args.skip_anchor_pre else snapshot_anchors('pre')
@@ -744,10 +744,10 @@ def main() -> int:
 
     sample = pd.read_parquet(SAMPLE_PATH)
     require(len(sample) == SAMPLE_ROWS, f'headline 样本行数 {len(sample)} != {SAMPLE_ROWS}')
-    require(int(sample['m1_in_fm_sample'].sum()) == FM_ROWS,
-            f'FM 行数 {int(sample["m1_in_fm_sample"].sum())} != {FM_ROWS}')
+    require(int(sample['pricing_in_fm_sample'].sum()) == FM_ROWS,
+            f'FM 行数 {int(sample["pricing_in_fm_sample"].sum())} != {FM_ROWS}')
     require(sample.duplicated(['focal_id', 'month']).sum() == 0, 'headline 样本键重复')
-    fm_months = sorted(sample.loc[sample['m1_in_fm_sample'].astype(bool), 'month'].unique())
+    fm_months = sorted(sample.loc[sample['pricing_in_fm_sample'].astype(bool), 'month'].unique())
     require(len(fm_months) == FM_MONTHS, f'FM 月数 {len(fm_months)} != {FM_MONTHS}')
     log(f'headline 样本 {len(sample):,} 行；FM {FM_ROWS:,} 行 / {FM_MONTHS} 月')
 
@@ -796,7 +796,7 @@ def main() -> int:
         cov = coverage_stats(sample, treat)
         net_metrics[vid]['coverage'] = cov
         if vid != 'headline':
-            fm_out = sample.loc[sample['m1_in_fm_sample'].astype(bool),
+            fm_out = sample.loc[sample['pricing_in_fm_sample'].astype(bool),
                                 ['focal_id', 'month']].copy()
             fm_out = fm_out.merge(
                 treat[['focal_id', 'month', 'PeerMAXraw', 'PeerReturn', 'n_sources',
@@ -805,7 +805,7 @@ def main() -> int:
             fm_out.insert(0, 'variant', vid)
             fm_out['peermax_missing'] = fm_out['PeerMAXraw'].isna()
             fm_out['peerreturn_missing'] = fm_out['PeerReturn'].isna()
-            write_parquet(SHADOW_DATA / f'p3_6_shadow_treat_{vid}.parquet', fm_out)
+            write_parquet(SHADOW_DATA / f'shadow_treat_{vid}.parquet', fm_out)
         log(f"{vid} 覆盖：fixed PM {cov['fixed_peermax_nonnull']:,} / FM PM "
             f"{cov['fm_peermax_nonnull']:,}（缺 {cov['fm_peermax_missing']:,}）；"
             f"Jaccard 中位 {net_metrics[vid]['jaccard_median_yearly']:.4f}")
@@ -875,7 +875,7 @@ def main() -> int:
     fm_df = fm_df.drop(columns=['beta_recompute', 't_recompute',
                                 'n_recompute', 'T_recompute'])
     cols = ['variant', 'variant_label', 'spec', 'spec_label', 'weight',
-            'beta_peermax', 'se_peermax', 't_peermax', 'p2_peermax',
+            'beta_peermax', 'se_peermax', 't_peermax', 'shadow_peermax',
             'ci_low_peermax', 'ci_high_peermax',
             'beta_ownmax', 'se_ownmax', 't_ownmax',
             'beta_peerreturn', 'se_peerreturn', 't_peerreturn',
@@ -922,7 +922,7 @@ def main() -> int:
          'variants': SHADOW_IDS,
          'impact': '网络版本白名单；现有两处 Phase-1 护栏的 shadow 白名单需回滚',
          'requires': 'Phase 4 变更单 + manifest 版本 bump'},
-        {'param': 'm1_contracts', 'current': '1.0',
+        {'param': 'pricing_inputs', 'current': '1.0',
          'proposed': 'bump 到覆盖 shadow treatment 源的合同版本',
          'variants': SHADOW_IDS,
          'impact': '样本/面板合同与审计',
@@ -932,7 +932,7 @@ def main() -> int:
          'variants': SHADOW_IDS,
          'impact': '对外表述与可复现性',
          'requires': 'Phase 4 文档变更'},
-        {'param': 'rewiring_reps', 'current': 1000, 'observed': 200,
+        {'param': 'rewiring_reps', 'current': int(param_value('rewiring_reps')), 'observed': 200,
          'proposed': '不推广推断层前必须补跑到 1000（3.4 R=200，仅提精度不改局部重连语义）',
          'variants': SHADOW_IDS,
          'impact': 'N-8 零分布分位/p 值精度',
@@ -943,7 +943,7 @@ def main() -> int:
         'script': str(Path(__file__).relative_to(ROOT)).replace('\\', '/'),
         'run_at': datetime.now(timezone.utc).isoformat(),
         'elapsed_sec': round(time.time() - t0, 1),
-        'version_tag': 'p3shadow_v1_network_m1_compare',
+        'version_tag': 'shadow_network_compare_v1',
         'constants': {'sample_rows': SAMPLE_ROWS, 'fm_rows': FM_ROWS,
                       'fm_months': FM_MONTHS, 'min_n': MIN_N, 'nw_lag': NW_LAG,
                       'winsor': list(WINSOR),
@@ -982,7 +982,7 @@ def main() -> int:
             prev = json.loads(OUTPUT_SHA.read_text(encoding='utf-8')).get('files', {})
         except Exception:
             prev = {}
-    files = [COMPARISON_CSV] + [SHADOW_DATA / f'p3_6_shadow_treat_{vid}.parquet'
+    files = [COMPARISON_CSV] + [SHADOW_DATA / f'shadow_treat_{vid}.parquet'
                                 for vid in SHADOW_IDS]
     cur = {str(p.relative_to(ROOT)).replace('\\', '/'): file_size(p) for p in files}
     diff = sorted(k for k in set(prev) | set(cur) if prev.get(k) != cur.get(k))

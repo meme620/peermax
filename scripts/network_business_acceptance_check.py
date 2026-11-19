@@ -1,4 +1,4 @@
-"""S3-B3.4：M-A 边表机械化验收（2026-09-14）。
+"""network-B3.4：M-A 边表机械化验收（2026-09-14）。
 
 与 B2 验收同构，差异：
   - 期望节点数取自 build_report（M-A 含 J/S 与上市不足 2 年筛选，不能直接对语料 ok 数）
@@ -7,7 +7,7 @@
 
 v2（2026-09-28，Phase B″5）：加 `--dir --clusters --years --ver-prefix --out` 参数化
 （与 B″2 同风格）。**判据一条未改**：默认值仍指历史自建链，重跑 self 结果与原
-`reports/data_gates/G0/s3_ma_acceptance.json` 逐字段一致（run_at 除外）。
+`reports/data_gates/G0/network_business_acceptance.json` 逐字段一致（run_at 除外）。
 九项：① 唯一键重复 0；② 自环 0；③ 权重行和偏差 0（≤1e-4）；④ 权重复算相对误差 <1e-5；
 ⑤ available_at 唯一且 = 次年 04-30；⑥ network_version 唯一且 = 期望版本串；
 ⑦ 边表 focal 集合 = support 表 support 节点集、零权重行 0、no-network-support 行无边；
@@ -24,15 +24,15 @@ peer 数 = 该 focal 的边数（无支持/零对手 = 0）。新增字段：`me
 `median_peer_edges_only`（旧口径，描述性）、`isolated_share`、`peers_universe`；
 若给 `--freeze-report`，另报 `freeze_peer_median` 与 `peer_median_matches_freeze`（逐值对账，
 进入 pass 条件）。**九项机械判据的合取式一条未改**（只新增一个可选对账项）。
-旧产物（`s3_ma_acceptance.json` / `s3_ma_acceptance_teacher.json`）不被覆盖：v3 一律显式 `--out`。
+旧产物（`network_business_acceptance.json` / `network_business_acceptance_teacher.json`）不被覆盖：v3 一律显式 `--out`。
 
-产物：--out（缺省 reports/data_gates/G0/s3_ma_acceptance.json）
+产物：--out（缺省 reports/data_gates/G0/network_business_acceptance.json）
 用法：
-  python scripts/network_business_acceptance_check.py --out reports/data_gates/G0/s3_ma_acceptance_self_v3.json
+  python scripts/network_business_acceptance_check.py --out reports/data_gates/G0/network_business_acceptance_self_v3.json
   python scripts/network_business_acceptance_check.py --dir data/processed/network_ma_teacher \
       --clusters data/processed/network_ma_teacher/clusters --years 2014 2015 2016 2017 2018 2019 2020 2021 2022 \
-      --ver-prefix pm_ma_ewcos_teacher_v1 --freeze-report reports/data_gates/G0/s3_b3_ma_param_freeze_teacher.json \
-      --out reports/data_gates/G0/s3_ma_acceptance_teacher_v3.json
+      --ver-prefix pm_ma_ewcos_teacher_v1 --freeze-report reports/data_gates/G0/network_business_param_freeze_teacher.json \
+      --out reports/data_gates/G0/network_business_acceptance_teacher_v3.json
 """
 import argparse
 import json
@@ -54,7 +54,7 @@ def main():
     ap.add_argument('--ver-prefix', default='pm_ma_ewcos_v1', help='期望版本串前缀（缺省自建链）')
     ap.add_argument('--freeze-report', default=None,
                     help='K 冻结报告（可选）：对账 median_peer 与 cluster_stats.peer_median 逐值一致')
-    ap.add_argument('--out', default='reports/data_gates/G0/s3_ma_acceptance.json')
+    ap.add_argument('--out', default='reports/data_gates/G0/network_business_acceptance.json')
     args = ap.parse_args()
     netd = ROOT / args.dir
     clud = ROOT / args.clusters

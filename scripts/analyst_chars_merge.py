@@ -1,4 +1,4 @@
-"""S3A Step 11：AnalystCoverage 接入 firm_chars_clean.analyst_cov。
+"""analyst-network Step 11：AnalystCoverage 接入 firm_chars_clean.analyst_cov。
 
 口径：
   derived.month（月末 cutoff YYYY-MM-DD）→ chars.month（YYYY-MM）

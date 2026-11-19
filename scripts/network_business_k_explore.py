@@ -3,7 +3,7 @@
 问题：K 较小时团内最小相似度≈0 → 对手集合退化为全市场（实测 K<=30 时中位 peer=3,503/3,544）。
 本脚本在指定 K 网格上直接评估，找出使对手集合规模进入合理区间（数十个）的 K 范围。
 
-产物：reports/data_gates/G0/s3_ma_K_explore.json
+产物：reports/data_gates/G0/network_business_k_explore.json
 """
 import json
 import sys
@@ -29,7 +29,7 @@ def eval_at(C, labels, l2, base_rate):
     sizes = []
     for k in np.unique(labels):
         idx = np.where(labels == k)[0]
-        file_size(len(idx))
+        sizes.append(len(idx))
         if len(idx) > 1:
             sub = C[np.ix_(idx, idx)].copy()
             np.fill_diagonal(sub, 2.0)
@@ -43,7 +43,7 @@ def eval_at(C, labels, l2, base_rate):
     tot = int(mask.sum()); sm = int((mask & same).sum())
     sizes = np.array(sizes)
     return {'n_clusters': int(len(sizes)), 'size_median': float(np.median(sizes)),
-            'size_min': int(file_size()), 'size_max': int(file_size()),
+            'size_min': int(sizes.min()), 'size_max': int(sizes.max()),
             'thr_median': round(float(np.median(thr)), 5), 'thr_p90': round(float(np.quantile(thr, .9)), 5),
             'peer_median': float(np.median(peers)), 'peer_mean': round(float(peers.mean()), 1),
             'peer_p90': float(np.quantile(peers, .9)), 'isolated_share': round(float((peers == 0).mean()), 4),
@@ -72,7 +72,7 @@ def main():
                'peer_rule': 'min_threshold_within_cluster（原文第四步阈值法，eval_at）：peer_i = '
                             '#{j: sim(i,j) > min_{k,l in same cluster} sim(k,l)}',
                'sw2_lift_rule': '同申万二级有向边占比 / 同样本边际基线',
-               'not_comparable_to': 's3_b3_ma_param_freeze_teacher.json 的同名字段'
+               'not_comparable_to': 'network_business_param_freeze_teacher.json 的同名字段'
                                     '（同团成员法：peer = 团规模−1）',
                'official_evidence_note': '2021 年 K=400 的 peer_median=3,347、sw2_lift=1.19 是本报告读数；'
                                          'freeze 2021 K=434 的 peer_median=45、sw2_lift=21.48 是另一轮'
@@ -93,8 +93,8 @@ def main():
             print(f"  [{lk}] K={K:>5} size_med={r['size_median']:.0f} thr_med={r['thr_median']:.3f} "
                   f"peer_med={r['peer_median']:.0f} peer_p90={r['peer_p90']:.0f} lift={r['sw2_lift']}", flush=True)
         print(f'  {lk} done {time.time()-t0:.0f}s', flush=True)
-    (REPD / 's3_ma_K_explore.json').write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding='utf-8')
-    print('->', REPD / 's3_ma_K_explore.json')
+    (REPD / 'network_business_k_explore.json').write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding='utf-8')
+    print('->', REPD / 'network_business_k_explore.json')
 
 
 if __name__ == '__main__':

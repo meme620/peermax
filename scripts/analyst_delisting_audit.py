@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""S3A 数据使用审计（2026-09-03）：退市/停牌缺失月对 NPM LS 的暴露量化。
+"""analyst-network 数据使用审计（2026-09-03）：退市/停牌缺失月对 NPM LS 的暴露量化。
 
 复刻主线 NPM 面板（同 9e：microcap Drive mv<10% 分位 + IPO<6 月过滤），
 但把 r_pred 内连接丢掉的 focal 行保留，量化：
@@ -132,6 +132,6 @@ res['drop_pct'] = round(n_drop / n_tot * 100, 3)
 res['exit_pct'] = round(n_exit / n_tot * 100, 3)
 res['dropped_by_q'] = {str(k): int(v) for k, v in dist.items()}
 res['all_by_q'] = {str(k): int(v) for k, v in tot_q.items()}
-Path('artifacts/s3a_delisting_exposure_20260903.json').write_text(
+Path('artifacts/analyst_delisting_exposure_20260903.json').write_text(
     json.dumps(res, ensure_ascii=False, indent=2), encoding='utf-8')
-print('DONE -> artifacts/s3a_delisting_exposure_20260903.json')
+print('DONE -> artifacts/analyst_delisting_exposure_20260903.json')

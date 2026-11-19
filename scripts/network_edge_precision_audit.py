@@ -1,4 +1,4 @@
-"""S3 网络边级语义审计（P5.1/P5.2 原型实现）——v2（2026-10-13）。
+"""network 网络边级语义审计（P5.1/P5.2 原型实现）——v2（2026-10-13）。
 
 对 M-A / M-B 正式边表做分层抽样，逐边收集"是否真竞争者"的可核验证据：
 - 两家公司申万二级行业是否一致（同行业 = 弱阳性信号，非金标准）
@@ -300,7 +300,7 @@ def sample_edges(net: str, year: int, net_dir: Path, n_per_stratum: int) -> pd.D
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description='S3 边级语义审计 v2（代理指标；两处失效 flag 已修）')
+    ap = argparse.ArgumentParser(description='network 边级语义审计 v2（代理指标；两处失效 flag 已修）')
     ap.add_argument('--corpus', choices=['self', 'teacher'], default='self',
                     help='self = 自建语料（business_texts / mda_texts）；teacher = 老师导出 MD&A 面板')
     ap.add_argument('--years', default=','.join(str(y) for y in YEARS))
@@ -309,7 +309,7 @@ def main() -> int:
                     help='边表目录模板（默认 data/processed/network_{net}；teacher 列用 network_{net}_teacher）')
     ap.add_argument('--lexicon', default=None, help='M-A 词库（默认随 --corpus）')
     ap.add_argument('--out-dir', default=str(OUT_DIR))
-    ap.add_argument('--out-prefix', default='s3_edge_precision_audit_v2')
+    ap.add_argument('--out-prefix', default='network_edge_precision_audit_v2')
     args = ap.parse_args()
 
     years = [int(x) for x in str(args.years).split(',') if x.strip()]
@@ -446,7 +446,7 @@ def main() -> int:
         'flag_fix_note': ('v2（2026-10-13）按 plan §8.10.4 修复要求替换两处失效 flag：'
                           '① 关键词越界判据 → §8.10.5 独占行结构判据；'
                           '② 固定 29900 截断阈值 → 当前提取器 MAX_LEN（teacher 语料为 Excel 上限）。'
-                          '旧产物 s3_edge_precision_audit.json / _sample.csv 的对应两列已失效，不得引用。'),
+                          '旧产物 network_edge_precision_audit.json / _sample.csv 的对应两列已失效，不得引用。'),
         'stop_names_source': STOP_NAMES_SOURCE,
         'method_note': '同申万二级率仅作弱阳性代理，不作为人工金标准；本脚本只读，不修改冻结边集',
         'stratum_stats': grp.to_dict(orient='records'),

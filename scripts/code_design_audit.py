@@ -1,4 +1,4 @@
-"""S3 代码↔设计一致性机械核查（对抗审计 R2，2026-09-14）。
+"""network 代码↔设计一致性机械核查（对抗审计 R2，2026-09-14）。
 
 对每条设计公式做**独立复算**，不信任构建脚本自报：
   C1  M-B 边集 = {(i,j): sim_ij > τ}  —— 用冻结实现重算某年相似度，逐 focal 比对边集与相似度值
@@ -8,7 +8,7 @@
   C5  样本筛选：J/S 门类、上市不足 2 年、命中词条 <10 的剔除计数与设计一致
   C6  赛点：τ/K 与 registry 冻结值一致
   C7  反例：no-network-support 行不得有权重；孤立公司不得被填 0
-产物：reports/data_gates/G0/s3_code_design_audit.json
+产物：reports/data_gates/G0/code_design_audit.json
 """
 import csv
 import json
@@ -158,7 +158,7 @@ def c6_frozen():
     ma = json.loads((MA / f'{YEAR}_build_report.json').read_text(encoding='utf-8'))
     tau_reg = float(P['m_b_tau_fixed']['headline_value'])
     k_ma = ma['params']['K']
-    freeze = json.loads((REPD / 's3_b3_ma_param_freeze.json').read_text(encoding='utf-8'))
+    freeze = json.loads((REPD / 'network_business_param_freeze.json').read_text(encoding='utf-8'))
     k_freeze = freeze['years'][str(YEAR)]['K']
     out['checks']['C6_frozen_params'] = {
         'tau_file': mb['tau'], 'tau_registry': tau_reg, 'tau_match': abs(mb['tau'] - tau_reg) < 1e-12,
@@ -199,7 +199,7 @@ def main():
     c7_adversarial()
     ok = all(v.get('pass', True) for v in out['checks'].values())
     out['status'] = 'PASS' if ok else 'FAIL'
-    (REPD / 's3_code_design_audit.json').write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding='utf-8')
+    (REPD / 'code_design_audit.json').write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding='utf-8')
     print(json.dumps(out, ensure_ascii=False, indent=1)[:3000])
     print('status =', out['status'])
 

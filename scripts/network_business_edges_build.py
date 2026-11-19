@@ -1,4 +1,4 @@
-"""S3-B3.3：M-A 正式构网（2026-09-14）。
+"""network-B3.3：M-A 正式构网（2026-09-14）。
 
 输入（全部冻结）：
   - 词库（self：`data/processed/product_lexicon_v2.csv`；teacher：`product_lexicon_v2_teacher.csv`）

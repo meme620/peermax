@@ -1,4 +1,4 @@
-"""S3A Step 4：报告级去重 -> firm_analyst_coverage_records（零外部依赖）。
+"""analyst-network Step 4：报告级去重 -> firm_analyst_coverage_records（零外部依赖）。
 
 规则（protocol §5A 第 5 步）:
   (firm_id, analyst_id, report_date) 至多计一次；
@@ -13,7 +13,7 @@ import json
 from pathlib import Path
 import pandas as pd
 
-SRC = 'data/processed/analyst/s3a_step3_clean.csv'
+SRC = 'data/processed/analyst/analyst_step3_clean.csv'
 OUTD = Path('data/processed/analyst')
 OUTD.mkdir(parents=True, exist_ok=True)
 

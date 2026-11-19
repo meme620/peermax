@@ -3,7 +3,7 @@
 背景（`artifacts/phase2/2.0_plan.md` §2.5；`reports/audits/peermax_audit_item_review_20261027.md` L-3）：
   - headline 控制集含 `rev` = **事件月当月收益** `R_t`（`build_firm_chars.py:108-111`），与
     `OwnMAXraw` 同月同源（月度截面 corr 均值 0.425），是第二条疑似机械吸收 MAX 的控制；
-  - `turnover`（月末值）已在 2.4 验证；本脚本在**只读** M1 headline 样本上跑
+  - `turnover`（月末值）已在 2.4 验证；本脚本在**只读** pricing_gate headline 样本上跑
     rev 三口径（same / lag1 / removed）× turnover 三口径（headline last / Drive 均值 / removed）
     的 FM 矩阵（EW/VW），其余控制、outcome、估计器与 headline 一致。
 
@@ -45,13 +45,15 @@ from datetime import datetime, timezone
 import numpy as np
 import pandas as pd
 from pricing_lib import (
-    RETURNS_V2, ROOT, assert_m1_inputs, fm_regression, param_value, require,
-    file_size, winsor_bounds, winsorize_by_month,
+    RETURNS_V2, ROOT, assert_pricing_inputs, fm_regression, param_value, require,
+    file_size, shadow_sample_path, winsor_bounds, winsorize_by_month,
 )
-from fileio import assert_path_allowed
+from fileio import assert_path_allowed, atomic_write_text
 
 
-SAMPLE_PARQUET = ROOT / 'data/processed/m1_common_sample_ma_teacher_v2.parquet'
+# shadow 全套的样本版本由 registry shadow_legacy_sample_version 登记（当前 v2），
+# 不用 headline 指针，避免 shadow 结果被误读成 headline 版本。
+SAMPLE_PARQUET = shadow_sample_path('ma_teacher')
 
 RETURNS_V1 = ROOT / 'data/processed/monthly_returns_clean.csv'
 
@@ -65,14 +67,14 @@ COUNTS_24 = ROOT / 'artifacts/phase2/2.4_counts.json'
 
 MATRIX_24 = ROOT / 'artifacts/phase2/2.4_control_matrix.csv'
 
-PRICING_TABLE_V2 = ROOT / 'reports/data_gates/G0/s3_m1_pricing_table_v2.json'
+PRICING_TABLE_V2 = ROOT / 'reports/data_gates/G0/pricing_table_v2.json'
 
 COUNTS_JSON = ROOT / 'artifacts/phase2/2.5_counts.json'
 
 MATRIX_CSV = ROOT / 'artifacts/phase2/2.5_control_matrix.csv'
 
 HEADLINE_GUARD_FILES = {
-    'm1_common_sample_ma_teacher_v2.parquet': SAMPLE_PARQUET,
+    'pricing_sample_ma_teacher_v2.parquet': SAMPLE_PARQUET,
     'firm_chars_clean.csv': CHARS,
     'monthly_pricing_panel_ma_teacher.csv':
         ROOT / 'data/processed/monthly_pricing_panel_ma_teacher.csv',
@@ -176,7 +178,7 @@ FORWARD_DIAG_SPEC_DEFS = {
 
 def write_json(path: Path, obj) -> None:
     assert_output_path_guard(path)   # 与矩阵 CSV 同守卫：--counts-out 不得指向 data/、G0、configs、headline
-    _atomic_write_text(path, json.dumps(obj, ensure_ascii=False, indent=1))
+    atomic_write_text(path, json.dumps(obj, ensure_ascii=False, indent=1))
     print(f'  -> {path.relative_to(ROOT)}', flush=True)
 
 def shift_month_series(months, delta: int) -> pd.Index:
@@ -232,7 +234,7 @@ def build_control_frame(sample_path: Path = SAMPLE_PARQUET,
                         returns_path: Path = RETURNS_V2,
                         turnover_shadow_path: Path = SHADOW_TURNOVER_CSV) -> tuple:
     """只读样本 + 月收益 + 2.4 shadow turnover -> FM 行 frame（rev 三口径 + turnover 三口径）。"""
-    cols = ['focal_id', 'month', 'm1_in_fm_sample', 'R_next', 'market_equity'] + TRIO + CONTROLS
+    cols = ['focal_id', 'month', 'pricing_in_fm_sample', 'R_next', 'market_equity'] + TRIO + CONTROLS
     df = pd.read_parquet(sample_path, columns=cols)
     require(len(df) == 307503, f'样本 parquet 行数 {len(df)} != 307503')
     ret = pd.read_csv(returns_path, usecols=['firm_id', 'month', 'R'],
@@ -289,7 +291,7 @@ def build_control_frame(sample_path: Path = SAMPLE_PARQUET,
     last_bridge = (last_win - m['turnover']).abs()
     last_bridge_raw = (m[TURN_LAST_RAW] / 100.0 - m['turnover']).abs()
 
-    fm = m[m['m1_in_fm_sample'].astype(bool)].copy()
+    fm = m[m['pricing_in_fm_sample'].astype(bool)].copy()
     # outcome 身份证据：R_next vs winsor(前视列)（证明 2.0_plan 的 rev_lag1 = outcome）
     fwd_win = winsorize_by_month(m, [REV_LAG1_FWD], lo=lo, hi=hi)[REV_LAG1_FWD]
     fwd_win_fm = fwd_win.loc[fm.index]
@@ -424,7 +426,7 @@ def spec_xcols(sd: dict) -> list:
 def run_spec_matrix(fm: pd.DataFrame, spec_defs: dict = None) -> dict:
     """规格 × EW/VW 的 FM（min_n=100，NW lag=6，与 headline 一致）。"""
     spec_defs = spec_defs or SPEC_DEFS
-    min_n = int(param_value('m1_sample_and_spec_registry')['min_focal_count_per_month'])
+    min_n = int(param_value('sample_and_spec_registry')['min_focal_count_per_month'])
     nw_lag = int(param_value('nw_lag'))
     out = {'min_n': min_n, 'nw_lag': nw_lag, 'n_rows': int(len(fm)),
            'months': [str(fm['month'].min()), str(fm['month'].max())], 'specs': {}}
@@ -474,7 +476,7 @@ def matrix_rows(matrix: dict) -> list:
 
 def headline_comparison(matrix: dict, table_path: Path = PRICING_TABLE_V2,
                         tol_beta: float = 1e-4, tol_t: float = 1e-3) -> dict:
-    """规格 a 与 headline 主表（s3_m1_pricing_table_v2.json, ma_teacher）逐值对比（只读）。"""
+    """规格 a 与 headline 主表（pricing_table_v2.json, ma_teacher）逐值对比（只读）。"""
     table = json.loads(table_path.read_text(encoding='utf-8'))
     mt = table['main']['ma_teacher']
     spec_a = matrix['specs']['a_registered_rev_turnover']
@@ -722,8 +724,8 @@ def absorption_block(matrix: dict) -> dict:
 def main(argv=None) -> int:
     args = parse_args(argv)
     t_generated = datetime.now(timezone.utc).isoformat(timespec='seconds')
-    print('[2.5] preflight：9 个 M1 输入锚（只读）', flush=True)
-    anchors_before = assert_m1_inputs()
+    print('[2.5] preflight：9 个 pricing_gate 输入锚（只读）', flush=True)
+    anchors_before = assert_pricing_inputs()
     headline_sha_before = {k: file_size(p) for k, p in HEADLINE_GUARD_FILES.items()}
     extra_inputs = {
         'monthly_returns_clean.csv': RETURNS_V1,
@@ -822,8 +824,8 @@ def main(argv=None) -> int:
     require(anchors['all_items_match'], '合规锚点对账失败（停机条件）')
     out_info = write_matrix_csv(matrix, Path(args.matrix_out))
 
-    print('[2.5] postflight：9 个 M1 输入锚与 headline 文件 sha 复核', flush=True)
-    anchors_after = assert_m1_inputs()
+    print('[2.5] postflight：9 个 pricing_gate 输入锚与 headline 文件 sha 复核', flush=True)
+    anchors_after = assert_pricing_inputs()
     headline_sha_after = {k: file_size(p) for k, p in HEADLINE_GUARD_FILES.items()}
     extra_sha_after = {k: (file_size(p) if p.is_file() else None)
                        for k, p in extra_inputs.items()}
@@ -841,16 +843,16 @@ def main(argv=None) -> int:
         'script': 'scripts/shadow_rev.py',
         'script_bytes': file_size(Path(__file__)),
         'scope': ('只读样本/月收益/2.4 shadow turnover/headline 定价表；只写 artifacts/phase2/2.5_counts.json '
-                  '与 2.5_control_matrix.csv；不重跑 M1/PC/网络，不写 data/、G0、configs、正式 reports'),
+                  '与 2.5_control_matrix.csv；不重跑 pricing_gate/PC/网络，不写 data/、G0、configs、正式 reports'),
         'outputs': {
             'counts_json': {'file': str(Path(args.counts_out).relative_to(ROOT))},
             'matrix_csv': out_info,
         },
         'inputs': {
-            'm1_common_sample_ma_teacher_v2': {
+            'pricing_sample_ma_teacher_v2': {
                 'file': str(SAMPLE_PARQUET.relative_to(ROOT)),
-                'bytes_before': headline_sha_before['m1_common_sample_ma_teacher_v2.parquet'],
-                'bytes_after': headline_sha_after['m1_common_sample_ma_teacher_v2.parquet'],
+                'bytes_before': headline_sha_before['pricing_sample_ma_teacher_v2.parquet'],
+                'bytes_after': headline_sha_after['pricing_sample_ma_teacher_v2.parquet'],
                 'rows': int(diag['sample_rows']), 'fm_rows': int(diag['fm_rows']),
                 'fm_months': int(diag['fm_months']), 'read_only': True},
             'monthly_returns_clean_v2': {
@@ -915,7 +917,7 @@ def main(argv=None) -> int:
                 'unchanged': extra_sha_before[k] == extra_sha_after[k]}
             for k in extra_inputs},
         'headline_files_modified': not headline_unchanged,
-        'm1_rerun': False,
+        'pricing_rerun': False,
         'configs_modified': False,
         'notes': [
             ('**关键更正**：2.0_plan §2.5「现状」与 §2 摘要引用的 rev_lag1 三组数字'

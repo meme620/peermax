@@ -1,4 +1,4 @@
-"""S3-B4.1：双网交叉审计（M-A headline vs M-B robustness，2026-09-14）。
+"""network-B4.1：双网交叉审计（M-A headline vs M-B robustness，2026-09-14）。
 
 检查项（plan §8 B4.1）：
   1. 分布对比：逐年 peer 数、权重集中度（HHI/Top1）、孤立率 —— 同节点集下并排
@@ -7,7 +7,7 @@
   4. 聚合一致性（构造效度）：同月 PeerReturn 在两网下的相关性与分位一致性
   5. 差异归因：分歧最大的公司按行业/规模画像
 
-产物：reports/data_gates/G0/s3_network_cross_audit.json
+产物：reports/data_gates/G0/network_cross_audit.json
 用法：python scripts/network_cross_audit.py [--years 2017 ... 2025]
 """
 import argparse
@@ -104,8 +104,8 @@ def main():
               f"lift={st_a['sw2_lift']} | MB edges={st_b['n_edges']} peer_med={st_b['peer_median']:.0f} lift={st_b['sw2_lift']} "
               f"| PeerReturn corr={corr:.3f} (n={len(both)})", flush=True)
     REPD.mkdir(parents=True, exist_ok=True)
-    (REPD / 's3_network_cross_audit.json').write_text(json.dumps(rep, ensure_ascii=False, indent=2), encoding='utf-8')
-    print('->', REPD / 's3_network_cross_audit.json')
+    (REPD / 'network_cross_audit.json').write_text(json.dumps(rep, ensure_ascii=False, indent=2), encoding='utf-8')
+    print('->', REPD / 'network_cross_audit.json')
 
 
 if __name__ == '__main__':

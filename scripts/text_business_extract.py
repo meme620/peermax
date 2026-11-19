@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""S3-2 v7：年报业务章节提取（公司业务概要/主营业务）——去 900 截断 + 审计列。
+"""network-2 v7：年报业务章节提取（公司业务概要/主营业务）——去 900 截断 + 审计列。
 
 相对 v6 的变更（2026-09-13，P0.2）：
   1. **移除 900 字硬截断**：改为章节边界截取（STOP 标题），安全上限 3e4；
@@ -136,7 +136,7 @@ def _try_anchor(t, anchor, idx):
     if "...." in _line0 or "…" in _line0:
         return None
     _after0 = _line0[len(anchor):].strip()
-    if _after0 and __import__("re").match(r"^[0-9\s.]+$", _after0):
+    if _after0 and re.match(r"^[0-9\s.]+$", _after0):
         return None
     _NEXT_SEC = ("第四节", "第五节", "第六节",
                  "第七节", "第八节", "第九节",

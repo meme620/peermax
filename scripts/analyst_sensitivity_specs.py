@@ -1,4 +1,4 @@
-"""S3A 敏感性规格（三轮对抗 review S2/S4/S7 落地，2026-08-12 参数冻结后执行）。
+"""analyst-network 敏感性规格（三轮对抗 review 所列敏感性规格落地，2026-08-12 参数冻结后执行）。
 
 变体维度：
   min_common      : {1, 2, 5}  连接阈值（A&H 基线=1；>=2/>=5 为稳健性，无发表先例仅作补充）
@@ -9,7 +9,7 @@
                       ⚠️ 历史标签 exclude_top1pct 与实际不符（2026-08-14 审查）：真 top-1% 为每月 28-37 人、
                       剔除后边数 −21.4%（degree 152→120），过于激进，不作为报告变体；正式名称 no_super_analysts，
                       输出 key 保持 no_top1 兼容下游引用
-  identity        : analyst（主）/ broker_analyst（复合键，S2，IBES 口径近似）
+  identity        : analyst（主）/ broker_analyst（复合键，daily-panel，IBES 口径近似）
 
 输出:
   data/processed/analyst/sensitivity_specs.json        边层变体跨月汇总 + 抽查月
@@ -21,7 +21,7 @@ from collections import defaultdict
 import pandas as pd
 
 COV = 'data/processed/analyst/firm_analyst_coverage.csv'
-CLEAN = 'data/processed/analyst/s3a_step3_clean.csv'  # broker_key 变体用行级输入（v2 起与主口径同 FY 语义）
+CLEAN = 'data/processed/analyst/analyst_step3_clean.csv'  # broker_key 变体用行级输入（v2 起与主口径同 FY 语义）
 OUTD = Path('data/processed/analyst')
 TOP_EXCLUDE_THRESHOLD = 300
 SPOTCHECK_MONTHS = ['2018-06-30', '2021-06-30', '2024-06-30']
@@ -106,9 +106,9 @@ def main():
     for cutoff in sorted(cov['network_cutoff'].unique()):
         sub = cov[cov['network_cutoff'] == cutoff]
         for exclude in (False, True):
-            s2 = sub[~sub['analyst_id'].isin(top_analysts)] if exclude else sub
+            excluded_sample = sub[~sub['analyst_id'].isin(top_analysts)] if exclude else sub
             fa = defaultdict(set)
-            for fid, aid in zip(s2['firm_id'], s2['analyst_id']):
+            for fid, aid in zip(excluded_sample['firm_id'], excluded_sample['analyst_id']):
                 fa[aid].add(fid)
             pair_count = build_pairs(fa)
             for mc in MIN_COMMONS:
@@ -157,7 +157,7 @@ def main():
 
 
 def broker_key_monthly():
-    """S2 复合键变体：identity = (broker_code, analyst_id)，近似 IBES broker 内 estimator 口径。
+    """daily-panel 复合键变体：identity = (broker_code, analyst_id)，近似 IBES broker 内 estimator 口径。
     仅输出 min_common=1、count_rownorm 的月度统计，与主口径对比边数/degree。
     v2 变更：输入改为行级 clean 数据，并补齐 mapping_status=='ok' 与 A_code 格式校验
     （^A\\d{5}$），FY1/FY2 为行级过滤（先于报告级去重），与主口径 v2 完全同语义。

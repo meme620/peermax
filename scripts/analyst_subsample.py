@@ -1,4 +1,4 @@
-"""S3A 9E：大小盘分层（csi300/csi500 成分内/外）的 NPM 五分组 + Drive 市值 VW。
+"""analyst-network 9E：大小盘分层（csi300/csi500 成分内/外）的 NPM 五分组 + Drive 市值 VW。
 复用 9C 的 NPM 面板逻辑；分层按形成期月末成分静态归属（简化）。
 """
 import pickle, sys, warnings
@@ -107,5 +107,5 @@ res['vw_drive'] = {'n_months': len(a), 'ew_ls_pct': round(float(a.mean())*100, 4
 print(f"VW(Drive 市值): n={len(a)} LS={a.mean()*100:.4f}% t={a.mean()/a.std()*np.sqrt(len(a)):.2f}", flush=True)
 import json
 attach_meta(res, __file__, NET_VER)
-Path('reports/data_gates/G0/s3a_9e_subsample.json').write_text(json.dumps(res, ensure_ascii=False, indent=2), encoding='utf-8')
-print("DONE -> reports/data_gates/G0/s3a_9e_subsample.json")
+Path('reports/data_gates/G0/analyst_subsample.json').write_text(json.dumps(res, ensure_ascii=False, indent=2), encoding='utf-8')
+print("DONE -> reports/data_gates/G0/analyst_subsample.json")

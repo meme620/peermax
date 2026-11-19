@@ -1,4 +1,4 @@
-"""S3A smoketest C6：覆盖窗口/FY 规则/快照频率敏感性网格兑现（2026-08-14）。
+"""analyst-network smoketest C6：覆盖窗口/FY 规则/快照频率敏感性网格兑现（2026-08-14）。
 
 registry 三-2 冻结条目登记的 sensitivity_grid 从未执行，本脚本兑现：
   coverage_window ∈ {1, 3, 6}（12=主口径，数字引用主产物）
@@ -14,7 +14,7 @@ from collections import defaultdict
 import pandas as pd
 import numpy as np
 
-CLEAN = 'data/processed/analyst/s3a_step3_clean.csv'
+CLEAN = 'data/processed/analyst/analyst_step3_clean.csv'
 OUT = Path('data/processed/analyst/sensitivity_window.json')
 
 

@@ -3,7 +3,7 @@
 目的：在冻结聚类参数之前，先确认 0/1 产品词向量是否携带行业信息
 （若同业对的相似度显著高于跨行业对，则向量有效，聚类与阈值才有意义）。
 
-产物：reports/data_gates/G0/s3_ma_vector_diag.json
+产物：reports/data_gates/G0/network_business_vector_diag.json
 """
 import json
 import sys
@@ -94,7 +94,7 @@ def main(year=2021, n_sample=1500, seed=7):
     out['top20_pairs'] = pairs
     out['share_top20_same_sw2'] = round(float(np.mean([p['same_sw2'] for p in pairs])), 3)
 
-    (REPD / 's3_ma_vector_diag.json').write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding='utf-8')
+    (REPD / 'network_business_vector_diag.json').write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding='utf-8')
     print(json.dumps({k: v for k, v in out.items() if k not in ('top20_pairs',)},
                      ensure_ascii=False, indent=1)[:2000])
     print('\ntop10 pairs:')

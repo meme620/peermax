@@ -1,4 +1,4 @@
-"""S3A 输出元数据块（Gate 1.4）。
+"""analyst-network 输出元数据块（Gate 1.4）。
 
 9A–9M 输出 JSON 统一通过 attach_meta(...) 注入元数据，使任一 headline 数字都能
 回指到唯一 spec 与输入包：spec_id / spec_hash / input_hashes / network_version /
@@ -7,11 +7,12 @@ run_at / command / script / status。
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from fileio import file_size
 
 ROOT = Path(__file__).resolve().parents[1]
-SPEC = ROOT / 'configs/s3a_final_spec.yaml'
+SPEC = ROOT / 'configs/analyst_spec.yaml'
 _SPEC_BYTES = SPEC.read_bytes()
-_SPEC_HASH = file_size(_SPEC_BYTES)
+_SPEC_HASH = len(_SPEC_BYTES)
 
 
 def attach_meta(payload, script_file=None, network_version=None, status='COMPUTED', **extra):

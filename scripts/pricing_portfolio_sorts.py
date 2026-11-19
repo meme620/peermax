@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""A8：M1 组合分位（五/十分位 EW/VW）与函数形式诊断（bins / RCS / (MAX-c)+）。
+"""A8：pricing_gate 组合分位（五/十分位 EW/VW）与函数形式诊断（bins / RCS / (MAX-c)+）。
 
-对应 plan §5.7A P3.4 与 §5.7 Step 2/Step 3。headline 仍是连续 PeerMAXraw；
+对应 plan §5.7A 与 §5.7。headline 仍是连续 PeerMAXraw；
 组合与形状诊断只作 supporting/exploratory 证据。空组与零分母写状态、不填 0。
-产出：reports/data_gates/G0/s3_m1_portfolio_deciles.json、s3_m1_diagnostics.json
+产出：reports/data_gates/G0/pricing_portfolio_deciles.json、pricing_diagnostics.json
 用法：python scripts/pricing_portfolio_sorts.py [--sample-version {v1,v2}] [--out-suffix _v2]
 
 2026-10-11 F-2（v2 样本重跑批）：新增 `--sample-version`（2026-11-19 起默认 v3 headline；另一版本自动作敏感性并报）
-与 `--out-suffix`（如 `--out-suffix _v2` 产出 s3_m1_portfolio_deciles_v2.json / s3_m1_diagnostics_v2.json，
+与 `--out-suffix`（如 `--out-suffix _v2` 产出 pricing_portfolio_deciles_v2.json / pricing_diagnostics_v2.json，
 不覆盖 v1 基线名）；组合与诊断块补**窗口标注**（FM 月范围）。
 """
 from __future__ import annotations
@@ -20,13 +20,13 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from pricing_lib import IQR_POOL_REGISTERED, M1_SAMPLE_VERSION_V1, M1_SAMPLE_VERSION_V2, M1_SAMPLE_VERSION_V3, M1_SAMPLE_VERSION_V4, OUT_DIR, fm_regression, joint_wald, newey_west, one_sided_p, param_value, progress, rank_average_groups, rcs_basis, sample_path, treatment_only_mask, two_sided_p, write_json
+from pricing_lib import IQR_POOL_REGISTERED, SAMPLE_VERSION_V1, SAMPLE_VERSION_V2, SAMPLE_VERSION_V3, SAMPLE_VERSION_V4, OUT_DIR, SAMPLE_VERSION_LABEL, fm_regression, joint_wald, newey_west, one_sided_p, param_value, progress, rank_average_groups, rcs_basis, sample_path, treatment_only_mask, two_sided_p, write_json
 
-P = param_value('m1_sample_and_spec_registry')
+P = param_value('sample_and_spec_registry')
 NW_LAG = int(param_value('nw_lag'))
 MIN_N = P['min_focal_count_per_month']
-K_SPREAD = param_value('K_Spread_M1')
-CONTROLS = ['size', 'bm', 'mom', 'rev', 'turnover', 'illiq', 'AnalystCoverage', 'NetworkDegree']
+K_SPREAD = param_value('K_Spread_Pricing')
+CONTROLS = list(param_value('pricing_main_controls_v1')['list'])
 BASE_X = ['OwnMAXraw', 'PeerReturn'] + CONTROLS
 
 
@@ -73,10 +73,12 @@ def portfolio_table(df: pd.DataFrame, n_groups: int) -> dict:
                   'p_one_sided_negative': one_sided_p(nw['t_nw'], 'negative'),
                   'p_two_sided': two_sided_p(nw['t_nw']),
                   'high_minus_low': 'group_high - group_low',
-                  'vs_K_Spread_M1': {'abs_spread': None if nw['mean'] is None else abs(nw['mean']),
-                                     'K_Spread_M1': K_SPREAD}}
+                  'vs_K_Spread_Pricing': {'abs_spread': None if nw['mean'] is None else abs(nw['mean']),
+                                     'K_Spread_Pricing': K_SPREAD}}
         if nw['mean'] is not None:
-            spread['vs_K_Spread_M1']['pass'] = bool(abs(nw['mean']) >= K_SPREAD)
+            spread['vs_K_Spread_Pricing']['abs_pass'] = bool(abs(nw['mean']) >= K_SPREAD)
+            spread['vs_K_Spread_Pricing']['signed_pass'] = bool(nw['mean'] <= -K_SPREAD)
+            spread['vs_K_Spread_Pricing']['pass'] = bool(nw['mean'] <= -K_SPREAD)
         out['spread'][wname] = spread
     out['monthly_spread_series'] = {
         'month': ts[ts['group'] == hi]['month'].tolist(),
@@ -85,13 +87,13 @@ def portfolio_table(df: pd.DataFrame, n_groups: int) -> dict:
 
 
 def parse_args(argv=None):
-    ap = argparse.ArgumentParser(description='A8：M1 组合分位（五/十分位）与函数形式诊断')
-    ap.add_argument('--sample-version', choices=['v1', 'v2', 'v3', 'v4'], default='v3',
-                    help='headline 样本版本：v2（默认，m1_s5_v2_2015_2023）/ v1 / v3 / v4（W2 创建）；'
+    ap = argparse.ArgumentParser(description='A8：pricing_gate 组合分位（五/十分位）与函数形式诊断')
+    ap.add_argument('--sample-version', choices=['v1', 'v2', 'v3', 'v4'], default=SAMPLE_VERSION_LABEL,
+                    help=f'headline 样本版本（默认读 registry 指针 = {SAMPLE_VERSION_LABEL}）；v1/v2 为历史版本；'
                          '另一版本自动作敏感性并报')
     ap.add_argument('--out-suffix', default='',
-                    help="产物文件名后缀，如 '_v2'（产出 s3_m1_portfolio_deciles_v2.json / "
-                         "s3_m1_diagnostics_v2.json，不覆盖 v1 基线名；默认空 = 现有默认名）")
+                    help="产物文件名后缀，如 '_v2'（产出 pricing_portfolio_deciles_v2.json / "
+                         "pricing_diagnostics_v2.json，不覆盖 v1 基线名；默认空 = 现有默认名）")
     return ap.parse_args(argv)
 
 
@@ -100,14 +102,14 @@ def main(argv=None):
     ver = args.sample_version
     other = {'v4': 'v3', 'v3': 'v2', 'v2': 'v1', 'v1': 'v2'}[ver]
     sfx = args.out_suffix
-    ver_id = {'v1': M1_SAMPLE_VERSION_V1, 'v2': M1_SAMPLE_VERSION_V2,
-              'v3': M1_SAMPLE_VERSION_V3, 'v4': M1_SAMPLE_VERSION_V4}[ver]
-    other_id = {'v1': M1_SAMPLE_VERSION_V1, 'v2': M1_SAMPLE_VERSION_V2,
-                'v3': M1_SAMPLE_VERSION_V3, 'v4': M1_SAMPLE_VERSION_V4}[other]
+    ver_id = {'v1': SAMPLE_VERSION_V1, 'v2': SAMPLE_VERSION_V2,
+              'v3': SAMPLE_VERSION_V3, 'v4': SAMPLE_VERSION_V4}[ver]
+    other_id = {'v1': SAMPLE_VERSION_V1, 'v2': SAMPLE_VERSION_V2,
+                'v3': SAMPLE_VERSION_V3, 'v4': SAMPLE_VERSION_V4}[other]
     progress(f'A8 开始：组合分位与函数形式诊断（headline={ver_id} + {other} 敏感性；'
              f'out_suffix={sfx or "(空)"}）')
     df_all = pd.read_parquet(sample_path('ma_teacher', ver))
-    df = df_all[df_all['m1_in_fm_sample'].astype(bool)].copy()
+    df = df_all[df_all['pricing_in_fm_sample'].astype(bool)].copy()
     fm_window = [str(df['month'].min()), str(df['month'].max())]
     # treatment-only 宇宙（outcome-blind）池化中位/IQR —— 用于 (MAX-c)+ 的 c（事前固定口径）
     to = df_all[treatment_only_mask(df_all)]
@@ -116,27 +118,27 @@ def main(argv=None):
     progress(f'A8 treatment-only 宇宙：n={len(to):,} median={c_med:.6f} IQR={iqr_to:.8f}'
              f'（登记 IQR={IQR_POOL_REGISTERED:.8f}）；FM 窗口={fm_window[0]}..{fm_window[1]}')
 
-    rep_pf = {'spec_id': 'm1_portfolio_q / m1_portfolio_d',
+    rep_pf = {'spec_id': 'pricing_portfolio_q / pricing_portfolio_d',
               'sample_version': ver_id,
               'headline_sample_version': ver_id,
-              'sample_version_v1_superseded': M1_SAMPLE_VERSION_V1,
-              'sample_version_v2': M1_SAMPLE_VERSION_V2,
+              'sample_version_v1_superseded': SAMPLE_VERSION_V1,
+              'sample_version_v2': SAMPLE_VERSION_V2,
               'out_suffix': sfx,
               'fm_window': fm_window, 'n_rows_fm': int(len(df)),
               'window_note': ('组合表按 headline 样本（主口径 ma_teacher）构造；'
                               f'本版本 FM 窗口 = {fm_window[0]}..{fm_window[1]}（{df["month"].nunique()} 月）。'
                               'v1（未施加 microcap 筛除）敏感性块另有其自身窗口，两版窗口与 N 不可混读。'),
-              'tie_rule_id': P['portfolio_tie_rule_id'], 'K_Spread_M1': K_SPREAD,
+              'tie_rule_id': P['portfolio_tie_rule_id'], 'K_Spread_Pricing': K_SPREAD,
               'headline_spec': 'continuous PeerMAXraw（组合仅作 supporting evidence）',
               'column_role': '本表按**主口径**（ma_teacher＝中文法 × 老师 MD&A，主表列）构造；'
                              '方法稳健性（mb_teacher）/ 文本稳健性（ma）/ 语料对照（mb）四列在主规格 FM 表中并报'
-                             '（s3_m1_pricing_table.json / s3_m1_robustness_placebo.json 的 m1_rob_col_*）',
+                             '（pricing_table.json / pricing_robustness_placebo.json 的 pricing_rob_col_*）',
               'outcome': 'raw（R_NEXT_MONTH_COMPLETE_v1）为主；后复权（R_NEXT_POST_ADJ_v1）敏感性见 '
-                         's3_m1_pricing_table.json:post_adjusted 与 s3_m1_robustness_placebo.json:m1_rob_postadj',
+                         'pricing_table.json:post_adjusted 与 pricing_robustness_placebo.json:pricing_rob_postadj',
               'quintile': portfolio_table(df, 5), 'decile': portfolio_table(df, 10)}
     # 另一版本敏感性（v1 = 未施加 microcap 筛除）
     df1_all = pd.read_parquet(sample_path('ma_teacher', other))
-    df1 = df1_all[df1_all['m1_in_fm_sample'].astype(bool)].copy()
+    df1 = df1_all[df1_all['pricing_in_fm_sample'].astype(bool)].copy()
     rep_pf[f'{other}_sensitivity'] = {
         'status': f'{other}_superseded_registered_deviation'
                   + ('（未施加 microcap/次新股筛除）' if other == 'v1' else ''),
@@ -145,7 +147,7 @@ def main(argv=None):
         'quintile': portfolio_table(df1, 5),
         'n_rows': int(len(df1)),
     }
-    write_json(OUT_DIR / f's3_m1_portfolio_deciles{sfx}.json', rep_pf)
+    write_json(OUT_DIR / f'pricing_portfolio_deciles{sfx}.json', rep_pf)
     progress(f"A8 五分位 EW spread = {rep_pf['quintile']['spread']['ew']['mean']:.5f} "
              f"(t={rep_pf['quintile']['spread']['ew']['t_nw']:.2f})；"
              f"{other} 五分位 EW spread = {rep_pf[f'{other}_sensitivity']['quintile']['spread']['ew']['mean']:.5f}")
@@ -155,8 +157,8 @@ def main(argv=None):
     diag = {'sample_version': ver_id, 'headline_sample_version': ver_id,
             'out_suffix': sfx, 'fm_window': fm_window, 'n_rows_fm': int(len(df)),
             'headline': 'continuous PeerMAXraw',
-            'column_role': '诊断按主口径（ma_teacher）构造；四列并报见 s3_m1_pricing_table.json',
-            'outcome': 'raw 主口径（后复权敏感性见 s3_m1_pricing_table.json:post_adjusted）',
+            'column_role': '诊断按主口径（ma_teacher）构造；四列并报见 pricing_table.json',
+            'outcome': 'raw 主口径（后复权敏感性见 pricing_table.json:post_adjusted）',
             'kink_threshold_c': c_med, 'kink_rule': '(MAX-c)+ 的 c = 池化中位数（treatment-only 宇宙，'
                                                    'outcome-blind 事前固定口径；2026-10-10 复核修复 I4 同批统一）',
             'kink_threshold_scope': {'treatment_only_n': int(len(to)),
@@ -219,8 +221,8 @@ def main(argv=None):
                    'ew_mean': float(r.ew_mean), 'n': int(r.n_cell)} for r in cell.itertuples()],
         'role': 'descriptive only（检验结果是否独立于 OwnMAXraw/PeerReturn 的诊断，不替代 headline）',
     }
-    write_json(OUT_DIR / f's3_m1_diagnostics{sfx}.json', diag)
-    progress(f'A8 完成：s3_m1_portfolio_deciles{sfx}.json / s3_m1_diagnostics{sfx}.json 落盘'
+    write_json(OUT_DIR / f'pricing_diagnostics{sfx}.json', diag)
+    progress(f'A8 完成：pricing_portfolio_deciles{sfx}.json / pricing_diagnostics{sfx}.json 落盘'
              f'（headline={ver_id}）')
 
 

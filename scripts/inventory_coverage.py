@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""S1 Step 4：universe 三分类 + 停牌核验 + 双源交叉抽检（execution_protocol §2 Step 4）。
+"""inventory Step 4：universe 三分类 + 停牌核验 + 双源交叉抽检（execution_protocol §2 Step 4）。
 
-4a universe 三分类：expected（s1_expected_universe.json 8,612,917）− observed（腾讯数据行 8,546,009）
+4a universe 三分类：expected（inventory_expected_universe.json 8,612,917）− observed（腾讯数据行 8,546,009）
    − 停牌（4b）→ 缺失；停牌核验覆盖期精确拆分，断档期（2020-10-30~2025-07-15）合并"待核验"。
 4b 停牌独立核验：baostock stock_list 967 文件 × 2 列（code,tradeStatus），filter 5543 只股票。
 4c 双源交叉抽检：新浪 quotes.sina.cn 30 只 × 2020 全年，腾讯 raw close 派生 vs 新浪 close 派生。
 4d 时序/泄漏：登记确认（历史快照无前视），无计算。
-产出：reports/data_gates/G0/s1_coverage_report.json
+产出：reports/data_gates/G0/inventory_coverage_report.json
 
 用法: python scripts/inventory_coverage.py [--skip-net]
 """
@@ -24,8 +24,8 @@ ROOT = Path(__file__).resolve().parents[1]
 STOCK_LIST = ROOT / "data/raw/baostock/stock_list"
 A_STOCKS = ROOT / "data/raw/baostock/stock_basic/a_stocks.csv"
 TENCENT = ROOT / "data/raw/tencent"
-EXPECTED = ROOT / "reports/data_gates/G0/s1_expected_universe.json"
-OUT = ROOT / "reports/data_gates/G0/s1_coverage_report.json"
+EXPECTED = ROOT / "reports/data_gates/G0/inventory_expected_universe.json"
+OUT = ROOT / "reports/data_gates/G0/inventory_coverage_report.json"
 
 # 草案阈值（用户确认后冻结）
 DRAFT_UNIVERSE_MISSING_FLOOR = 0.01
@@ -87,7 +87,7 @@ def main():
     # ---------- 4a universe 三分类 ----------
     # 停牌核验覆盖期（967 天）内：缺失 = expected(同期) − observed(同期) − 停牌(同期)
     # 简化精确口径：对覆盖期日期，expected 同期按比例估算（按日粒度需重建 expected 日期集，
-    # 这里用覆盖期比例近似并注明；S2 生成 firm-day 面板后精确复算）
+    # 这里用覆盖期比例近似并注明；daily-panel 生成 firm-day 面板后精确复算）
     covered_ratio = n_covered_days / 1942
     expected_covered = int(expected_total * covered_ratio)
     observed_covered = int(OBSERVED_ROWS * covered_ratio)
@@ -145,7 +145,7 @@ def main():
         print(f"4c 双源抽检: checked={checked} mismatch={mismatch} rate={conflict_rate}")
 
     report = {
-        "report_id": "s1_coverage_report",
+        "report_id": "inventory_coverage_report",
         "4a_universe_three_class": {
             "expected_firm_days": expected_total,
             "observed_rows_tencent": OBSERVED_ROWS,
@@ -157,7 +157,7 @@ def main():
             "missing_rate_covered_period": round(missing_rate_covered, 6) if missing_rate_covered else None,
             "draft_universe_missing_floor": DRAFT_UNIVERSE_MISSING_FLOOR,
             "gap_period_note": gap_period_note,
-            "note": "覆盖期缺失率按 967/1942 比例近似（S2 firm-day 面板后精确复算）；断档期 975 天不拆分",
+            "note": "覆盖期缺失率按 967/1942 比例近似（daily-panel firm-day 面板后精确复算）；断档期 975 天不拆分",
         },
         "4b_suspension": {
             "day_files": n_covered_days,

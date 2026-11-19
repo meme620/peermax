@@ -15,7 +15,7 @@
     但月频 R 与 sh601360 在 73 个重叠月中 72 个相同；46 行恢复 `n_trade_days`
     （43 行 >=15、3 行 1–14），2017-07..10 的 4 行仍为真实停牌。
     alias 表写入 `artifacts/phase2/2.1_alias_map.json`。
-  - 仍然只写 shadow；不覆盖 headline、不改 configs、不重跑 M1/PC/网络。
+  - 仍然只写 shadow；不覆盖 headline、不改 configs、不重跑 pricing_gate/PC/网络。
 
 口径：
   - 输入 `monthly_returns_clean_v2.csv` 原列只读复制；行数固定 856,771。
@@ -61,9 +61,11 @@ from pathlib import Path
 import numpy as np
 import os
 import pandas as pd
-from fileio import write_json_atomic
+from fileio import write_json_atomic, file_size
 
 ROOT = Path(__file__).resolve().parents[1]
+
+from pricing_lib import shadow_sample_path  # noqa: E402  (registry legacy 样本指针)
 
 RETURNS = ROOT / "data/processed/monthly_returns_clean_v2.csv"
 
@@ -81,9 +83,9 @@ ALIAS_OUT = ROOT / "artifacts/phase2/2.1_alias_map.json"
 
 COUNTS_OUT = ROOT / "artifacts/phase2/2.1_counts.json"
 
-CONTRACTS = ROOT / "configs/m1_contracts.yaml"
+CONTRACTS = ROOT / "configs/pricing_inputs.yaml"
 
-FM_SAMPLE = ROOT / "data/processed/m1_common_sample_ma_teacher_v2.parquet"
+FM_SAMPLE = shadow_sample_path('ma_teacher')
 
 SOURCE_PANEL = ROOT / "data/processed/source_month_argmax_panel.csv"
 
@@ -149,12 +151,12 @@ def load_contracts(path: Path = CONTRACTS) -> dict:
     return yaml.safe_load(Path(path).read_text(encoding="utf-8"))
 
 def anchor_snapshot(contracts: dict) -> dict:
-    """9 个 M1 主输入 sha 前后快照；sha 与登记不一致立即停机。"""
+    """9 个 pricing_gate 主输入 sha 前后快照；sha 与登记不一致立即停机。"""
     snap = {}
-    for key, meta in contracts["m1_inputs"].items():
+    for key, meta in contracts["pricing_inputs"].items():
         p = ROOT / meta["file"]
         if not p.is_file():
-            raise SystemExit(f"[P2.1] headline 锚缺失: {p}")
+            raise SystemExit(f"[shadow-max] headline 锚缺失: {p}")
         h = file_size(p)
         snap[key] = {
             "file": meta["file"],
@@ -168,12 +170,12 @@ def anchor_snapshot(contracts: dict) -> dict:
 def assert_anchors_unchanged(before: dict, after: dict) -> None:
     for key in before:
         if not before[key]["sha_match"]:
-            raise SystemExit(f"[P2.1] 起始锚已不一致: {key}")
+            raise SystemExit(f"[shadow-max] 起始锚已不一致: {key}")
         if before[key]["bytes"] != after[key]["bytes"]:
-            raise SystemExit(f"[P2.1] headline 锚在运行中变化: {key}")
+            raise SystemExit(f"[shadow-max] headline 锚在运行中变化: {key}")
 
 def protected_paths(contracts: dict) -> set[Path]:
-    return {(ROOT / m["file"]).resolve() for m in contracts["m1_inputs"].values()}
+    return {(ROOT / m["file"]).resolve() for m in contracts["pricing_inputs"].values()}
 
 def daily_panel_audit(panel_dir: Path, start_year: int = START_YEAR,
                       end_year: int = END_YEAR) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -211,14 +213,14 @@ def _load_suspend_monthly(suspend_flag, start_year: int = START_YEAR,
     else:
         p = Path(suspend_flag)
         if not p.is_file():
-            raise SystemExit(f"[P2.1] suspend flag 缺失: {p}")
+            raise SystemExit(f"[shadow-max] suspend flag 缺失: {p}")
         flag = pd.read_pickle(p)
     if not isinstance(flag.index, pd.DatetimeIndex):
         flag.index = pd.to_datetime(flag.index)
     flag = flag.loc[(flag.index >= f"{start_year}-01-01")
                     & (flag.index <= f"{end_year}-12-31")]
     if flag.empty:
-        raise SystemExit("[P2.1] suspend flag 在覆盖期为空")
+        raise SystemExit("[shadow-max] suspend flag 在覆盖期为空")
     for c in flag.columns:
         s = flag[c]
         if s.dtype == object:
@@ -240,12 +242,12 @@ def _build_status_panel_full(ret: pd.DataFrame, panel_dir: Path,
     required = {"firm_id", "month", "R", "n_valid_days", "complete_month"}
     missing = required - set(ret.columns)
     if missing:
-        raise SystemExit(f"[P2.1] 月频输入缺列: {sorted(missing)}")
+        raise SystemExit(f"[shadow-max] 月频输入缺列: {sorted(missing)}")
     internal = ["_daily_code", "n_daily_rows", "market_trade_days",
                 "_suspend_true_days"]
     collisions = [c for c in NEW_COLS + internal if c in ret.columns]
     if collisions:
-        raise SystemExit(f"[P2.1] 月频输入已含 shadow/内部列，拒绝覆盖: {collisions}")
+        raise SystemExit(f"[shadow-max] 月频输入已含 shadow/内部列，拒绝覆盖: {collisions}")
 
     alias = {str(k): str(v) for k, v in (alias_map or {}).items()}
     out = ret.copy()
@@ -253,7 +255,7 @@ def _build_status_panel_full(ret: pd.DataFrame, panel_dir: Path,
 
     td = trade_days_long(panel_dir)
     if td.duplicated(["firm_id", "month"]).any():
-        raise SystemExit("[P2.1] trade_days_long 返回重复 (firm_id, month)")
+        raise SystemExit("[shadow-max] trade_days_long 返回重复 (firm_id, month)")
     td = td.rename(columns={"firm_id": "_daily_code"})
     out = out.merge(td, on=["_daily_code", "month"], how="left",
                     validate="many_to_one")
@@ -261,15 +263,15 @@ def _build_status_panel_full(ret: pd.DataFrame, panel_dir: Path,
     daily_rows, market = daily_panel_audit(panel_dir, start_year, end_year)
     daily_lookup = daily_rows.rename(columns={"firm_id": "_daily_code"})
     if daily_lookup.duplicated(["_daily_code", "month"]).any():
-        raise SystemExit("[P2.1] daily_panel_audit 返回重复 (code, month)")
+        raise SystemExit("[shadow-max] daily_panel_audit 返回重复 (code, month)")
     out = out.merge(daily_lookup, on=["_daily_code", "month"], how="left",
                     validate="many_to_one")
     out = out.merge(market, on="month", how="left", validate="many_to_one")
 
     if len(out) != len(ret):
-        raise SystemExit("[P2.1] merge 后行数变化")
+        raise SystemExit("[shadow-max] merge 后行数变化")
     if out.duplicated(["firm_id", "month"]).any():
-        raise SystemExit("[P2.1] 月频键 (firm_id, month) 不唯一")
+        raise SystemExit("[shadow-max] 月频键 (firm_id, month) 不唯一")
 
     year = out["month"].str[:4].astype(int)
     in_scope = (year >= start_year) & (year <= end_year)
@@ -299,9 +301,9 @@ def _build_status_panel_full(ret: pd.DataFrame, panel_dir: Path,
     no_trade = in_scope & (td_zero_with_rows | susp_full)
     dpm = in_scope & no_rows & ~susp_full
     if not (ok | no_trade | dpm).loc[in_scope].all():
-        raise SystemExit("[P2.1] 2014–2025 状态未完全覆盖")
+        raise SystemExit("[shadow-max] 2014–2025 状态未完全覆盖")
     if ((ok & no_trade) | (ok & dpm) | (no_trade & dpm)).any():
-        raise SystemExit("[P2.1] 状态互斥失败")
+        raise SystemExit("[shadow-max] 状态互斥失败")
 
     status = pd.Series(pd.NA, index=out.index, dtype="object")
     status.loc[pre_scope] = STATUS_NO_VOLUME
@@ -350,7 +352,7 @@ def _build_status_panel_full(ret: pd.DataFrame, panel_dir: Path,
     viol = int((out.loc[evaluable, "n_trade_days"]
                 > out.loc[evaluable, "n_price_obs"]).sum())
     if viol:
-        raise SystemExit(f"[P2.1] n_trade_days > n_price_obs 行数 {viol} != 0")
+        raise SystemExit(f"[shadow-max] n_trade_days > n_price_obs 行数 {viol} != 0")
 
     out = out.sort_values(["month", "firm_id"], kind="mergesort").reset_index(drop=True)
     return out, daily_rows
@@ -562,11 +564,11 @@ def _fm_counts(out: pd.DataFrame, sample_path: Path, source_path: Path) -> dict:
     if not sample_path.is_file():
         return {"available": False, "reason": f"missing: {sample_path}"}
     fm = pd.read_parquet(sample_path)
-    need = {"focal_id", "month", "m1_in_fm_sample", "R_next"}
+    need = {"focal_id", "month", "pricing_in_fm_sample", "R_next"}
     if not need.issubset(fm.columns):
         return {"available": False,
                 "reason": f"missing columns: {sorted(need - set(fm.columns))}"}
-    fm = fm.loc[fm["m1_in_fm_sample"].fillna(False).astype(bool),
+    fm = fm.loc[fm["pricing_in_fm_sample"].fillna(False).astype(bool),
                 ["focal_id", "month", "R_next"]].copy()
     fm["next_month"] = fm["month"].map(lambda m: ym_add(m, 1))
 
@@ -575,7 +577,7 @@ def _fm_counts(out: pd.DataFrame, sample_path: Path, source_path: Path) -> dict:
                  "n_trade_days": "next_n_trade_days",
                  "trade_days_status": "next_status"})
     if nxt.duplicated(["focal_id", "next_month"]).any():
-        raise SystemExit("[P2.1] shadow 面板键重复，无法映射下月")
+        raise SystemExit("[shadow-max] shadow 面板键重复，无法映射下月")
     fm = fm.merge(nxt, on=["focal_id", "next_month"], how="left",
                   validate="many_to_one")
 
@@ -594,7 +596,7 @@ def _fm_counts(out: pd.DataFrame, sample_path: Path, source_path: Path) -> dict:
                       dtype={"source_id": str, "month": str}).rename(
         columns={"source_id": "focal_id", "n_valid_days": "src_n_valid_days"})
     if src.duplicated(["focal_id", "month"]).any():
-        raise SystemExit("[P2.1] source_month_argmax_panel 键重复")
+        raise SystemExit("[shadow-max] source_month_argmax_panel 键重复")
     fm = fm.merge(src, on=["focal_id", "month"], how="left", validate="many_to_one")
     max_loss = fm["src_n_valid_days"].isna() | fm["src_n_valid_days"].lt(MIN_TRADE_DAYS)
 
@@ -659,8 +661,8 @@ def _fm_event_month_counts(out: pd.DataFrame, sample_path: Path) -> dict:
     """事件月状态分布（供 2.6 解释变量可用性）。"""
     if not sample_path.is_file():
         return {"available": False}
-    fm = pd.read_parquet(sample_path, columns=["focal_id", "month", "m1_in_fm_sample"])
-    fm = fm.loc[fm["m1_in_fm_sample"].fillna(False).astype(bool), ["focal_id", "month"]]
+    fm = pd.read_parquet(sample_path, columns=["focal_id", "month", "pricing_in_fm_sample"])
+    fm = fm.loc[fm["pricing_in_fm_sample"].fillna(False).astype(bool), ["focal_id", "month"]]
     key = out[["firm_id", "month", "trade_days_status", "n_trade_days"]].rename(
         columns={"firm_id": "focal_id"})
     j = fm.merge(key, on=["focal_id", "month"], how="left", validate="many_to_one")
@@ -687,7 +689,7 @@ def _source_bridge(out: pd.DataFrame, source_path: Path) -> dict:
                       dtype={"source_id": str, "month": str}).rename(
         columns={"source_id": "firm_id", "n_valid_days": "source_n_valid_days"})
     if src.duplicated(["firm_id", "month"]).any():
-        raise SystemExit("[P2.1] source_month_argmax_panel 键重复")
+        raise SystemExit("[shadow-max] source_month_argmax_panel 键重复")
     w = out[(out["month"] >= "2015-05") & (out["month"] <= "2023-12")][
         ["firm_id", "month", "n_trade_days", "R"]]
     j = w.merge(src, on=["firm_id", "month"], how="inner", validate="one_to_one")
@@ -824,23 +826,23 @@ def main(argv=None) -> int:
     for label, p in (("out", out_p), ("meta-out", meta_p),
                      ("alias-out", alias_p), ("counts-out", counts_p)):
         if p in protected:
-            raise SystemExit(f"[P2.1] {label} 指向 headline 路径，拒绝写出: {p}")
+            raise SystemExit(f"[shadow-max] {label} 指向 headline 路径，拒绝写出: {p}")
     shadow_dir = (ROOT / "data/processed/phase2_shadow").resolve()
     artifacts_dir = (ROOT / "artifacts/phase2").resolve()
     if out_p.parent != shadow_dir or meta_p.parent != shadow_dir:
-        raise SystemExit(f"[P2.1] shadow 输出必须位于 {shadow_dir}")
+        raise SystemExit(f"[shadow-max] shadow 输出必须位于 {shadow_dir}")
     if alias_p.parent != artifacts_dir or counts_p.parent != artifacts_dir:
-        raise SystemExit("[P2.1] alias/counts 输出必须位于 artifacts/phase2/")
+        raise SystemExit("[shadow-max] alias/counts 输出必须位于 artifacts/phase2/")
 
     anchors_before = anchor_snapshot(contracts)
     if not all(v["sha_match"] for v in anchors_before.values()):
         bad = [k for k, v in anchors_before.items() if not v["sha_match"]]
-        raise SystemExit(f"[P2.1] headline 锚起始不一致: {bad}")
+        raise SystemExit(f"[shadow-max] headline 锚起始不一致: {bad}")
 
     ret = pd.read_csv(returns_p, dtype={"firm_id": str, "month": str})
     if len(ret) != args.expected_rows:
-        raise SystemExit(f"[P2.1] 月频行数 {len(ret)} != {args.expected_rows}")
-    print(f"[P2.1] 月频输入 {len(ret):,} 行；读 daily_panel {args.start_year}-{args.end_year}"
+        raise SystemExit(f"[shadow-max] 月频行数 {len(ret)} != {args.expected_rows}")
+    print(f"[shadow-max] 月频输入 {len(ret):,} 行；读 daily_panel {args.start_year}-{args.end_year}"
           f" 与 suspend flag …", flush=True)
 
     full, daily_rows = _build_status_panel_full(
@@ -851,9 +853,9 @@ def main(argv=None) -> int:
     panel = full[list(ret.columns) + NEW_COLS]
 
     if len(panel) != args.expected_rows:
-        raise SystemExit(f"[P2.1] shadow 行数 {len(panel)} != {args.expected_rows}")
+        raise SystemExit(f"[shadow-max] shadow 行数 {len(panel)} != {args.expected_rows}")
     if panel.duplicated(["firm_id", "month"]).any():
-        raise SystemExit("[P2.1] shadow 键 (firm_id, month) 不唯一")
+        raise SystemExit("[shadow-max] shadow 键 (firm_id, month) 不唯一")
 
     write_csv_atomic(panel, out_p)
     out_bytes = file_size(out_p)
@@ -1011,22 +1013,22 @@ def main(argv=None) -> int:
         "headline_anchors_after": anchors_after,
         "headline_anchors_match": meta["headline_anchors_match"],
         "headline_files_modified": False,
-        "m1_rerun": False,
+        "pricing_rerun": False,
         "configs_modified": False,
     }
     write_json_atomic(counts, counts_p)
 
-    print(f"[P2.1] shadow -> {out_p.relative_to(ROOT)}  rows={len(panel):,}  sha={out_bytes[:12]}…")
-    print(f"[P2.1] 2014–2025: ok={scope_counts['n_trade_days_ge_15'] + scope_counts['n_trade_days_1_14']:,} "
+    print(f"[shadow-max] shadow -> {out_p.relative_to(ROOT)}  rows={len(panel):,}  sha={out_bytes[:12]}…")
+    print(f"[shadow-max] 2014–2025: ok={scope_counts['n_trade_days_ge_15'] + scope_counts['n_trade_days_1_14']:,} "
           f"no_trade={scope_counts['n_trade_days_zero']:,} "
           f"daily_panel_missing={scope_counts['rows_daily_panel_missing']:,}")
-    print(f"[P2.1] window 2015-05..2023-12: legacy complete & td<15="
+    print(f"[shadow-max] window 2015-05..2023-12: legacy complete & td<15="
           f"{window_counts['complete_legacy_and_trade_days_lt_15']:,} "
           f"(zero={window_counts['complete_legacy_and_trade_days_zero']:,}, "
           f"partial={window_counts['complete_legacy_and_trade_days_1_14']:,}) "
           f"all_match={counts['window_2015_05_2023_12_all_match']}")
     if fm_counts.get("available"):
-        print(f"[P2.1] FM: R_next==0={fm_counts['R_next_zero']:,} "
+        print(f"[shadow-max] FM: R_next==0={fm_counts['R_next_zero']:,} "
               f"split={fm_counts['R_next_zero_pseudo_full_month_no_trade']}/"
               f"{fm_counts['R_next_zero_partial_1_14_trade_days']}/"
               f"{fm_counts['R_next_zero_true_ge_15_trade_days']}/"
@@ -1036,19 +1038,19 @@ def main(argv=None) -> int:
               f"union={fm_counts['gate_union_loss_rows']:,} "
               f"upper={fm_counts['fm_upper_bound_after_gates']:,}; "
               f"all_match={all(fm_counts['matches_2_0_plan'].values())}")
-    print(f"[P2.1] split: 586={classification['no_trade_R_nonzero']:,} "
+    print(f"[shadow-max] split: 586={classification['no_trade_R_nonzero']:,} "
           f"46={classification['alias_recovered_rows']:,} "
           f"96={classification['daily_panel_missing_rows']:,} "
           f"632={classification['original_nonzero_R_daily_panel_missing_632']:,} "
           f"overlap96_632={classification['overlap_daily_panel_missing_with_632']}")
     if source_bridge.get("available"):
-        print(f"[P2.1] source bridge 2015-05..2023-12: matched="
+        print(f"[shadow-max] source bridge 2015-05..2023-12: matched="
               f"{source_bridge['matched_rows']:,} equal={source_bridge['equal_rows']:,} "
               f"diff={source_bridge['diff_rows']} "
               f"all_match={source_bridge['matches_2_0_plan']}")
-    print(f"[P2.1] 9 anchors unchanged: {meta['headline_anchors_match']}")
+    print(f"[shadow-max] 9 anchors unchanged: {meta['headline_anchors_match']}")
     if not counts["window_2015_05_2023_12_all_match"]:
-        print("[P2.1] WARN: 2015-05..2023-12 计数与预期不一致", file=sys.stderr)
+        print("[shadow-max] WARN: 2015-05..2023-12 计数与预期不一致", file=sys.stderr)
     return 0
 
 

@@ -1,4 +1,4 @@
-"""S3A 9C：NPM 的 Fama-MacBeth 回归（对标 Long Table 5, p.49）。
+"""analyst-network 9C：NPM 的 Fama-MacBeth 回归（对标 Long Table 5, p.49）。
 控制变量：size(Drive市值 log)、BM(TTM)、REV(上月收益)、MOM(12-2 累计)、TURN(官方换手率)、ILLIQ(Amihud 月|R|/成交额)。
 手写 FM：每月横截面 OLS -> 系数序列 -> 均值 + NW(t) 与 iid(t)。
 """
@@ -153,7 +153,7 @@ res = {'n_months': n_months, 'sample': f"{panel['month_pred'].min()}~{panel['mon
        'coefs': {}, 'benchmark': {'long2025_table5_npm': 'NPM 系数 0.012~0.023, t 2.60~6.26',
                                   'note': '本项目控制变量：size(Drive市值)/BM(TTM)/REV/MOM/TURN(官方)/ILLIQ(Amihud |R_form|/amt)'}}
 if EXTREME_FILTER:
-    res['output_path'] = 'reports/data_gates/G0/s3a_9c_fm_regression_extreme.json'
+    res['output_path'] = 'reports/data_gates/G0/analyst_fm_regression_extreme.json'
 for k in X_names+['const']:
     m, t_iid, t_nw, T = fm_report(coefs[k])
     res['coefs'][k] = {'beta': round(float(m), 5), 't_iid': round(float(t_iid), 2),
@@ -161,7 +161,7 @@ for k in X_names+['const']:
     print(f"  {k:8s}: beta={m:+.5f} t_iid={t_iid:+.2f} t_nw={t_nw:+.2f}", flush=True)
 import json
 attach_meta(res, __file__, NET_VER)
-_out = Path('reports/data_gates/G0/s3a_9c_fm_regression_extreme.json') if EXTREME_FILTER \
-    else Path('reports/data_gates/G0/s3a_9c_fm_regression.json')
+_out = Path('reports/data_gates/G0/analyst_fm_regression_extreme.json') if EXTREME_FILTER \
+    else Path('reports/data_gates/G0/analyst_fm_regression.json')
 _out.write_text(json.dumps(res, ensure_ascii=False, indent=2), encoding='utf-8')
 print(f"DONE -> {_out}")

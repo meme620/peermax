@@ -5,7 +5,7 @@
 原文第四步对手集合 = 「相似度 > **团内最小相似度**」的公司，**字面不限定候选域**（可含团外）；
 项目口径 = **同团成员**（`network_business_edges_build.py` 已登记偏离：「团内最小相似度阈值法实测退化」）。
 既有退化证据只在 2021 年 **self 语料**：K=300 → peer 3,456 / lift 1.14；**K=400 → 3,347 / 1.19**
-（`reports/data_gates/G0/s3_ma_K_explore.json`）；**teacher 语料（headline K_y 235–463）从未读过** → 本脚本补齐。
+（`reports/data_gates/G0/network_business_k_explore.json`）；**teacher 语料（headline K_y 235–463）从未读过** → 本脚本补齐。
 「窄词表重建到原文 ~1.6 万 active_vocab」路线实测不可行（df 阈值收紧对词表/active_vocab 几乎无影响，
 见本脚本 `--vocab-probe` 实测与 `3.3_counts.json` 的 `vocab_sensitivity`）。
 
@@ -23,14 +23,14 @@
 5. R1 对账：逐年矩阵与 headline `{y}_similarity.csv` 逐对核对；同团规则重算 PC 与 headline `{y}_pc.csv`
    逐值对账（容差 1e-6）；同团规则 peer/lift/K 重算与 freeze 报告逐值对账；
 6. 固化解读：`3.3_counts.json`（退化计数/PC 对比/词表敏感度/结论）、`3.3_origrule_readout.csv`、
-   `pc_origrule_p3shadow.csv`(+`.meta.json`)，另 `3.3_decision_memo.md` / `3.3_execution.md`（执行期写）。
+   `pc_origrule_shadow.csv`(+`.meta.json`)，另 `decision_memo.md` / `execution.md`（执行期写）。
 
-不改：headline 网络/PC/M1（只读）、`reports/data_gates/G0/*`、`configs/*`、现有脚本与测试；版本串 `p3shadow_v1`。
+不改：headline 网络/PC/pricing_gate（只读）、`reports/data_gates/G0/*`、`configs/*`、现有脚本与测试；版本串 `p3shadow_v1`。
 
 产物
 ----
-  data/processed/phase3_shadow/pc_origrule_p3shadow.csv       逐 focal×年×规则（原文规则 / 同团对照）
-  data/processed/phase3_shadow/pc_origrule_p3shadow.meta.json 口径/列定义/版本
+  data/processed/phase3_shadow/pc_origrule_shadow.csv       逐 focal×年×规则（原文规则 / 同团对照）
+  data/processed/phase3_shadow/pc_origrule_shadow.meta.json 口径/列定义/版本
   artifacts/phase3/3.3_origrule_readout.csv                   逐年 × {headline,p3asof} × {2 规则} 读数
   artifacts/phase3/3.3_counts.json                            计数/对账/结论/锚台账
   artifacts/phase3/3.3_anchor_{pre,post}.json                 9 锚 + headline 45 文件 sha 台账（+3.1 产物）
@@ -58,7 +58,7 @@ from datetime import datetime, timezone
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import normalize
-from pricing_lib import assert_m1_inputs, require, file_size
+from pricing_lib import assert_pricing_inputs, require, file_size
 from network_business_lexicon import build_automaton, load_lexicon
 from network_business_cluster_grid import build_vectors, load_refs
 
@@ -77,15 +77,15 @@ REVENUE_PKL = ROOT / 'data/raw/drive/operating_revenue_annual.pkl'
 
 SW2_LATEST = ROOT / 'data/processed/sw2_industry_latest.csv'
 
-ASOF_MAP_PARQUET = SHADOW_DIR / 'sw2_asof_map_p3shadow.parquet'  # 3.1 交接（只读；缺则跳过 as-of lift）
+ASOF_MAP_PARQUET = SHADOW_DIR / 'sw2_asof_map_shadow.parquet'  # as-of 交接（只读；缺则跳过 as-of lift）
 
-FREEZE_REPORT = ROOT / 'reports/data_gates/G0/s3_b3_ma_param_freeze_teacher.json'   # 只读对账
+FREEZE_REPORT = ROOT / 'reports/data_gates/G0/network_business_param_freeze_teacher.json'   # 只读对账
 
 ART = ROOT / 'artifacts/phase3'
 
-SHADOW_CSV = SHADOW_DIR / 'pc_origrule_p3shadow.csv'
+SHADOW_CSV = SHADOW_DIR / 'pc_origrule_shadow.csv'
 
-SHADOW_META = SHADOW_DIR / 'pc_origrule_p3shadow.meta.json'
+SHADOW_META = SHADOW_DIR / 'pc_origrule_shadow.meta.json'
 
 READOUT_CSV = ART / '3.3_origrule_readout.csv'
 
@@ -167,7 +167,7 @@ BANNED_ROOTS = (
     ROOT / 'data/processed/network_ma_teacher_p3yt_ydf',
     ROOT / 'data/processed/network_ma_teacher_p3yt_latest',
     ROOT / 'data/processed/phase2_shadow',
-    ROOT / 'data/processed/m1_common_sample_ma_teacher_v2.parquet',
+    ROOT / 'data/processed/pricing_sample_ma_teacher_v2.parquet',
     ROOT / 'reports',
     ROOT / 'configs',
     ROOT / 'scripts',
@@ -585,17 +585,17 @@ def read_year(y: int, A, uni, l2m: dict, rev: dict, vocab_stats: dict) -> dict:
             f' vs headline 同团 中位={np.nanmedian(pc_head):.6f}；同团重算对账 max|Δhhi|={max_dif:.2e}')
 
     # ---- shadow 行（仅 headline 来源）
-    m1_obj = {'sw2_lift_latest': cl['lift_lat']['sw2_lift'],
+    pricing_obj = {'sw2_lift_latest': cl['lift_lat']['sw2_lift'],
               'cl_sw2_lift_latest': cl['cl_lift_lat']['sw2_lift'],
               'sw2_lift_asof': (cl['lift_asof'] or {}).get('sw2_lift'),
               'cl_sw2_lift_asof': (cl['cl_lift_asof'] or {}).get('sw2_lift'),
               'base_latest': cl['lift_lat']['base_same_sw2_rate']}
-    shadow_rows = build_shadow_rows(y, firms, cl, rep, pc, m1_obj)
+    shadow_rows = build_shadow_rows(y, firms, cl, rep, pc, pricing_obj)
     del C, detail
     return {'readout_rows': readout_rows, 'shadow_rows': shadow_rows, 'pc_summary': pc_summary,
             'matrix_check': chk, 'sec': round(time.time() - t0, 1)}
 
-def build_shadow_rows(y: int, firms: list, cl: dict, rep: dict, pc, m1_obj) -> list:
+def build_shadow_rows(y: int, firms: list, cl: dict, rep: dict, pc, pricing_obj) -> list:
     """逐 focal × 规则 → shadow CSV 行（原文规则 + 同团对照；PC 仅 2017–2022）。"""
     n = len(firms)
     labels = cl['labels']
@@ -643,9 +643,9 @@ def build_shadow_rows(y: int, firms: list, cl: dict, rep: dict, pc, m1_obj) -> l
                 int(peers_arr[i]), round(float(peers_arr[i] / max(1, n - 1)), 6),
                 (round(float(cnt_arr[i] / peers_arr[i]), 6) if peers_arr[i] > 0 else ''),
                 (round(float(thr[i]), 12) if rule == RULE_ORIG else ''),
-                m1_obj['sw2_lift_latest'] if rule == RULE_ORIG else m1_obj['cl_sw2_lift_latest'],
-                (m1_obj['sw2_lift_asof'] if rule == RULE_ORIG else m1_obj['cl_sw2_lift_asof']),
-                m1_obj['base_latest'], avail, hver, SOURCE_VERSION, ry,
+                pricing_obj['sw2_lift_latest'] if rule == RULE_ORIG else pricing_obj['cl_sw2_lift_latest'],
+                (pricing_obj['sw2_lift_asof'] if rule == RULE_ORIG else pricing_obj['cl_sw2_lift_asof']),
+                pricing_obj['base_latest'], avail, hver, SOURCE_VERSION, ry,
                 ('' if (pv is None or np.isnan(pv)) else round(float(pv), 8)),
                 ('' if (hv is None or np.isnan(hv)) else round(float(hv), 8)),
                 nrev, cov, status,
@@ -662,16 +662,16 @@ def sha_ledger_dir(d: Path) -> dict:
     return out
 
 def anchors_snapshot(tag: str) -> dict:
-    ledger = assert_m1_inputs()
+    ledger = assert_pricing_inputs()
     extra = {k: {'file': str(Path(v).relative_to(ROOT)).replace('\\', '/'), 'bytes': file_size(v)}
              for k, v in {'product_lexicon_v2_teacher': TEACHER_LEXICON,
                           'operating_revenue_annual': REVENUE_PKL,
                           'sw2_industry_latest': SW2_LATEST,
-                          'sw2_asof_map_p3shadow': ASOF_MAP_PARQUET}.items() if Path(v).is_file()}
+                          'sw2_asof_map_shadow': ASOF_MAP_PARQUET}.items() if Path(v).is_file()}
     snap = {
         'tag': tag, 'run_at': datetime.now(timezone.utc).isoformat(),
-        'm1_inputs_9': {r['input']: r['rows'] for r in ledger},
-        'm1_inputs_ledger': ledger,
+        'pricing_inputs_9': {r['input']: r['rows'] for r in ledger},
+        'pricing_inputs_ledger': ledger,
         'extra_inputs': extra,
         'headline_network_bytes': sha_ledger_dir(HEADLINE_NET),
         'p3asof_network_bytes': sha_ledger_dir(P3ASOF_NET) if P3ASOF_NET.is_dir() else {},
@@ -683,7 +683,7 @@ def anchors_snapshot(tag: str) -> dict:
 
 def compare_anchors(pre: dict, post: dict) -> dict:
     diffs = []
-    for sect in ('m1_inputs_9', 'extra_inputs', 'headline_network_bytes', 'p3asof_network_bytes'):
+    for sect in ('pricing_inputs_9', 'extra_inputs', 'headline_network_bytes', 'p3asof_network_bytes'):
         a, b = pre.get(sect) or {}, post.get(sect) or {}
         if isinstance(a, dict) and a and isinstance(list(a.values())[0], dict):
             a = {k: v.get('bytes') for k, v in a.items()}

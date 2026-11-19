@@ -1,4 +1,4 @@
-"""S3A CF MOM 复现诊断（三轮对抗 review S8 实证闭环，2026-08-12）。
+"""analyst-network CF MOM 复现诊断（三轮对抗 review 实证闭环，2026-08-12）。
 
 用法: python analyst_cf_mom_replication.py [weight=count|ln] [horizon=1|12]
   weight: count=共同分析师数行归一化（主口径）；ln=ln(1+count) 行归一化（Long et al. 2025）
@@ -9,7 +9,7 @@
   - horizon=1 : CF_ret(i,t-1) = sum_j w_ij * R(j,t-1)
   - horizon=12: CF_ret(i,t-1) = sum_j w_ij * cumret(j, t-12..t-2)（AH "12-month skipping most recent"）
   - 预测 focal 在 t 月的收益 R(i,t)；
-  - 每月横截面按 CF_ret 分 5 组，报告 EW/VW 未来收益、多空（P5-P1）与 t 统计（iid + NW L=1）。
+  - 每月横截面按 CF_ret 分 5 组，报告 EW/VW 未来收益、多空（高分位减低分位）与 t 统计（iid + NW L=1）。
 
 对照基准：
   - Jansen et al. 2021（IBES 稀疏）：CF MOM(1m) EW 0.46%/月 t=1.54 不显著
@@ -28,16 +28,20 @@ import numpy as np
 import yaml
 
 from analyst_meta import attach_meta
+from fileio import file_size
 
 EDGES = Path('data/processed/analyst/edges')
-SPEC = Path('configs/s3a_final_spec.yaml')
+SPEC = Path('configs/analyst_spec.yaml')
 _SPEC = yaml.safe_load(SPEC.read_text(encoding='utf-8'))
 RET = Path(_SPEC['inputs']['returns'])
 MEQ = Path(_SPEC['inputs']['market_equity'])
 OUT = Path('data/processed/analyst/cf_mom_replication.json')
 NET_VER = _SPEC['network']['primary_version']
 H12_MIN_AVAIL = int(_SPEC['horizon']['h12_min_available_months'])
-_SPEC_HASH = file_size(SPEC.read_bytes()).hexdigest()
+if not 1 <= H12_MIN_AVAIL <= 11:
+    # H12 窗口 t-12..t-2 共 11 个月：门槛大于 11 时过滤恒为空，h12 变体整体无产出
+    raise SystemExit(f'h12_min_available_months={H12_MIN_AVAIL} 超出 11 个月窗口，不可满足')
+_SPEC_HASH = file_size(SPEC)
 _INPUT_HASHES = _SPEC['provenance']['input_hashes']
 
 
@@ -157,6 +161,8 @@ def main():
         if len(rows) % 12 == 0:
             print(f"signal months done: {len(rows)} (at {pred_month})", flush=True)
 
+    if not rows:
+        raise SystemExit('CF 面板为空：无任何月份产出（检查 edges glob、收益月份覆盖与 H12 门槛）')
     panel = pd.concat(rows, ignore_index=True)
     # v2 修复（对抗检查 R2-2）：VW 权重改用形成期（cutoff 月）月末市值，
     # 不再用收益实现月（pred_month）月末市值，消除组合权重对当月收益的轻微前视。
@@ -194,10 +200,10 @@ def main():
         rec['ew_ls'] = rec['ew_q5'] - rec['ew_q1']
         rec['vw_ls'] = rec['vw_q5'] - rec['vw_q1']
         # CFRET2 诊断（AH Table 8 链接复杂度维度简化版）：高二阶 vs 低二阶组的未来收益差
-        s2 = sub.dropna(subset=['cfret2'])
-        if len(s2) >= 20:
-            med = s2['cfret2'].median()
-            rec['cfret2_hi_lo'] = s2[s2['cfret2'] >= med]['r_pred'].mean() - s2[s2['cfret2'] < med]['r_pred'].mean()
+        cm_sample = sub.dropna(subset=['cfret2'])
+        if len(cm_sample) >= 20:
+            med = cm_sample['cfret2'].median()
+            rec['cfret2_hi_lo'] = cm_sample[cm_sample['cfret2'] >= med]['r_pred'].mean() - cm_sample[cm_sample['cfret2'] < med]['r_pred'].mean()
         else:
             rec['cfret2_hi_lo'] = np.nan
         monthly.append(rec)

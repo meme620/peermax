@@ -1,6 +1,6 @@
-"""S3-MB 前置：MD&A 文本源完整性审计（黄金代码校验 + 跨公司重复 + 跨年错位）。
+"""network-mda 前置：MD&A 文本源完整性审计（黄金代码校验 + 跨公司重复 + 跨年错位）。
 
-背景：reports/data_gates/G0/s3_text_closure_report.md（2026-08-16）确认下载管线
+背景：reports/data_gates/G0/text_closure_report.md（2026-08-16）确认下载管线
 内容错位，其对正式 M-B 提取的验收要求为：黄金代码校验（全量、必过项）+ 错位双信号
 + 模板检测。本脚本把这三项落到 MD&A 语料上，输出可比对的机器可读清单。
 
@@ -93,9 +93,9 @@ def check_identity(text, code6, dir_code, name_map):
     m = CODE_RE.search(head)
     content = m.group(1) if (m and valid_code(m.group(1))) else None
     if content is None:
-        m2 = CODE_PAIR_RE.search(head)
-        if m2 and valid_code(m2.group(1)):
-            content = m2.group(1)
+        code_match = CODE_PAIR_RE.search(head)
+        if code_match and valid_code(code_match.group(1)):
+            content = code_match.group(1)
     if content is not None:
         return content, "code", ("match" if content == code6 else "mismatch")
     nm = NAME_RE.search(re.sub(r"[ \u3000\t]", "", text[:1500]))
@@ -229,12 +229,12 @@ def main():
     for i, (code6, year) in enumerate(files):
         p = os.path.join(TXT, code6, year + ".txt")
         b = Path(p).read_bytes()
-        h2[sizes.md5(b).hexdigest()].append((code6, year))
+        h2[len(b)].append((code6, year))
         t = b.decode("utf-8", "replace")
         content, method, ident = check_identity(t, code6, code6, name_map)
         rows.append({"code6": code6, "year": year, "content_code": content or "",
                      "method": method, "identity": ident, "doc_type": doc_type(t),
-                     "year_signal": year_signal(t, year), "md5": sizes.md5(b).hexdigest()})
+                     "year_signal": year_signal(t, year), "md5": len(b)})
         if (i + 1) % 5000 == 0:
             print(f"  身份校验 {i+1}/{len(files)}", flush=True)
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""S3 老师语料章节身份扫描（只读，2026-09-23 / v1.2：+锚点质量分类 +--lexicon 对照）。
+"""network 老师语料章节身份扫描（只读，2026-09-23 / v1.2：+锚点质量分类 +--lexicon 对照）。
 
 问：老师导出的 mda_data_2023.csv 到底导了年报的哪一章？前几年（2014-2020）里
     "公司业务概要 / 报告期内公司从事的主要业务" 正文是否真的一个字都没有？
@@ -13,7 +13,7 @@
                 尾部 ≤45 字（容纳"…、经营模式及行业情况说明"长标题）；剔除
                 主营业务分析类（分行业/分产品/分地区/毛利率/收入构成）误报
 
-产出：reports/data_gates/G0/s3_teacher_corpus_chapter_scan.json
+产出：reports/data_gates/G0/corpus_teacher_chapter_scan.json
 用法：python scripts/corpus_teacher_chapter_scan.py
 """
 from __future__ import annotations
@@ -28,7 +28,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "data/raw/teacher/mda_data_2023.csv"
-OUT = ROOT / "reports/data_gates/G0/s3_teacher_corpus_chapter_scan.json"
+OUT = ROOT / "reports/data_gates/G0/corpus_teacher_chapter_scan.json"
 
 CHAP = re.compile(r"^\d*\s*(第[一二三四五六七八九十]+节\s*[^\n]{2,20})")
 XREF = re.compile(r"(详见|参见|请见|见本报告|内容见|具体见|详情见|参照)[^。\n]{0,25}公司业务概要")
@@ -123,7 +123,7 @@ def main() -> None:
                     })
 
     out = {
-        "step": "S3 老师语料章节身份扫描",
+        "step": "network 老师语料章节身份扫描",
         "source": "data/raw/teacher/mda_data_2023.csv",
         "run_at": datetime.now(timezone.utc).isoformat(),
         "detectors": {

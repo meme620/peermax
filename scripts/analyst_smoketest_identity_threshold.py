@@ -1,8 +1,8 @@
-"""S3A smoketest C9：身份冲突阈值敏感性（TAIL_THRESHOLD ∈ {5,10,20}，2026-08-14）。
+"""analyst-network smoketest C9：身份冲突阈值敏感性（TAIL_THRESHOLD ∈ {5,10,20}，2026-08-14）。
 
 身份审计把次名字记录数 <= TAIL_THRESHOLD 的归为无害变体尾巴；阈值影响 conflict_ids 集合。
 本脚本复现 analyst_identity_audit.py 的分类逻辑，对比三个阈值下的冲突 ID 数量与记录占比
-（不重跑网络——S1 已证明 49 个 ID 影响仅 -0.36%，此处的量级估算足够）。
+（不重跑网络——inventory 已证明 49 个 ID 影响仅 -0.36%，此处的量级估算足够）。
 输出: data/processed/analyst/smoketest_identity_threshold.json
 """
 import json
@@ -61,7 +61,7 @@ def main():
         print(thr, json.dumps(out[f'tail_thr_{thr}']), flush=True)
     OUT.write_text(json.dumps({
         'note': 'TAIL_THRESHOLD 敏感性（2026-08-14）。主口径阈值=10（49 个冲突 ID）。'
-                'conflict_ids 数量变化对网络影响量级参考 S1：49 个 ID 影响 -0.36%（边）。',
+                'conflict_ids 数量变化对网络影响量级参考 inventory：49 个 ID 影响 -0.36%（边）。',
         'multi_name_ids': 311,
         'results': out,
     }, ensure_ascii=False, indent=2), encoding='utf-8')

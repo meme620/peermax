@@ -76,7 +76,7 @@ ipo_map = dict(zip(pd.read_csv('data/processed/firm_id_map.csv', dtype=str)['cod
                    pd.read_csv('data/processed/firm_id_map.csv', dtype=str)['ipo_date']))
 nfp = nf.loc['2020-06-30']
 nfp.index = w(nfp.index)
-ex = nfp[nfp].index
+ex = nfp[nfp.fillna(False)].index
 exp_rule = [c for c in ex if c in ipo_map and (pd.Timestamp('2020-06-30') - pd.Timestamp(ipo_map[c])).days < 30.4*6]
 out['new_stock_vs_ipo6m'] = {'flag_new': len(ex), 'within_6m': len(exp_rule), 'outside_6m': len(ex)-len(exp_rule)}
 print(f"E. new_stock flag(2020-06-30): flag={len(ex)} 家, 其中上市<6月={len(exp_rule)}, >6月={len(ex)-len(exp_rule)}", flush=True)

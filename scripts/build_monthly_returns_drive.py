@@ -1,11 +1,11 @@
-"""S1 全期月收益面板 builder（Drive raw close 派生，2026-09-03 审计 F5 持久化）。
+"""inventory 全期月收益面板 builder（Drive raw close 派生，2026-09-03 审计 F5 持久化）。
 
 重建 2026-08-29 全期化交付面板 `data/processed/monthly_returns_clean.csv`
 （交付时为一次性会话产物，builder 未落盘——本脚本即该补齐；首月 2000-02）。
 
 口径：
   - raw close 月末环比（close_none，不含分红；除权日断崖保留在 R 中，
-    见 s3a_report.md §3.3 除权口径注 / 审计报告 s3a_data_usage_review_20260903.md F2）
+    见 analyst_report.md §3.3 除权口径注 / 审计报告 analyst_data_usage_review_20260903.md F2）
   - 质量列契约沿用 build_monthly_returns.py：n_trading_days + monthly_return_status
     （PASS>=15d / CONDITIONAL 5-14d / BLOCKED <5d）。
     注意：交付 CSV 仅 firm_id,month,R 三列（未带质量列）——消费方若需质量
@@ -31,10 +31,14 @@ ROOT = Path(__file__).resolve().parents[1]
 DRIVE_PX = ROOT / "data/raw/drive/daily_close_none_20260630.pkl"
 SHIPPED = ROOT / "data/processed/monthly_returns_clean.csv"
 PX_POST = ROOT / "data/raw/drive/daily_adj_close_post_20260630.pkl"
-REPORT = ROOT / "reports/data_gates/G0/s2_return_convention.json"
+REPORT = ROOT / "reports/data_gates/G0/return_convention.json"
 CLIFF = -0.215  # A 股涨跌停制度下不可能的日跌幅，出现即为公司行为
 CONVENTIONS = {'post_adjusted': PX_POST, 'raw': DRIVE_PX}
-OUT = ROOT / "data/processed/monthly_returns_clean.csv"
+# 每个口径写自己的文件：后复权是 headine 交付面板，raw 只作敏感性（同名会互相覆盖）
+OUT_BY_CONVENTION = {
+    'post_adjusted': ROOT / "data/processed/monthly_returns_clean.csv",
+    'raw': ROOT / "data/processed/monthly_returns_clean_raw.csv",
+}
 
 
 def build(with_status: bool, convention: str = 'post_adjusted') -> pd.DataFrame:
@@ -93,10 +97,11 @@ def main() -> int:
     args = ap.parse_args()
     stats = cliff_stats(read_pickle(CONVENTIONS[args.convention]))
     out = build(args.with_status, args.convention)
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    out.to_csv(OUT, index=False)
+    out_path = OUT_BY_CONVENTION[args.convention]
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out.to_csv(out_path, index=False)
     write_report(args.convention, stats, len(out))
-    print(f"rebuilt rows={len(out)} convention={args.convention} -> {OUT}")
+    print(f"rebuilt rows={len(out)} convention={args.convention} -> {out_path}")
 
     # 独立对拍：后复权口径应与老师交付的 monthly_returns_adj.csv 逐位一致（不再与自身对账）
     teacher = ROOT / "data/raw/drive/monthly_returns_adj.csv"

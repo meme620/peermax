@@ -1,4 +1,4 @@
-"""表格数值格式化。函数体逐字搬自 p2_2/p2_3。"""
+"""表格数值格式化。函数体逐字搬自 shadow 脚本。"""
 
 from __future__ import annotations
 

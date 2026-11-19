@@ -1,4 +1,4 @@
-r"""S3A smoketest A1：A_code 格式校验 ^A\d{5}$ 的影响对比（2026-08-14）。
+r"""analyst-network smoketest A1：A_code 格式校验 ^A\d{5}$ 的影响对比（2026-08-14）。
 
 自设计：step5 剔除 6,600 行非法 A_code（'0'/'S31388'/'A3162' 等）。
 外部方案：不校验（直接使用全部 ok 记录）。
@@ -12,7 +12,7 @@ from collections import defaultdict
 import pandas as pd
 import numpy as np
 
-CLEAN = 'data/processed/analyst/s3a_step3_clean.csv'
+CLEAN = 'data/processed/analyst/analyst_step3_clean.csv'
 OUT = Path('data/processed/analyst/smoketest_a1_format_check.json')
 CUTOFFS = ['2018-06-30', '2021-06-30', '2024-06-30']
 

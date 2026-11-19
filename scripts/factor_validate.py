@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""S2.5 验收：factor_returns_daily 7 项检查 + MKT vs 沪深300 交叉（sensitivity）。
+"""factor 验收：factor_returns_daily 7 项检查 + MKT vs 沪深300 交叉（sensitivity）。
 
 检查：
   ① 设计矩阵 [1,MKT,SMB,HML,MOM] 满秩 5（高斯消元）

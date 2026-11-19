@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-"""S3A 9K 对照表生成（2026-09-01）：主口径 fy12(v3) vs nofy(v4) 网络层+结果层并排。
-读取双方 JSON 产物，输出 reports/data_gates/G0/s3a_9k_nofy_compare.{json,md}。
+"""analyst-network 9K 对照表生成（2026-09-01）：主口径 fy12(v3) vs nofy(v4) 网络层+结果层并排。
+读取双方 JSON 产物，输出 reports/data_gates/G0/analyst_nofy_compare.{json,md}。
 判读预案（execution plan Step 9·9K）：nofy 版 NPM EW 多空仍 ≥ Long 锚点 1.28 → "超锚点"
 不依赖 FY 口径；回落到锚点之下 → FY 严宽是显式边界条件，报告须改口。
 """
@@ -58,14 +58,14 @@ def main():
            'table': rows, 'verdict': verdict,
            'network_versions': {'fy12_v3': 'coverage_win12_fy12_v3', 'nofy_v4': 'coverage_win12_nofy_v4'}}
     attach_meta(out, __file__, 'coverage_win12_fy12_v3 + coverage_win12_nofy_v4')
-    (G / 's3a_9k_nofy_compare.json').write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding='utf-8')
+    (G / 'analyst_nofy_compare.json').write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding='utf-8')
     md = ['# 9K 对照表：FY1/FY2 主口径(v3) vs 不限 FY Long 口径(v4)\n',
           f"- Long 锚点：NPM EW 多空 {LONG_ANCHOR_PCT}%/月（t={LONG_ANCHOR_T}，CSMAR 2004-2022）",
           f"- 判读：**{verdict}**\n",
           '| 维度 | fy12_v3（主口径） | nofy_v4（Long=蒋等值） |', '|---|---|---|']
     for r in rows:
         md.append(f"| {r['dim']} | {r['fy12_v3']} | {r['nofy_v4']} |")
-    (G / 's3a_9k_nofy_compare.md').write_text('\n'.join(md) + '\n', encoding='utf-8')
+    (G / 'analyst_nofy_compare.md').write_text('\n'.join(md) + '\n', encoding='utf-8')
     print(verdict)
 
 

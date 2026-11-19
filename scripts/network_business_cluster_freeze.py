@@ -8,13 +8,13 @@ K 的选取沿用 τ 校准同一套"阶梯函数→网格命中区间"方法。
 v3（2026-09-28，Phase B″2/B″3）：加 `--corpus {self,teacher}` / `--lexicon` / `--target` /
 `--out-dir` / `--out-report` / `--years` 参数化。**算法、阈值与筛选一字未改**：
   - `--corpus self`（默认）= 历史口径：语料 business_texts.csv、目标 56、
-    聚类落 `data/processed/network_ma/clusters/`、报告落 `s3_b3_ma_param_freeze.json`；
+    聚类落 `data/processed/network_ma/clusters/`、报告落 `network_business_param_freeze.json`；
   - `--corpus teacher`（主口径，Phase B″3）= 语料 teacher_mda_panel.csv、目标 = registry
     `ma_k_target_teacher`（44）、聚类落 `data/processed/network_ma_teacher/clusters/`、
-    报告落 `s3_b3_ma_param_freeze_teacher.json`（**不覆盖历史自建证据**）。
+    报告落 `network_business_param_freeze_teacher.json`（**不覆盖历史自建证据**）。
 
-产物（self）：reports/data_gates/G0/s3_b3_ma_param_freeze.json
-产物（teacher）：reports/data_gates/G0/s3_b3_ma_param_freeze_teacher.json
+产物（self）：reports/data_gates/G0/network_business_param_freeze.json
+产物（teacher）：reports/data_gates/G0/network_business_param_freeze_teacher.json
 
 用法：
   python scripts/network_business_cluster_freeze.py                       # 历史 self 全 9 年
@@ -28,7 +28,7 @@ v5（2026-10-05，Phase B″10）：加 `--corpus teacher_idf`（同语料 IDF �
 后半段 SPECS / CLI / registry 目标读取（`corpus.startswith('teacher')` 共用 `ma_k_target_teacher=44`）
 各加一个条目；报告新增 `weighting` / `idf_formula` 字段，`decision` 段的"等权 0/1"标签按 weighting
 分支改写（IDF 产物不得自称等权）。`self` / `teacher` 的算法、阈值与输出字段一字未改。
-产物（teacher_idf）：`reports/data_gates/G0/s3_b3_ma_param_freeze_teacher_idf.json` +
+产物（teacher_idf）：`reports/data_gates/G0/network_business_param_freeze_teacher_idf.json` +
 `data/processed/network_ma_teacher_idf/clusters/`（主口径产物不被触碰）。
 
 v6（2026-10-11，第一梯队 ⑤ / B″11-8 df 阈值网格）：加 `--df-max`（词库按既有 `df_ratio` 列过滤，
@@ -42,13 +42,13 @@ v7（2026-10-13，第二梯队 #8 路线 A / B″11-4）：加 `--sim-adjust {no
 `sim_adj(i,j) = sim(i,j) − (m_i+m_j)/2`（HP16 PDF p.19；`m_i` = 全行含零相似对的相似度中位数，
 排除自身；**不裁剪负值**），聚类距离 `1 − sim_adj`（构造上 ∈[0,2] 非负，无需秩变换）。缺省
 `--sim-adjust none` 时向量、相似度、K 校准与全部输出字段与 v6 逐字节一致（回归门）。
-产物（teacher_medadj）：`reports/data_gates/G0/s3_b3_ma_param_freeze_teacher_medadj.json` +
+产物（teacher_medadj）：`reports/data_gates/G0/network_business_param_freeze_teacher_medadj.json` +
 `data/processed/network_ma_teacher_medadj/clusters/`（主口径产物不被触碰）。
 
 v8（2026-10-19，全文语料对表轮）：加语料条目 `ma_fulltext`（**中文法 × 年报全文**，对表语料敏感性列、
 **不升主口径**；registry `ma_fulltext_text_corpus` F0 前置登记 2026-10-19）：年份 = 对表可用文本年
 FY2017–FY2022；聚类落 `data/processed/network_ma_fulltext/clusters/`、报告落
-`s3_b3_ma_param_freeze_ma_fulltext.json`；K 目标 = registry `ma_k_target_teacher`（44，**不重标定**）、
+`network_business_param_freeze_ma_fulltext.json`；K 目标 = registry `ma_k_target_teacher`（44，**不重标定**）、
 df 阈值 0.25、等权 0/1、average linkage、筛选规则**一字未改**。向量走 `build_vectors` 的命中缓存分支
 （等价性见 `network_business_fulltext_cache_check.py`）。`self` / `teacher` / `teacher_idf` / `teacher_medadj`
 路径的算法、阈值与输出字段**逐字节不变**（回归门：非 `ma_fulltext` 语料不进入 `hits_dir` 分支；
@@ -78,28 +78,28 @@ SELF_TARGET = 56   # self 口径历史冻结值；teacher 系一律读 registry 
 SPECS = {
     'self': {'years': list(range(2017, 2026)),
              'out_dir': ROOT / 'data/processed/network_ma/clusters',
-             'report': REPD / 's3_b3_ma_param_freeze.json',
+             'report': REPD / 'network_business_param_freeze.json',
              'target_source': 'network_business_cluster_freeze.TARGET=56（历史冻结；对应 registry elbow_rule 文本）'},
     'teacher': {'years': list(range(2014, 2023)),
                 'out_dir': ROOT / 'data/processed/network_ma_teacher/clusters',
-                'report': REPD / 's3_b3_ma_param_freeze_teacher.json',
+                'report': REPD / 'network_business_param_freeze_teacher.json',
                 'target_source': 'registry ma_k_target_teacher（主口径 K 目标，Phase B″3）'},
     # Phase B″10：同语料 IDF 加权对照变体（不升主口径）——同语料/词表/筛选/算法，K 目标沿用 44
     'teacher_idf': {'years': list(range(2014, 2023)),
                     'out_dir': ROOT / 'data/processed/network_ma_teacher_idf/clusters',
-                    'report': REPD / 's3_b3_ma_param_freeze_teacher_idf.json',
+                    'report': REPD / 'network_business_param_freeze_teacher_idf.json',
                     'target_source': 'registry ma_k_target_teacher（与主口径同目标 44；IDF 变体不改目标）'},
     # 第二梯队 #8 路线 A：同语料 HP 式中位数调整变体（不升主口径）——同语料/词表/筛选/算法，K 目标沿用 44
     'teacher_medadj': {'years': list(range(2014, 2023)),
                        'out_dir': ROOT / 'data/processed/network_ma_teacher_medadj/clusters',
-                       'report': REPD / 's3_b3_ma_param_freeze_teacher_medadj.json',
+                       'report': REPD / 'network_business_param_freeze_teacher_medadj.json',
                        'target_source': 'registry ma_k_target_teacher（与主口径同目标 44；中位数调整变体不改目标）'},
     # 2026-10-19 全文语料对表轮（registry `ma_fulltext_text_corpus`，不升主口径）：
     # 语料 = 自建年报全文面板；年份 = 对表可用文本年 FY2017–FY2022（PC 需 y−1 年营收）；
     # K 目标沿用 ma_k_target_teacher=44（**不因语料切换重标定**）、df 阈值沿用 0.25、等权 0/1、average。
     'ma_fulltext': {'years': list(range(2017, 2023)),
                     'out_dir': ROOT / 'data/processed/network_ma_fulltext/clusters',
-                    'report': REPD / 's3_b3_ma_param_freeze_ma_fulltext.json',
+                    'report': REPD / 'network_business_param_freeze_ma_fulltext.json',
                     'target_source': 'registry ma_k_target_teacher（沿用主口径目标 44；对表语料敏感性列不重标定）'},
 }
 REGISTRY = ROOT / 'configs/parameter_registry.yaml'
@@ -148,7 +148,7 @@ def cluster_stats(labels, l2_idx, n_l2, base):
             'peer_p25': float(np.quantile(peers, .25)), 'peer_p90': float(np.quantile(peers, .9)),
             'isolated_share': round(float((peers == 0).mean()), 4),
             'n_clusters': int(len(ks)), 'size_median': float(np.median(sizes)),
-            'size_max': int(file_size()), 'size_p90': float(np.quantile(sizes, .9)),
+            'size_max': int(sizes.max()), 'size_p90': float(np.quantile(sizes, .9)),
             'same_sw2_edge_share': round(same / max(1, tot), 4),
             'sw2_lift': round((same / max(1, tot)) / max(1e-9, base), 2)}
 
@@ -237,7 +237,7 @@ def main():
     # 代码不再携带读数；逐年值以档案产物为准。
     if args.corpus == 'teacher':
         rep['per_year_calibration_ref'] = {
-            'archive': 'reports/data_gates/G0/s3_b3_ma_param_freeze_teacher.json',
+            'archive': 'reports/data_gates/G0/network_business_param_freeze_teacher.json',
             'fields': ['target_median_peer_y', 'sw2_median_peer_y', 'realized_median_peer_y', 'K_y', 'K_mode'],
             'note': '逐年值以档案产物为准；代码只写指针，不复制读数',
         }
@@ -247,7 +247,7 @@ def main():
         'peer_fields': ['peer_median', 'peer_mean', 'peer_p25', 'peer_p90', 'isolated_share'],
         'sw2_lift_rule': '同团同申万二级无序对数 / 同团全部无序对数 / 同样本边际基线',
         'sw2_lift_fields': ['same_sw2_edge_share', 'sw2_lift'],
-        'not_comparable_to': 's3_b3_ma_cluster_grid*.json / s3_ma_K_explore.json 的同名字段'
+        'not_comparable_to': 'network_business_cluster_grid*.json / network_business_k_explore.json 的同名字段'
                              '（原文阈值法：sim > 团内最小相似度）',
         'phase0_3_note': '2026-10-27 Phase 0.3 口径注记；未改任何数值、未重跑网络',
     }
@@ -308,7 +308,7 @@ def main():
         'cluster_linkage': args.linkage,
         'elbow_rule': f'per_year_target_peer_match（目标中位 peer={target}，K 逐年记录；'
                       '原拟肘点法实测不识别：K-lift 与 K-peer 曲线单调无拐点）',
-        'competitor_set_rule': 'same_cluster_members（团内最小相似度阈值法实测退化，见 s3_ma_K_explore.json）',
+        'competitor_set_rule': 'same_cluster_members（团内最小相似度阈值法实测退化，见 network_business_k_explore.json）',
         'min_product_terms': 10,
         'ma_sample_filter': '排除证监会 J（金融）/S（综合）门类 + 上市不足 2 年',
         'anti_drift_evidence': '固定 K=500 时逐年中位 peer 13→188、lift 10.84→2.08；逐年校准后见各年记录',

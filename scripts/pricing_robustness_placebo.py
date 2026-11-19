@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""A9：M1 稳健性与 placebo（Phase A 复核修复批）。
+"""A9：pricing_gate 稳健性与 placebo（Phase A 复核修复批）。
 
-规格（plan §5.7A P3.5，每规格独立 specification_id）：
+规格（plan §5.7A，每规格独立 specification_id）：
   raw/post-adjusted、ST 分层、limit-hit 分层、规模/流动性分层、MA/MB 四列、
   equal/linear/log_sim 权重、同密度随机网络（匹配 peer 数与权重分布）、时间错位网络。
 
@@ -11,11 +11,11 @@
       （宇宙 = 该规格 FM 分析行集）；修正前这些列是未 winsorize 值，与主规格口径不对称。
       宇宙说明：主规格列在面板构造期按面板宇宙 winsorize（可复现 max|Δ|=0），此处按规格 FM 行集
       计算边界（同规则不同宇宙），故 linear 变体与主规格 β 差 <5e-4（实测 2.84e-4；方向/显著性一致）。
-  I3  headline 样本 = m1_s5_v2_2015_2023；v1（未施加 microcap 筛除）作敏感性并报
+  I3  headline 样本 = pricing_sample_v2_2015_2023；v1（未施加 microcap 筛除）作敏感性并报
   I4  经济量级统一用 treatment-only 池化登记值 IQR_POOL_REGISTERED；各规格自身 IQR 仅诊断
   I6  退化规格（空层 / 全月低于 min_focal_count_per_month）写 spec_status=NOT_COMPUTABLE + reason，
       不再只写 spec_beta=null；ST 分层用 focal 侧 Drive ST 标记（代码格式映射缺陷已修复）
-产出：reports/data_gates/G0/s3_m1_robustness_placebo.json
+产出：reports/data_gates/G0/pricing_robustness_placebo.json
 用法：python scripts/pricing_robustness_placebo.py
 """
 from __future__ import annotations
@@ -27,9 +27,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from pricing_lib import IQR_POOL_REGISTERED, M1_SAMPLE_VERSION_V1, M1_SAMPLE_VERSION_V2, M1_SAMPLE_VERSION_V3, M1_SAMPLE_VERSION_V4, NET_DIRS, OUT_DIR, ROOT, SAMPLE_DIR, aggregate_edges, clip_by_month, fm_regression, load_edges, load_returns_raw, load_src_month, load_support, param_value, progress, rank_average_groups, sample_path, write_json
+from pricing_lib import IQR_POOL_REGISTERED, SAMPLE_VERSION_V1, SAMPLE_VERSION_V2, SAMPLE_VERSION_V3, SAMPLE_VERSION_V4, NET_DIRS, OUT_DIR, ROOT, SAMPLE_DIR, SAMPLE_VERSION_LABEL, aggregate_edges, clip_by_month, fm_regression, load_edges, load_returns_raw, load_src_month, load_support, param_value, progress, rank_average_groups, sample_path, write_json
 
-P = param_value('m1_sample_and_spec_registry')
+P = param_value('sample_and_spec_registry')
 NW_LAG = int(param_value('nw_lag'))
 MIN_N = P['min_focal_count_per_month']
 MIN_MONTHS = P['min_effective_month_count']
@@ -38,9 +38,9 @@ CONTROLS = ['size', 'bm', 'mom', 'rev', 'turnover', 'illiq', 'AnalystCoverage', 
 MAIN = ['PeerMAXraw', 'OwnMAXraw', 'PeerReturn'] + CONTROLS
 COLUMNS = ['ma_teacher', 'mb_teacher', 'ma', 'mb']
 KEEP = ['focal_id', 'month', 'PeerMAXraw', 'OwnMAXraw', 'PeerReturn', 'R_next', 'R_next_postadj',
-        'm1_in_fm_sample', 'st_flag_focal', 'limit_hit_max_stratum', 'market_equity'] + CONTROLS
-WINSORIZED_SPECS = ['m1_weight_equal', 'm1_weight_linear', 'm1_weight_logsim',
-                    'm1_placebo_random', 'm1_placebo_timeshift']
+        'pricing_in_fm_sample', 'st_flag_focal', 'limit_hit_max_stratum', 'market_equity'] + CONTROLS
+WINSORIZED_SPECS = ['pricing_weight_equal', 'pricing_weight_linear', 'pricing_weight_logsim',
+                    'pricing_placebo_random', 'pricing_placebo_timeshift']
 
 
 def summarise(res, iqr, xcol='PeerMAXraw', n_rows=None):
@@ -89,7 +89,7 @@ def aggregate_version(key, text_year, months, srcm, edges=None, wcol='weight', r
 
 
 def random_edges(key, text_year):
-    """M1_RANDOM_DENSITY_NETWORK_v1：保留 peer 数与权重向量，随机重指派 source。"""
+    """PRICING_RANDOM_DENSITY_NETWORK_v1：保留 peer 数与权重向量，随机重指派 source。"""
     e = load_edges(key, int(text_year))
     sup = load_support(key, int(text_year))
     nodes = np.array(sorted(set(sup['focal_id'].astype(str)) | set(e['focal_id']) | set(e['source_id'])))
@@ -120,9 +120,116 @@ def spec_frame(fm: pd.DataFrame, merge_df: pd.DataFrame, pxcol: str, prcol: str,
     return sub
 
 
+PLACEBO_DRAWS = int(param_value('placebo_draws'))
+
+
+
+def permuted_peer_max(edges: pd.DataFrame, vals: pd.DataFrame, rng, draws: int,
+                      ind: pd.DataFrame | None = None) -> pd.DataFrame:
+    """R 次置换后的 PeerMAX 伪列：返回 (draw, focal_id, month, px)。
+
+    无 ind：每个 focal 内部对 source 指派做无放回置换（peer 数与权重不变）。
+    给了 ind：改为「(month, 申万一级) 内打乱 MAX 取值」——零模型因此保留真实的
+    行业构成（每个行业-月的取值池不变），只打断"谁是谁的 peer"。
+    """
+    if ind is not None:
+        v = vals.merge(ind.rename(columns={'firm_id': 'peer_id'}), on='peer_id', how='left')
+        v = v[v['l1_code'].notna()]
+        e = edges.rename(columns={'source_id': 'peer_id'})[['focal_id', 'peer_id', 'weight']]
+        frames = []
+        for k in range(draws):
+            shuf = v.copy()
+            shuf['MAXraw'] = (shuf.groupby(['month', 'l1_code'])['MAXraw']
+                                 .transform(lambda s: s.sample(frac=1.0, random_state=rng.integers(1 << 31))
+                                            .to_numpy()))
+            j = e.merge(shuf[['peer_id', 'month', 'MAXraw']], on='peer_id', how='inner')
+            if j.empty:
+                continue
+            j['wx'] = j['weight'].astype(float) * j['MAXraw'].astype(float)
+            agg = (j.groupby(['focal_id', 'month'], sort=False)['wx'].sum()
+                     .reset_index().rename(columns={'wx': 'px'}))
+            agg['draw'] = k
+            frames.append(agg)
+        if not frames:
+            return pd.DataFrame(columns=['draw', 'focal_id', 'month', 'px'])
+        return pd.concat(frames, ignore_index=True)
+
+    e = edges.rename(columns={'source_id': 'peer_id'})[['focal_id', 'peer_id', 'weight']]
+    v = vals[['firm_id', 'month', 'MAXraw']].rename(columns={'firm_id': 'peer_id'})
+    groups = [g for _, g in e.groupby('focal_id', sort=False)]
+    frames = []
+    for k in range(draws):
+        parts = []
+        for g in groups:
+            gg = g.copy()
+            gg['peer_id'] = rng.permutation(gg['peer_id'].to_numpy())
+            parts.append(gg)
+        perm = pd.concat(parts, ignore_index=True)
+        j = perm.merge(v, on='peer_id', how='inner')
+        if j.empty:
+            continue
+        j['wx'] = j['weight'].astype(float) * j['MAXraw'].astype(float)
+        agg = (j.groupby(['focal_id', 'month'], sort=False)['wx'].sum()
+                 .reset_index().rename(columns={'wx': 'px'}))
+        agg['draw'] = k
+        frames.append(agg)
+    if not frames:
+        return pd.DataFrame(columns=['draw', 'focal_id', 'month', 'px'])
+    return pd.concat(frames, ignore_index=True)
+
+
+def placebo_distribution(fm: pd.DataFrame, edges: pd.DataFrame, vals: pd.DataFrame,
+                         base_beta=None, draws: int = PLACEBO_DRAWS,
+                         seed: int = SEED, ind: pd.DataFrame | None = None) -> dict:
+    """R 次置换 placebo 的 β 分布与经验 p（design.inference.placebo 的执行面）。
+
+    每次 draw 用置换后的 PeerMAX 重估主规格（同控制、同 NW、同 winsorize），
+    经验 p = (1 + #{β_k <= β_real}) / (R + 1)。
+    """
+    rng = np.random.default_rng(seed)
+    perm = permuted_peer_max(edges, vals, rng, draws, ind=ind)
+    betas = []
+    n_rows = []
+    for k, g in perm.groupby('draw', sort=True):
+        # 只替换 treatment（PeerMAXraw）；PeerReturn 保持真实值，置换的只有「谁是谁的 peer」
+        d = fm.merge(g[['focal_id', 'month', 'px']], on=['focal_id', 'month'], how='left')
+        sub = d[d['px'].notna()].copy()
+        if sub.empty:
+            continue
+        sub = clip_by_month(sub, ['px'])
+        sub['PeerMAXraw'] = sub['px']
+        sub = sub.drop(columns=['px'])
+        if len(sub) < MIN_N:
+            continue
+        res, _ = fm_regression(sub, 'R_next', MAIN, min_n=MIN_N, nw_lag=NW_LAG)
+        b = (res['coefs'].get('PeerMAXraw') or {}).get('beta')
+        if b is not None:
+            betas.append(float(b))
+            n_rows.append(int(len(sub)))
+    arr = np.asarray(betas, dtype=float)
+    out = {'draws_requested': int(draws), 'draws_usable': int(arr.size),
+           'seed': int(seed), 'base_beta': base_beta,
+           'n_rows_median': float(np.median(n_rows)) if n_rows else None}
+    if arr.size == 0:
+        out.update({'status': 'NOT_COMPUTABLE', 'empirical_p': None})
+        return out
+    emp_p = None if base_beta is None else float((1 + int((arr <= base_beta).sum())) / (arr.size + 1))
+    out.update({
+        'status': 'COMPUTED',
+        'beta_mean': float(arr.mean()), 'beta_sd': float(arr.std(ddof=1)) if arr.size > 1 else None,
+        'beta_q05': float(np.quantile(arr, 0.05)), 'beta_q50': float(np.quantile(arr, 0.50)),
+        'beta_q95': float(np.quantile(arr, 0.95)),
+        'beta_min': float(arr.min()), 'beta_max': float(arr.max()),
+        'empirical_p': emp_p,
+        'reading': ('经验 p 为单侧「置换后 β 不大于真实 β 的比例」；用于判断真实网络的 β 是否'
+                    '落在随机指派分布内，不构成网络特异性证据'),
+    })
+    return out
+
+
 def parse_args(argv=None):
-    ap = argparse.ArgumentParser(description='A9：M1 稳健性与 placebo')
-    ap.add_argument('--sample-version', choices=['v1', 'v2', 'v3', 'v4'], default='v2',
+    ap = argparse.ArgumentParser(description='A9：pricing_gate 稳健性与 placebo')
+    ap.add_argument('--sample-version', choices=['v1', 'v2', 'v3', 'v4'], default=SAMPLE_VERSION_LABEL,
                     help='headline 样本版本（默认 v2，行为不变）；v3/v4 为 W1 CLI 支持')
     return ap.parse_args(argv)
 
@@ -130,21 +237,21 @@ def parse_args(argv=None):
 def main(argv=None):
     args = parse_args(argv)
     ver = args.sample_version
-    ver_id = {'v1': M1_SAMPLE_VERSION_V1, 'v2': M1_SAMPLE_VERSION_V2,
-              'v3': M1_SAMPLE_VERSION_V3, 'v4': M1_SAMPLE_VERSION_V4}[ver]
+    ver_id = {'v1': SAMPLE_VERSION_V1, 'v2': SAMPLE_VERSION_V2,
+              'v3': SAMPLE_VERSION_V3, 'v4': SAMPLE_VERSION_V4}[ver]
     progress(f'A9 开始：稳健性与 placebo（headline={ver_id}；I1 winsorize 修正 + I6 状态）')
     srcm = load_src_month()
     ret_raw = load_returns_raw()
     base = pd.read_parquet(sample_path('ma_teacher', ver))
-    fm = base[base['m1_in_fm_sample'].astype(bool)][KEEP].copy()
-    out = {'spec_id': 'm1_robustness_placebo_v1', 'sample_version': ver_id,
-           'sample_version_v1_superseded': M1_SAMPLE_VERSION_V1,
+    fm = base[base['pricing_in_fm_sample'].astype(bool)][KEEP].copy()
+    out = {'spec_id': 'pricing_robustness_placebo_v1', 'sample_version': ver_id,
+           'sample_version_v1_superseded': SAMPLE_VERSION_V1,
            'iqr_pool_registered': IQR_POOL_REGISTERED,
            'random_seed': SEED, 'specs': {}, 'v1_sensitivity': {},
            'main_column': 'ma_teacher（主口径，主表列）',
-           'outcome': 'raw 主口径（m1_rob_postadj 为后复权敏感性，raw 仍主表）',
-           'four_column_reporting': 'm1_rob_col_{ma_teacher,mb_teacher,ma,mb} 四列并报；'
-                                    '各列角色见 m1_rob_col_* 规格的 note 与 s3_m1_pricing_table.json:column_roles',
+           'outcome': 'raw 主口径（pricing_rob_postadj 为后复权敏感性，raw 仍主表）',
+           'four_column_reporting': 'pricing_rob_col_{ma_teacher,mb_teacher,ma,mb} 四列并报；'
+                                    '各列角色见 pricing_rob_col_* 规格的 note 与 pricing_table.json:column_roles',
            'winsorization': {
                'rule': 'registry winsorization_pct = [0.01,0.99] 月度截面',
                'i1_fix': ('权重变体（equal/linear/log_sim）与 placebo（random/timeshift）在 merge 后'
@@ -173,16 +280,16 @@ def main(argv=None):
 
     # 1) raw 主（参照）+ 后复权
     r, _ = fm_regression(fm, 'R_next', MAIN, min_n=MIN_N, nw_lag=NW_LAG)
-    add('m1_rob_raw', r, IQR_POOL_REGISTERED, 'raw 主口径（参照）', {'n_rows': int(len(fm))})
+    add('pricing_rob_raw', r, IQR_POOL_REGISTERED, 'raw 主口径（参照）', {'n_rows': int(len(fm))})
     fmp = fm[fm['R_next_postadj'].notna()]
     r, _ = fm_regression(fmp, 'R_next_postadj', MAIN, min_n=MIN_N, nw_lag=NW_LAG)
-    add('m1_rob_postadj', r, IQR_POOL_REGISTERED, 'R_NEXT_POST_ADJ_v1（后复权敏感性；raw 仍主口径）',
+    add('pricing_rob_postadj', r, IQR_POOL_REGISTERED, 'R_NEXT_POST_ADJ_v1（后复权敏感性；raw 仍主口径）',
         {'n_rows': int(len(fmp))})
 
     # 2) ST 分层（focal 侧 Drive ST 标记）
     for lab, sub in [('st', fm[fm['st_flag_focal']]), ('non_st', fm[~fm['st_flag_focal']])]:
         r, _ = fm_regression(sub, 'R_next', MAIN, min_n=MIN_N, nw_lag=NW_LAG)
-        add(f'm1_rob_{lab}', r, IQR_POOL_REGISTERED, f'ST 分层：{lab}（focal 侧 Drive stock_st_flag）',
+        add(f'pricing_rob_{lab}', r, IQR_POOL_REGISTERED, f'ST 分层：{lab}（focal 侧 Drive stock_st_flag）',
             {'n_rows': int(len(sub)),
              'st_source_note': 'Drive stock_st_flag 当月曾 ST 即标 1；代码格式映射缺陷已于 2026-10-10 修复'})
 
@@ -190,7 +297,7 @@ def main(argv=None):
     for lab in ['all_non_limit', 'mixed', 'all_limit']:
         sub = fm[fm['limit_hit_max_stratum'] == lab]
         r, _ = fm_regression(sub, 'R_next', MAIN, min_n=MIN_N, nw_lag=NW_LAG)
-        add(f'm1_rob_limit_{lab}', r, IQR_POOL_REGISTERED, f'limit-hit 分层：{lab}', {'n_rows': int(len(sub))})
+        add(f'pricing_rob_limit_{lab}', r, IQR_POOL_REGISTERED, f'limit-hit 分层：{lab}', {'n_rows': int(len(sub))})
 
     # 4) 规模 / 流动性分层（月内三分位）
     for var, name in [('market_equity', 'size'), ('illiq', 'liq')]:
@@ -198,26 +305,26 @@ def main(argv=None):
         for k, lab in [(1, 'low'), (3, 'high')]:
             sub = fm[g == k]
             r, _ = fm_regression(sub, 'R_next', MAIN, min_n=MIN_N, nw_lag=NW_LAG)
-            add(f'm1_rob_{name}_{lab}', r, IQR_POOL_REGISTERED, f'{name} 三分位分层（{lab}）',
+            add(f'pricing_rob_{name}_{lab}', r, IQR_POOL_REGISTERED, f'{name} 三分位分层（{lab}）',
                 {'n_rows': int(len(sub))})
 
     # 5) 四列并报（同规格；各列面板已 winsorize）
     for key in COLUMNS:
         d = pd.read_parquet(sample_path(key, ver))
-        d = d[d['m1_in_fm_sample'].astype(bool)]
+        d = d[d['pricing_in_fm_sample'].astype(bool)]
         r, _ = fm_regression(d, 'R_next', MAIN, min_n=MIN_N, nw_lag=NW_LAG)
-        add(f'm1_rob_col_{key}', r, IQR_POOL_REGISTERED, f'四列并报：{key}（{out["column_roles"][key]}）',
+        add(f'pricing_rob_col_{key}', r, IQR_POOL_REGISTERED, f'四列并报：{key}（{out["column_roles"][key]}）',
             {'n_rows': int(len(d)), 'winsorized': 'panel_construction'})
 
     # 6) 权重规则（固定边集）：equal / linear / log_sim（I1：merge 后同规则 winsorize）
-    wv = pd.read_parquet(SAMPLE_DIR / 'm1_weight_variants_ma_teacher.parquet')
+    wv = pd.read_parquet(SAMPLE_DIR / 'pricing_weight_variants_ma_teacher.parquet')
     for lab, pmax, pret in [('equal', 'PeerMAXraw_weq', 'PeerReturn_weq'),
                             ('linear', 'PeerMAXraw_wlin', 'PeerReturn_wlin'),
                             ('logsim', 'PeerMAXraw_wlog', 'PeerReturn_wlog')]:
         sub = spec_frame(fm, wv, pmax, pret, winsorize=True)
         iqr_w = float(sub['PeerMAXraw'].quantile(.75) - sub['PeerMAXraw'].quantile(.25))
         r, _ = fm_regression(sub, 'R_next', MAIN, min_n=MIN_N, nw_lag=NW_LAG)
-        add(f'm1_weight_{lab}', r, IQR_POOL_REGISTERED, f'P2.2 权重规则：w_{"log_sim" if lab == "logsim" else lab}',
+        add(f'pricing_weight_{lab}', r, IQR_POOL_REGISTERED, f'权重规则：w_{"log_sim" if lab == "logsim" else lab}',
             {'n_rows': int(len(sub)), 'weight_rule': lab, 'winsorized': 'spec_fm_universe_[0.01,0.99]',
              'iqr_pool_sample_diagnostic': iqr_w,
              'formula_note': 'w_log_sim = log(1+s) 归一化，**不是** Long 的 ln(1+n) 权重'})
@@ -226,8 +333,8 @@ def main(argv=None):
     panel = pd.read_parquet(sample_path('ma_teacher', ver))
     ver = (panel[['month', 'network_version']].dropna().drop_duplicates())
     ver['text_year'] = pd.to_numeric(ver['network_version'], errors='coerce').astype(int)
-    cache_rand = ROOT / 'artifacts/tmp/m1_cache_placebo_random.parquet'
-    cache_shift = ROOT / 'artifacts/tmp/m1_cache_placebo_timeshift.parquet'
+    cache_rand = ROOT / 'artifacts/tmp/pricing_cache_placebo_random.parquet'
+    cache_shift = ROOT / 'artifacts/tmp/pricing_cache_placebo_timeshift.parquet'
     rand_parts, shift_parts = [], []
     if cache_rand.exists() and cache_shift.exists():
         rand = pd.read_parquet(cache_rand)
@@ -255,8 +362,8 @@ def main(argv=None):
         shift.to_parquet(cache_shift, index=False)
 
     for sid, merge_df, note in [
-            ('m1_placebo_random', rand, 'M1_RANDOM_DENSITY_NETWORK_v1：保留 peer 数与权重向量、随机重指派 source（seed=random_seed；不做行业保持）'),
-            ('m1_placebo_timeshift', shift, 'M1_TIME_SHIFTED_NETWORK_v1：改用上一文本年网络版本重算 PeerMAXraw/PeerReturn')]:
+            ('pricing_placebo_random', rand, 'PRICING_RANDOM_DENSITY_NETWORK_v1：保留 peer 数与权重向量、随机重指派 source（seed=random_seed；不做行业保持）'),
+            ('pricing_placebo_timeshift', shift, 'PRICING_TIME_SHIFTED_NETWORK_v1：改用上一文本年网络版本重算 PeerMAXraw/PeerReturn')]:
         col = 'PeerMAXrand' if sid.endswith('random') else 'PeerMAXshift'
         rcol = 'PeerReturnrand' if sid.endswith('random') else 'PeerReturnshift'
         sub = spec_frame(fm, merge_df, col, rcol, winsorize=True)
@@ -269,8 +376,8 @@ def main(argv=None):
              'iqr_pool_sample_diagnostic': iqr_p})
 
     # 7b) I1 交叉核验：linear 变体 vs 主规格（同规则、宇宙差异）
-    lin = out['specs']['m1_weight_linear']
-    raw = out['specs']['m1_rob_raw']
+    lin = out['specs']['pricing_weight_linear']
+    raw = out['specs']['pricing_rob_raw']
     out['winsorize_crosscheck'] = {
         'main_spec_beta': raw['spec_beta'], 'weight_linear_beta': lin['spec_beta'],
         'abs_diff': (None if (raw['spec_beta'] is None or lin['spec_beta'] is None)
@@ -282,27 +389,86 @@ def main(argv=None):
                               'note': '未 winsorize 的旧值（v1 样本，2026-10-10 复核复核实测）；'
                                       'v1 样本下修正后 placebo random = −0.06801（t=−2.41，与复核一致）、'
                                       'weight_linear = +0.02577（主规格 v1 = +0.02583）',
-                              'source': 'archive/phaseA_v1_tables_20261010/s3_m1_robustness_placebo.json'},
+                              'source': 'archive/phaseA_v1_tables_20261010/pricing_robustness_placebo.json'},
     }
     out['placebo_comparison'] = {
-        'real_network': {'spec': 'm1_rob_raw', 'beta': raw['spec_beta'], 't_nw': raw['t_nw']},
-        'random_network': {k: out['specs']['m1_placebo_random'][k] for k in ('spec_beta', 't_nw', 'n_months_used')},
-        'timeshift_network': {k: out['specs']['m1_placebo_timeshift'][k] for k in ('spec_beta', 't_nw', 'n_months_used')},
-        'reading': '随机网络（I1 修正后）β 强于真实网络 → 描述性关联不构成网络特异性证据（与 Phase A 结论一致）。',
+        'real_network': {'spec': 'pricing_rob_raw', 'beta': raw['spec_beta'], 't_nw': raw['t_nw']},
+        'random_network': {k: out['specs']['pricing_placebo_random'][k] for k in ('spec_beta', 't_nw', 'n_months_used')},
+        'timeshift_network': {k: out['specs']['pricing_placebo_timeshift'][k] for k in ('spec_beta', 't_nw', 'n_months_used')},
+        'reading': (lambda br, bn: (
+            '随机网络 β 强于真实网络 → 描述性关联不构成网络特异性证据'
+            if (br is not None and bn is not None and abs(bn) >= abs(br))
+            else '随机网络 β 未强于真实网络；方向不能由本对照读出，结论以置换分布的经验 p 为准'))(
+            out['specs']['pricing_rob_raw']['spec_beta'],
+            out['specs']['pricing_placebo_random']['spec_beta']),
     }
+
+    # 7c) placebo 置换分布（design.inference.placebo 的 R 次执行面）
+    prog_note = []
+    dist_parts = []
+    vals_max = srcm[['source_id', 'month', 'MAXraw']].rename(columns={'source_id': 'firm_id'})
+    # 行业保持的零模型需要申万一级：置换成「(month, 行业) 内打乱 MAX 取值」，
+    # 每个行业-月的取值池不变，只打断"谁是谁的 peer"。
+    from pricing_lib import load_sw2
+    sw2 = load_sw2()
+    for ty, grp in ver.groupby('text_year', sort=True):
+        months = sorted(grp['month'])
+        edges_ty = load_edges('ma_teacher', int(ty))
+        d = placebo_distribution(fm[fm['month'].isin(months)], edges_ty, vals_max,
+                                 base_beta=raw['spec_beta'],
+                                 draws=max(1, PLACEBO_DRAWS // max(1, len(ver))),
+                                 seed=SEED + int(ty), ind=sw2)
+        d['text_year'] = int(ty)
+        dist_parts.append(d)
+        prog_note.append(f'{ty}: {d.get("draws_usable")}/{d.get("draws_requested")}')
+        progress(f'A9 placebo 置换分布 文本年 {ty}：{d.get("status")}（{d.get("draws_usable")} draws）')
+    out['placebo_distribution'] = {
+        'draws_registered': PLACEBO_DRAWS,
+        'draws_per_year': max(1, PLACEBO_DRAWS // max(1, len(ver))),
+        'by_text_year': dist_parts,
+        'note': ('每文本年做 draws_per_year 次 source 置换（同 peer 数、同权重、随机重指派），'
+                 '逐月 FM 后汇总 β 分布；经验 p=(1+#{β_k<=β_real})/(R+1)。'
+                 '全样本置换另见 placebo_comparison.random_network（单次，保留作对照）。'),
+    }
+
+# 7d) ex-grace 伴生规格（CO-2026-11-19-parameters）：用 MAXraw_la 口径重估主规格
+    panel_path = ROOT / 'data/processed/monthly_pricing_panel_ma_teacher_v4.csv'
+    exgr_note = 'NOT_AVAILABLE：面板未落盘或缺 PeerMAXraw_la'
+    if panel_path.is_file():
+        pan = pd.read_csv(panel_path, usecols=['focal_id', 'month', 'PeerMAXraw_la'],
+                          dtype={'focal_id': str, 'month': str})
+        pan = pan.rename(columns={'PeerMAXraw_la': 'PeerMAXraw_la_col'})
+        d = fm.merge(pan, on=['focal_id', 'month'], how='left')
+        sub = d[d['PeerMAXraw_la_col'].notna()].copy()
+        if sub.empty:
+            exgr_note = 'NOT_COMPUTABLE：交集样本 0 行'
+        else:
+            sub = clip_by_month(sub, ['PeerMAXraw_la_col'])
+            sub['PeerMAXraw'] = sub['PeerMAXraw_la_col']
+            sub = sub.drop(columns=['PeerMAXraw_la_col'])
+            r_la, _ = fm_regression(sub, 'R_next', MAIN, min_n=MIN_N, nw_lag=NW_LAG)
+            add('pricing_rob_exgr', r_la, IQR_POOL_REGISTERED,
+                'PRICING_EX_GRACE_v1：MAXraw_la（剔上市后前 listing_grace_days 个交易日）口径',
+                {'n_rows': int(len(sub)), 'rows_dropped_vs_headline': int(len(fm) - len(sub)),
+                 'gate_bearing': False,
+                 'note': '与主规格同一批行（仅重算 treatment），差异只来自 MAX 定义'})
+            exgr_note = 'COMPUTED'
+    else:
+        out['pricing_rob_exgr_status'] = exgr_note
+        progress(f'A9 ex-grace 规格：{exgr_note}（缺 {panel_path.name}）')
 
     # 8) v1 敏感性（未施加 microcap 筛除）
     base1 = pd.read_parquet(sample_path('ma_teacher', 'v1'))
-    fm1 = base1[base1['m1_in_fm_sample'].astype(bool)][KEEP].copy()
+    fm1 = base1[base1['pricing_in_fm_sample'].astype(bool)][KEEP].copy()
     r, _ = fm_regression(fm1, 'R_next', MAIN, min_n=MIN_N, nw_lag=NW_LAG)
-    add('m1_rob_raw', r, IQR_POOL_REGISTERED, 'v1（未施加 microcap 筛除）raw 主口径',
+    add('pricing_rob_raw', r, IQR_POOL_REGISTERED, 'v1（未施加 microcap 筛除）raw 主口径',
         {'n_rows': int(len(fm1)), 'status_note': 'v1_superseded_registered_deviation'}, target=out['v1_sensitivity'])
     sub1 = spec_frame(fm1, wv, 'PeerMAXraw_wlin', 'PeerReturn_wlin', winsorize=True)
     r, _ = fm_regression(sub1, 'R_next', MAIN, min_n=MIN_N, nw_lag=NW_LAG)
-    add('m1_weight_linear', r, IQR_POOL_REGISTERED, 'v1 权重 linear（同 I1 winsorize 规则）',
+    add('pricing_weight_linear', r, IQR_POOL_REGISTERED, 'v1 权重 linear（同 I1 winsorize 规则）',
         {'n_rows': int(len(sub1)), 'status_note': 'v1_superseded_registered_deviation'},
         target=out['v1_sensitivity'])
-    for sid, merge_df in [('m1_placebo_random', rand), ('m1_placebo_timeshift', shift)]:
+    for sid, merge_df in [('pricing_placebo_random', rand), ('pricing_placebo_timeshift', shift)]:
         col = 'PeerMAXrand' if sid.endswith('random') else 'PeerMAXshift'
         rcol = 'PeerReturnrand' if sid.endswith('random') else 'PeerReturnshift'
         sub1 = spec_frame(fm1, merge_df, col, rcol, winsorize=True)
@@ -311,8 +477,8 @@ def main(argv=None):
             {'n_rows': int(len(sub1)), 'status_note': 'v1_superseded_registered_deviation'},
             target=out['v1_sensitivity'])
 
-    write_json(OUT_DIR / 's3_m1_robustness_placebo.json', out)
-    progress('A9 完成：s3_m1_robustness_placebo.json 落盘（v2 headline）')
+    write_json(OUT_DIR / 'pricing_robustness_placebo.json', out)
+    progress('A9 完成：pricing_robustness_placebo.json 落盘（v2 headline）')
 
 
 if __name__ == '__main__':

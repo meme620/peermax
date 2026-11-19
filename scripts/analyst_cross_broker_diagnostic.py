@@ -1,4 +1,4 @@
-"""S3A 跨券商身份诊断（待办 2 收尾，2026-08-15）。
+"""analyst-network 跨券商身份诊断（待办 2 收尾，2026-08-15）。
 
 背景：身份审计按 A_code（个人码）做主键，未跨券商合并。要确认
 "A_code 是否跨券商不变（跳槽不换码）"。本脚本用现有数据做三层诊断，
@@ -21,7 +21,7 @@ from pathlib import Path
 
 import pandas as pd
 
-CLEAN = 'data/processed/analyst/s3a_step3_clean.csv'
+CLEAN = 'data/processed/analyst/analyst_step3_clean.csv'
 OUT = Path('data/processed/analyst/cross_broker_diag.json')
 
 

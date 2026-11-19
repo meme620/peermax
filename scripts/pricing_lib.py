@@ -1,9 +1,9 @@
-"""M1（S5）月度定价共享库（Phase A / C2，2026-10-10）。
+"""pricing月度定价共享库（Phase A / C2，2026-10-10）。
 
 只提供纯计算与装载工具；不含任何 outcome 相关的口径选择（口径一律来自 registry：
-alpha_m1 / K_Econ_M1 / K_Spread_M1 / K_Consist_M1 / nw_lag / winsorization_pct /
-portfolio_breakpoints / random_seed / sample_start / sample_end / m1_sample_and_spec_registry /
-m1_formula_ids）。
+alpha_pricing / K_Econ_Pricing / K_Spread_Pricing / K_Consist_Pricing / nw_lag / winsorization_pct /
+portfolio_breakpoints / random_seed / sample_start / sample_end / sample_and_spec_registry /
+pricing_formula_ids）。
 
 关键约定（先登记后跑，见 configs/parameter_registry.yaml）：
   - PIT：max{available_at < month}（面板既有映射，严格小于）
@@ -12,7 +12,7 @@ m1_formula_ids）。
   - 样本窗口：sample_start/sample_end 截月（当前 registry 2015-01/2023-12）
   - FM：逐月 OLS/WLS -> 系数序列 -> 均值 + Newey-West(lag=6, Bartlett) SE
   - 单侧 p：H0 beta>=0 vs H1 beta<0（主方向 beta<0）时 p = Phi(t)
-  - TOST：d = beta_EW - beta_VW，等价界 = +/- K_Consist_M1，alpha = alpha_m1"""
+  - TOST：d = beta_EW - beta_VW，等价界 = +/- K_Consist_Pricing，alpha = alpha_pricing"""
 
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ import pandas as pd
 
 from pathlib import Path
 import re
-from fileio import read_pickle
+from fileio import file_size, read_pickle
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -37,8 +37,8 @@ REGISTRY = ROOT / 'configs/parameter_registry.yaml'
 
 MANIFEST = ROOT / 'configs/version_manifest.yaml'
 
-SPEC = ROOT / 'configs/s3a_final_spec.yaml'
-CONTRACTS = ROOT / 'configs/m1_contracts.yaml'
+SPEC = ROOT / 'configs/analyst_spec.yaml'
+CONTRACTS = ROOT / 'configs/pricing_inputs.yaml'
 
 PANELS = {
     'ma_teacher': ROOT / 'data/processed/monthly_pricing_panel_ma_teacher.csv',
@@ -91,11 +91,11 @@ PROGRESS = ROOT / 'artifacts/tmp/phaseA_progress.md'
 
 ILLIQ_FORMULA_ID = 'ILLIQ_MONTHLY_ABS_RET_OVER_AMOUNT_v1'
 
-AMOUNT_CACHE_NAME = 'm1_cache_amount_100m.parquet'
+AMOUNT_CACHE_NAME = 'pricing_cache_amount_100m.parquet'
 
-AMOUNT_CACHE_META_NAME = 'm1_cache_amount_100m.meta.json'
+AMOUNT_CACHE_META_NAME = 'pricing_cache_amount_100m.meta.json'
 
-LEGACY_AMOUNT_CACHE_NAME = 'm1_cache_illiq.parquet'
+LEGACY_AMOUNT_CACHE_NAME = 'pricing_cache_illiq.parquet'
 
 AMOUNT_CACHE_COLUMNS = ['firm_id', 'month', 'amount_100m']
 
@@ -107,17 +107,17 @@ AMOUNT_CACHE_META_REQUIRED = (
     'script_path', 'script_bytes', 'created_at_utc',
 )
 
-M1_SAMPLE_VERSION_V1 = 'm1_s5_v1_2015_2023'
+SAMPLE_VERSION_V1 = 'pricing_sample_v1_2015_2023'
 
-M1_SAMPLE_VERSION_V2 = 'm1_s5_v2_2015_2023'
+SAMPLE_VERSION_V2 = 'pricing_sample_v2_2015_2023'
 
-M1_SAMPLE_VERSION_V3 = 'm1_s5_v3_20261115'
+SAMPLE_VERSION_V3 = 'pricing_sample_v3_20261115'
 
-M1_SAMPLE_VERSION_V4 = 'm1_s5_v4_20261116'
+SAMPLE_VERSION_V4 = 'pricing_sample_v4_20261116'
 
-M1_SAMPLE_VERSION_V4_RENORM = 'm1_s5_v4_renorm_20261116'
+SAMPLE_VERSION_V4_RENORM = 'pricing_sample_v4_renorm_20261116'
 
-M1_SAMPLE_VERSION = M1_SAMPLE_VERSION_V3
+SAMPLE_VERSION = SAMPLE_VERSION_V3
 
 _MONTH_RE = re.compile(r'^\d{4}-(0[1-9]|1[0-2])$')
 
@@ -126,12 +126,12 @@ IQR_POOL_RULE_ID = 'IQR_POOL_TREATMENT_ONLY_v1'
 IQR_POOL_REGISTERED = 0.02341287
 
 IQR_POOL_REGISTERED_SOURCE = ('configs/parameter_registry.yaml:'
-                              'm1_sample_and_spec_registry.iqr_scale_rule_id'
+                              'sample_and_spec_registry.iqr_scale_rule_id'
                               '（规则 ID；数值见 change_log 2026-10-10 正文，无独立数值参数）')
 
 SAMPLE_MONTHS = None  # 由 months_between 生成
 
-M1_INPUTS = {
+PRICING_INPUTS = {
     'monthly_returns_clean_v2': 'data/processed/monthly_returns_clean_v2.csv',
     'monthly_returns_adj_full_2006_2025': 'data/processed/monthly_returns_adj_full_2006_2025.csv',
     'source_month_argmax_panel': 'data/processed/source_month_argmax_panel.csv',
@@ -149,7 +149,7 @@ HARD_GATE_KEYS = ('rows_match_registered', 'pit_violations_strict_lt',
 
 ROWS_NOT_APPLICABLE = 'not_applicable_custom_panel'
 
-_M1_RETURN_COLS = ('PeerMAXraw', 'OwnMAXraw', 'PeerReturn')
+_PRICING_RETURN_COLS = ('PeerMAXraw', 'OwnMAXraw', 'PeerReturn')
 
 _SAMPLE_EXCLUSION_VALUE_COL = {'microcap_q10_exclusion': 'market_equity',
                                'no_network_support': 'PeerMAXraw',
@@ -185,19 +185,24 @@ import os
 import pandas as pd
 import sys
 
-def sample_path(key: str, version: str = 'v3'):
+def sample_path(key: str, version: str | None = None):
     """v1 = ..._{key}.parquet；v2 = ..._{key}_v2.parquet；v3 = ..._{key}_v3.parquet；
     v4 = ..._{key}_v4.parquet（W2 才创建）；v4 renorm = ..._{key}_v4_renorm.parquet（仅 D-08 B）。
+
+    version=None 读 registry sample_and_spec_registry.sample_version（headline 唯一指针，
+    2026-11-19 参数口径核查）。显式传 'v1'/'v2' 仍可读历史版本。
     """
-    if version in ('v4', M1_SAMPLE_VERSION_V4):
-        return SAMPLE_DIR / f'm1_common_sample_{key}_v4.parquet'
-    if version in ('v4_renorm', M1_SAMPLE_VERSION_V4_RENORM):
-        return SAMPLE_DIR / f'm1_common_sample_{key}_v4_renorm.parquet'
-    if version in ('v3', 'm1_s5_v3_20261115'):
-        return SAMPLE_DIR / f'm1_common_sample_{key}_v3.parquet'
-    if version in ('v2', 'm1_s5_v2_2015_2023'):
-        return SAMPLE_DIR / f'm1_common_sample_{key}_v2.parquet'
-    return SAMPLE_DIR / f'm1_common_sample_{key}.parquet'
+    if version is None:
+        version = HEADLINE_SAMPLE_VERSION
+    if version in ('v4', SAMPLE_VERSION_V4):
+        return SAMPLE_DIR / f'pricing_sample_{key}_v4.parquet'
+    if version in ('v4_renorm', SAMPLE_VERSION_V4_RENORM):
+        return SAMPLE_DIR / f'pricing_sample_{key}_v4_renorm.parquet'
+    if version in ('v3', 'pricing_sample_v3_20261115'):
+        return SAMPLE_DIR / f'pricing_sample_{key}_v3.parquet'
+    if version in ('v2', 'pricing_sample_v2_2015_2023'):
+        return SAMPLE_DIR / f'pricing_sample_{key}_v2.parquet'
+    return SAMPLE_DIR / f'pricing_sample_{key}.parquet'
 
 def progress(msg: str) -> None:
     print(f'[A] {msg}', flush=True)
@@ -213,12 +218,9 @@ def write_json(path, obj) -> None:
     os.replace(tmp, p)
     print(f'  -> {p.relative_to(ROOT)}', flush=True)
 
-def file_size(path):
-    return Path(path).stat().st_size
-
 def load_panel(key: str, version: str = 'v3') -> pd.DataFrame:
     """v3（默认）= 现行面板；v4 = W1 新面板（新文件名，不覆盖 v3）。"""
-    path = PANEL_PATHS_V4[key] if version in ('v4', 's4_panel_v4') else PANELS[key]
+    path = PANEL_PATHS_V4[key] if version in ('v4', 'panel_v4') else PANELS[key]
     df = pd.read_csv(path, dtype={'focal_id': str, 'month': str})
     return df
 
@@ -437,11 +439,11 @@ def load_amount_100m_cached(cache_dir=None, cache_path=None, meta_path=None,
     """读取/迁移/重建 amount_100m 缓存，返回 (df, meta)。
 
     明确策略（不静默复用）：
-      - 新缓存 + 有效 sidecar + 输入 sha/行数/列一致 → 命中，不重算；
+      - 新缓存 + 有效 sidecar + source_bytes/行数/列一致 → 命中，不重算；
       - 新缓存存在但 sidecar 缺失/不可读 → 从 source 重建并写 sidecar；
-      - sidecar 存在但输入 sha / formula id / 行数 / 列不匹配 → 默认 SystemExit(2)；
+      - sidecar 存在但 source_bytes / formula id / 行数 / 列不匹配 → 默认 SystemExit(2)；
         只有显式 `rebuild=True` 才重算覆盖（输入漂移不得静默沿用旧值）；
-      - 新缓存不存在、旧 `m1_cache_illiq.parquet` 存在且列正确 → 一次性只读迁移
+      - 新缓存不存在、旧 `pricing_cache_illiq.parquet` 存在且列正确 → 一次性只读迁移
         （读旧值原样写新缓存+sidecar，旧文件保留）；
       - 两者都不存在 → 从 source 计算并落盘。
     `recompute`/`source_path` 仅测试注入；生产默认 `load_amount_100m` + AMOUNT_PKL。
@@ -501,7 +503,7 @@ def load_amount_100m_cached(cache_dir=None, cache_path=None, meta_path=None,
     return _rebuild('created', '无缓存')
 
 def load_turnover_drive() -> pd.DataFrame:
-    """Turnover = Drive daily_turnover_rate(官方 %) 月末值 / 100（与 S3A 9C 同口径）。
+    """Turnover = Drive daily_turnover_rate(官方 %) 月末值 / 100（与 analyst-network 9C 同口径）。
 
     登记原因：firm_chars_clean.turnover 在 2015–2016 覆盖率为 0（仅 2017 起可得），
     故主控制集的 Turnover 改读已登记 spec 输入 Drive daily_turnover_rate。
@@ -536,7 +538,7 @@ def load_support(net_key: str, text_year: int) -> pd.DataFrame:
     return pd.read_csv(p, dtype={'focal_id': str})
 
 def add_weight_rules(e: pd.DataFrame) -> pd.DataFrame:
-    """P2.2 三套权重（固定边集，只换权重；行内归一化）。"""
+    """one_sided_significance.2 三套权重（固定边集，只换权重；行内归一化）。"""
     e = e.copy()
     g = e.groupby('focal_id', sort=False)['similarity']
     s_sum = g.transform('sum')
@@ -557,7 +559,7 @@ def aggregate_edges(edges: pd.DataFrame, values: pd.DataFrame, wcols, value_col:
     edges: focal/source/wcols；values: [key_col(=source 身份), month, value_col]
     注意：本函数是历史 A9 权重变体/placebo 使用的 **renormalized** 实现（诊断用途）；
     headline PeerMAXraw/PeerReturn 聚合使用 `aggregate_stat`（未归一化 complete-only，
-    07 P1.2-01 A2/A3），两者不得混用。
+    07 sign.2-01 A2/A3），两者不得混用。
     """
     m = edges.merge(values.rename(columns={key_col: source_col}), on=source_col, how='left')
     m = m[m[value_col].notna()]
@@ -576,9 +578,9 @@ def aggregate_stat(edges: pd.DataFrame, src: pd.DataFrame, stat_col: str,
                    eligible_mask, suffix: str, w_col: str = 'weight',
                    excluded_mask=None, zero_trading_days_mask=None,
                    incomplete_mask=None, extra_weight=None) -> pd.DataFrame:
-    """**唯一共享聚合函数**（P1.2-01 为 owner；P1.4-05/M2 复用，禁止第二套）。
+    """**唯一共享聚合函数**（唯一实现，禁止第二套）。
 
-    语义（07 P1.2-01 A2/A3；plan :4739-4761/:4968）：
+    语义（07 sign.2-01 A2/A3；plan :4739-4761/:4968）：
       support_mass = sum(w)（全部边）
       covered_mass = sum(w where class=='covered')
       missing_mass = sum(w where class!='covered')  ← 直接累加缺失权重，不用 support-covered 反算
@@ -700,7 +702,7 @@ def aggregate_stat(edges: pd.DataFrame, src: pd.DataFrame, stat_col: str,
     agg['support_status'] = status
 
     # missing_reason：按 §0.4B 的 suffix 专用词表（多因 → mixed；空串 = 无缺失）
-    if suffix == 'max':
+    if suffix in ('max', 'max_la'):
         candidates = [(agg['n_missing_statistic'] > 0, 'peer_max_not_in_source_panel'),
                       (agg['n_excluded'] > 0, 'limit_status_unknown_excluded'),
                       (agg['n_zero_trading_days'] > 0, 'zero_trading_days')]
@@ -821,7 +823,7 @@ def load_input_contracts(contracts_path=None) -> dict:
     p = Path(contracts_path) if contracts_path is not None else CONTRACTS
     require(p.is_file(), f'输入合同不存在: {p}')
     doc = yaml.safe_load(p.read_text(encoding='utf-8'))
-    entries = doc.get('m1_inputs') if isinstance(doc, dict) else None
+    entries = doc.get('pricing_inputs') if isinstance(doc, dict) else None
     require(isinstance(entries, dict) and bool(entries), f'输入合同结构非法: {p}')
     return entries
 
@@ -846,13 +848,19 @@ def check_input_contract(path, name=None, key=None, contracts_path=None) -> dict
     require(p.is_file(), f'输入不存在: {p}')
     contracts = load_input_contracts(contracts_path)
     k = key or manifest_input_key(p)
-    entry = contracts.get(k) or {}
+    entry = contracts.get(k)
+    if entry is None:
+        # 生产合同按逻辑名键控（pricing_inputs.<name>.file=登记路径）；key/路径都未命中时
+        # 经 PRICING_INPUTS 反查逻辑名（测试临时合同按路径键控，走上一分支）
+        by_path = {rel: nm for nm, rel in PRICING_INPUTS.items()}
+        entry = contracts.get(by_path.get(k, '\x00'))
+    entry = entry or {}
     rows, columns = file_shape(p)
     reg_rows = entry.get('rows')
     reg_cols = entry.get('columns')
     missing = [c for c in (reg_cols or []) if c not in columns]
     require(reg_rows is not None,
-            f'输入合同未登记行数（file={k}）；先填 configs/m1_contracts.yaml 的 rows')
+            f'输入合同未登记行数（file={k}）；先填 configs/pricing_inputs.yaml 的 rows')
     require(int(reg_rows) == rows,
             f'输入行数不匹配（file={k}）期望={reg_rows} 实际={rows}')
     require(not missing, f'输入缺列（file={k}）缺={missing}')
@@ -861,30 +869,27 @@ def check_input_contract(path, name=None, key=None, contracts_path=None) -> dict
             'rows_match_registered': reg_rows is None or int(reg_rows) == rows,
             'columns_missing': missing, 'match': True}
 
-def assert_anchored_file_bytes(path, manifest_key=None, manifest_path=None, spec_path=None) -> dict:
-    return check_input_contract(path, key=manifest_key)
+def assert_named_pricing_input(name: str, path=None, manifest_path=None) -> dict:
+    require(name in PRICING_INPUTS, f'pricing_gate 输入: 未登记逻辑名 {name!r}')
+    p = Path(path) if path is not None else ROOT / PRICING_INPUTS[name]
+    return check_input_contract(p, name=name, key=PRICING_INPUTS[name])
 
-def assert_named_m1_input(name: str, path=None, manifest_path=None) -> dict:
-    require(name in M1_INPUTS, f'M1 输入: 未登记逻辑名 {name!r}')
-    p = Path(path) if path is not None else ROOT / M1_INPUTS[name]
-    return check_input_contract(p, name=name, key=M1_INPUTS[name])
-
-def assert_m1_inputs(inputs=None, manifest_path=None, spec_path=None, *,
+def assert_pricing_inputs(inputs=None, manifest_path=None, spec_path=None, *,
                          _allow_subset: bool = False, contracts_path=None) -> list:
     if inputs is None:
-        inputs = {name: ROOT / rel for name, rel in M1_INPUTS.items()}
+        inputs = {name: ROOT / rel for name, rel in PRICING_INPUTS.items()}
     else:
         inputs = dict(inputs)
-        require(bool(inputs), 'M1 输入: inputs 为空；拒绝 0/0 PASS')
+        require(bool(inputs), 'pricing_gate 输入: inputs 为空；拒绝 0/0 PASS')
         if not _allow_subset:
-            expected_names = set(M1_INPUTS)
+            expected_names = set(PRICING_INPUTS)
             require(set(inputs) == expected_names,
-                    f'M1 输入: 非测试调用必须校验全部 {len(expected_names)} 个输入；'
+                    f'pricing_gate 输入: 非测试调用必须校验全部 {len(expected_names)} 个输入；'
                     f'缺少={sorted(expected_names - set(inputs))} '
                     f'多余={sorted(set(inputs) - expected_names)}')
     ledger = []
     for name, path in inputs.items():
-        rec = check_input_contract(path, name=name, key=M1_INPUTS[name],
+        rec = check_input_contract(path, name=name, key=PRICING_INPUTS[name],
                                    contracts_path=contracts_path)
         print(f"[INPUT] {name}: rows={rec['rows']} registered={rec['rows_registered']}", flush=True)
         ledger.append(rec)
@@ -900,13 +905,13 @@ def contract_from_frame(df: pd.DataFrame, expected_rows=None, kind: str = 'auto'
     """从面板/样本 DataFrame 现算四条硬门（只读，不写文件）。
 
     kind='panel'：missing_filled_with_zero 按 network_support_status != 'support' 的
-                  PeerMAXraw/OwnMAXraw/PeerReturn 零值统计（与 s3_m1_1 A1 面板合同同口径）。
-    kind='sample'：按 m1_exclusion_reason -> 对应值列统计（与 s3_m1_1 _integrity_checks 同口径）。
+                  PeerMAXraw/OwnMAXraw/PeerReturn 零值统计（与 pricing_sample_build A1 面板合同同口径）。
+    kind='sample'：按 pricing_exclusion_reason -> 对应值列统计（与 pricing_sample_build _integrity_checks 同口径）。
     expected_rows=None：rows_match_registered 记 ROWS_NOT_APPLICABLE（仅自定义面板使用，
     表示“行数门未施加”，不是通过）。
     """
     if kind == 'auto':
-        if 'm1_exclusion_reason' in df.columns:
+        if 'pricing_exclusion_reason' in df.columns:
             kind = 'sample'
         elif 'network_support_status' in df.columns:
             kind = 'panel'
@@ -929,15 +934,15 @@ def contract_from_frame(df: pd.DataFrame, expected_rows=None, kind: str = 'auto'
     else:
         c['pit_violations_strict_lt'] = None
     zeros = None
-    if kind == 'sample' and 'm1_exclusion_reason' in df.columns:
-        exc = df['m1_exclusion_reason'].fillna('')
+    if kind == 'sample' and 'pricing_exclusion_reason' in df.columns:
+        exc = df['pricing_exclusion_reason'].fillna('')
         zeros = 0
         for name, col in _SAMPLE_EXCLUSION_VALUE_COL.items():
             if col in df.columns:
                 zeros += int((df.loc[exc == name, col].fillna(-999) == 0).sum())
     elif kind == 'panel' and 'network_support_status' in df.columns:
         sup = df['network_support_status'] == 'support'
-        cols = [c2 for c2 in _M1_RETURN_COLS if c2 in df.columns]
+        cols = [c2 for c2 in _PRICING_RETURN_COLS if c2 in df.columns]
         if cols:
             zeros = int((df.loc[~sup, cols].fillna(-999) == 0).sum().sum())
     c['missing_filled_with_zero'] = None if zeros is None else int(zeros)
@@ -974,12 +979,12 @@ def _contract_entries(source, where: str, expected_rows, kind: str) -> dict:
                    '需要 build report dict / contract dict / json|parquet|csv 路径 / DataFrame')
     return {}
 
-def assert_m1_contract(source, expected_rows=None, where: str = 'm1_contract',
+def assert_pricing_contract(source, expected_rows=None, where: str = 'pricing_contract',
                        kind: str = 'auto') -> dict:
     """硬门入口：核验四条输入契约，任一失败即 SystemExit(2)。
 
     source:
-      - s3_m1_sample_report(.json) 的 report dict（使用其 contracts）
+      - pricing_sample_report(.json) 的 report dict（使用其 contracts）
       - 单列 contract dict（直接含四条硬门字段）
       - report/parquet/csv 路径
       - DataFrame（此时 expected_rows 给登记行数；None 表示行数门不适用，仅自定义面板）
@@ -1016,7 +1021,7 @@ def assert_m1_contract(source, expected_rows=None, where: str = 'm1_contract',
             'rows_match_registered': rows_val, 'rows_gate_enforced': rows_enforced,
             'pit_violations_strict_lt': pit,
             'duplicate_focal_month_keys': dup, 'missing_filled_with_zero': zero}
-    print(f'[M1-CONTRACT] {where}: PASS（{len(contracts)} 个契约 × 4 条硬门）', flush=True)
+    print(f'[pricing_gate-CONTRACT] {where}: PASS（{len(contracts)} 个契约 × 4 条硬门）', flush=True)
     return summary
 import math
 import numpy as np
@@ -1105,11 +1110,11 @@ def tost_equivalence(diff_series, bound: float, alpha: float, lag: int = 6):
         return out
     t1 = (d + bound) / se          # H0: d <= -bound
     t2 = (bound - d) / se          # H0: d >= +bound
-    p1 = 1.0 - norm_cdf(t1)
-    p2 = 1.0 - norm_cdf(t2)
-    out.update({'p_lower': p1, 'p_upper': p2,
-                'equivalent': bool(p1 < alpha and p2 < alpha),
-                'status': 'PASS' if (p1 < alpha and p2 < alpha) else 'FAIL'})
+    p_low = 1.0 - norm_cdf(t1)
+    p_high = 1.0 - norm_cdf(t2)
+    out.update({'p_lower': p_low, 'p_upper': p_high,
+                'equivalent': bool(p_low < alpha and p_high < alpha),
+                'status': 'PASS' if (p_low < alpha and p_high < alpha) else 'FAIL'})
     return out
 
 def winsorize_by_month(df: pd.DataFrame, cols, lo: float = 0.01, hi: float = 0.99,
@@ -1128,10 +1133,24 @@ def winsorize_by_month(df: pd.DataFrame, cols, lo: float = 0.01, hi: float = 0.9
 def treatment_only_mask(df: pd.DataFrame) -> pd.Series:
     """treatment-only eligible 宇宙（outcome-blind）：
     通过全部 treatment/controls 可得性屏幕的行（exclusion 顺序中 outcome 屏之前）；
-    v2 样本的 `m1_exclusion_reason ∈ {'', 'no_outcome_next_month'}` 即该宇宙。"""
-    if 'm1_exclusion_reason' not in df.columns:
+    v2 样本的 `pricing_exclusion_reason ∈ {'', 'no_outcome_next_month'}` 即该宇宙。"""
+    if 'pricing_exclusion_reason' not in df.columns:
         return pd.Series(True, index=df.index)
-    return df['m1_exclusion_reason'].fillna('').isin(['', 'no_outcome_next_month'])
+    return df['pricing_exclusion_reason'].fillna('').isin(['', 'no_outcome_next_month'])
+
+def demean_by(df: pd.DataFrame, cols, group_cols) -> pd.DataFrame:
+    """组内去均值（within 变换）。
+
+    group_cols 含 month 时等价于「行业×月固定效应」：每个 (month, industry) 组是
+    饱和虚拟变量，组内去均值后的 OLS 就是带该组固定效应的估计量。缺失保持缺失。
+    """
+    out = df.copy()
+    g = out.groupby(list(group_cols), sort=False)
+    for c in cols:
+        if c in out.columns:
+            out[c] = out[c] - g[c].transform('mean')
+    return out
+
 
 def rank_average_groups(x: pd.Series, n_groups: int) -> pd.Series:
     """冻结 tie rule：rank(method='average') 后按 ceil(rank/N*g) 分组（跨 cutoff 的 tie 同组）。"""
@@ -1230,6 +1249,75 @@ def fm_regression(df: pd.DataFrame, ycol: str, xcols, month_col: str = 'month',
         summary['coefs'][c] = s
     return summary, per_month
 
+def fm_cluster_se(df: pd.DataFrame, ycol: str, xcols, cluster_col: str,
+                  weight_col: str | None = None, month_col: str = 'month',
+                  min_n: int = 100, nw_lag: int = 6) -> dict:
+    """Fama-MacBeth + 月内聚类稳健抽样误差（hybrid：跨月 NW × 月内聚类设计效应）。
+
+    逐月横截面 OLS（与 fm_regression 同口径）；对 treatment 列给出：
+      se_sampling_iid_m     = sqrt(sigma2 * (X'WX)^{-1}_jj)   当月同方差抽样误差
+      se_sampling_cluster_m = sqrt(sum_g psi_gj^2)            当月团聚类抽样误差
+      psi_g                 = (X'WX)^{-1} X_g' W e_g          团得分函数
+    T 个月合并后：
+      se_sampling = sqrt(mean(se_m^2) / T)
+      se_hybrid   = sqrt(se_nw^2 + se_sampling_cluster^2 - se_sampling_iid^2)
+    deff = se_sampling_cluster / se_sampling_iid（月内聚类的设计效应）。
+    """
+    j = list(xcols).index('PeerMAXraw') if 'PeerMAXraw' in xcols else 0
+    betas = []
+    var_iid, var_cl = [], []
+    for m, sub in df.groupby(month_col, sort=True):
+        sub = sub.dropna(subset=[ycol] + list(xcols) + [cluster_col])
+        if weight_col:
+            sub = sub[sub[weight_col].notna() & (sub[weight_col] > 0)]
+        n = len(sub)
+        if n < min_n:
+            continue
+        X = np.column_stack([sub[c].to_numpy(dtype=float) for c in xcols] + [np.ones(n)])
+        y = sub[ycol].to_numpy(dtype=float)
+        w = sub[weight_col].to_numpy(dtype=float) if weight_col else None
+        fit = _ols(X, y, w)
+        if fit is None or not fit['finite']:
+            continue
+        sw = np.sqrt(w) if w is not None else np.ones(n)
+        Xw, yw = X * sw[:, None], y * sw
+        resid = yw - Xw @ fit['beta']
+        bread = np.linalg.pinv(Xw.T @ Xw)
+        betas.append(float(fit['beta'][j]))
+        var_iid.append(float(fit['cov'][j, j]))
+        g = pd.factorize(sub[cluster_col].to_numpy())[0]
+        s = 0.0
+        for gi in np.unique(g):
+            sel = (g == gi)
+            psi = bread @ (Xw[sel].T @ resid[sel])
+            s += float(psi[j]) ** 2
+        var_cl.append(s)
+    T = len(betas)
+    out = {'T': T, 'cluster_col': cluster_col, 'nw_lag': nw_lag,
+           'status': 'NOT_COMPUTABLE', 'beta': None}
+    if T < 2:
+        return out
+    nw = newey_west(betas, lag=nw_lag)
+    se_iid_s = math.sqrt(float(np.mean(var_iid)) / T)
+    se_cl_s = math.sqrt(float(np.mean(var_cl)) / T)
+    hybrid = math.sqrt(max(nw['se_nw'] ** 2 + se_cl_s ** 2 - se_iid_s ** 2, 0.0))
+    out.update({
+        'status': 'COMPUTED',
+        'beta': nw['mean'], 'se_nw': nw['se_nw'], 't_nw': nw['t_nw'],
+        'se_sampling_iid': se_iid_s,
+        'se_sampling_cluster': se_cl_s,
+        'deff_within_month': (se_cl_s / se_iid_s) if se_iid_s > 0 else None,
+        'se_hybrid': hybrid,
+        't_hybrid': (nw['mean'] / hybrid) if hybrid > 0 else None,
+        'ratio_hybrid_vs_nw': (hybrid / nw['se_nw']) if nw['se_nw'] else None,
+        'p_one_sided_hybrid': one_sided_p((nw['mean'] / hybrid) if hybrid > 0 else None,
+                                          'negative'),
+        'reading': 'hybrid 为「跨月 NW + 月内聚类设计效应」；deff>1 表示同月同团内相关使'
+                   '同方差 SE 偏小',
+    })
+    return out
+
+
 def nw_cov_matrix(vecs, lag: int = 6):
     """系数向量序列的均值 + Newey-West 协方差矩阵（Bartlett 权）。"""
     A = np.asarray([v for v in vecs if v is not None and np.isfinite(v).all()], dtype=float)
@@ -1322,20 +1410,20 @@ import numpy as np
 import pandas as pd
 
 
-# W1 bundle（P1.2-01）：v4 面板路径（新文件名；不覆盖 v3）。默认行为仍走 PANELS。
+# W1 bundle（sign.2-01）：v4 面板路径（新文件名；不覆盖 v3）。默认行为仍走 PANELS。
 
 # ---------------------------------------------------------------- I-14 amount 缓存契约
 # 缓存名必须与内容一致：本缓存只存 firm_id/month/amount_100m（Drive 日成交额千元当月求和 / 1e5），
-# **不含 illiq 列**。下游（s3_m1_1）事件月实际公式：illiq = |own_R_t| / amount_100m。
+# **不含 illiq 列**。下游（pricing_sample_build）事件月实际公式：illiq = |own_R_t| / amount_100m。
 # 既有 registry/formula 登记名 ILLIQ_MONTHLY_AMIHUD_CNY100M_v1 保持不动（冻结登记），
 # 本常量仅用于报告/缓存元数据澄清实际公式，不新增 Amihud 公式、不改数值。
 
 # 样本版本（Phase A 复核修复批 2026-10-10）：
-#   v1 = m1_s5_v1_2015_2023：未施加 microcap 筛除、ma/mb 未施加 sample 窗口过滤 →
+#   v1 = pricing_sample_v1_2015_2023：未施加 microcap 筛除、ma/mb 未施加 sample 窗口过滤 →
 #        status = superseded_registered_deviation（保留作「未施加 microcap 筛除」敏感性）
-#   v2 = m1_s5_v2_2015_2023：microcap + 次新股筛除；2026-11-15 P1-01 起标 superseded
+#   v2 = pricing_sample_v2_2015_2023：microcap + 次新股筛除；2026-11-15 sign-01 起标 superseded
 #        （旧 complete_month 用价格非空日数，非有效交易日）
-#   v3 = m1_s5_v3_20261115：headline（P1-01：complete_month/n_valid_days = volume>0 交易日 >=15）
+#   v3 = pricing_sample_v3_20261115：headline（sign-01：complete_month/n_valid_days = volume>0 交易日 >=15）
 # W1 bundle 版本占位：v4 样本只在 W2 创建；W1 仅让 sample_path/CLI 可解析（默认行为不变）。
 
 # ---------------------------------------------------------------- registry 参数绑定（Phase 1 I-5）
@@ -1357,20 +1445,59 @@ if abs(_IQR_REGISTRY - IQR_POOL_REGISTERED) > 1e-12:
         f"iqr_pool_value={_IQR_REGISTRY} 不一致；以 registry 为准并同步常量")
 IQR_POOL_REGISTERED = _IQR_REGISTRY
 
+# 2026-11-19 参数口径核查（CO-2026-11-19-parameters）：
+# headline 样本指针与 ew_vw_consistency 等价界同样只认 registry，禁止各脚本再写字面量。
+_SAMPLE_REG = param_value('sample_and_spec_registry')
+HEADLINE_SAMPLE_VERSION = str(_SAMPLE_REG['sample_version'])
+_VERSION_LABELS = {SAMPLE_VERSION_V1: 'v1', SAMPLE_VERSION_V2: 'v2',
+                   SAMPLE_VERSION_V3: 'v3', SAMPLE_VERSION_V4: 'v4'}
+if HEADLINE_SAMPLE_VERSION not in _VERSION_LABELS:
+    raise SystemExit(f"[STOP] registry sample_version={HEADLINE_SAMPLE_VERSION!r} 不在已登记版本集")
+SAMPLE_VERSION_LABEL = _VERSION_LABELS[HEADLINE_SAMPLE_VERSION]
+
+# shadow_* 全套尚未重跑到 headline 版本；其样本版本单独登记，避免与 headline 混用。
+# 退役条件：shadow 全部重跑到 HEADLINE_SAMPLE_VERSION 后删除本参数与 shadow_sample_version()。
+_SHADOW_REG = param_value('shadow_legacy_sample_version')
+if _SHADOW_REG not in _VERSION_LABELS:
+    raise SystemExit(f"[STOP] registry shadow_legacy_sample_version={_SHADOW_REG!r} 不在已登记版本集")
+SHADOW_SAMPLE_VERSION_LABEL = _VERSION_LABELS[_SHADOW_REG]
+
+
+def shadow_sample_path(key: str):
+    """shadow_* 专用：读 registry 登记的 legacy 样本版本（当前 v2），不随 headline 漂移。"""
+    return sample_path(key, SHADOW_SAMPLE_VERSION_LABEL)
+
+_K_ECON = float(param_value('K_Econ_Pricing'))
+_K_CONSIST = float(param_value('K_Consist_Pricing'))
+_K_CONSIST_DERIVED = _K_ECON / IQR_POOL_REGISTERED
+if abs(_K_CONSIST - _K_CONSIST_DERIVED) > 1e-6:
+    raise SystemExit(
+        f"[STOP] K_Consist_Pricing={_K_CONSIST} 与 K_Econ_Pricing/IQR_pool={_K_CONSIST_DERIVED:.6f} 不一致；"
+        "以派生关系为准并同步 registry")
+
+import yaml as _yaml
+_SPEC_DOC = _yaml.safe_load(SPEC.read_text(encoding='utf-8')) or {}
+_REG_VERSION = load_registry().get('registry_version')
+_SPEC_REG_VERSION = ((_SPEC_DOC.get('governance') or {}).get('registry_version'))
+if _REG_VERSION != _SPEC_REG_VERSION:
+    raise SystemExit(
+        f"[STOP] registry_version={_REG_VERSION!r} 与 analyst_spec governance.registry_version="
+        f"{_SPEC_REG_VERSION!r} 不一致；改 registry 必须同步 configs/analyst_spec.yaml")
+
 
 # ---------------------------------------------------------------- 基础工具
 
 
-# ---------------------------------------------------------------- M1 主输入锚（Phase 1 I-3）
-# 9 个 M1 主输入（以 s3_m1_1 / pricing_lib 实际读取路径为准；market_equity_panel_full
-# 为 market_equity_panel 的字节相同孪生件，按方案一并纳入锚账本；postadj 为 s3_m1_1
+# ---------------------------------------------------------------- pricing_gate 主输入合同（Phase 1 I-3）
+# 9 个 pricing_gate 主输入（以 pricing_sample_build / pricing_lib 实际读取路径为准；market_equity_panel_full
+# 为 market_equity_panel 的字节相同孪生件，按方案一并纳入账本；postadj 为 pricing_1
 # 读取的后复权敏感性收益面板，R1 复核后加入）。
-# 锚只读 configs/version_manifest.yaml 的 active + 64-hex bytes；缺条目/缺 sha/
-# sha 不匹配一律 SystemExit(2)，禁止回退实测值或自动刷新 manifest。
+# 合同只读 configs/pricing_inputs.yaml 的 rows / columns；rows 未登记或行数、
+# 列名不匹配一律 SystemExit(2)，禁止回退实测值或自动刷新合同。
 
 
 # ---------------------------------------------------------------- 输入契约硬门（Phase 1 I-2）
-# 四条硬门（字段名 == s3_m1_sample_report.json:contracts.<column> 的实际键名）：
+# 四条硬门（字段名 == pricing_sample_report.json:contracts.<column> 的实际键名）：
 #   rows_match_registered / pit_violations_strict_lt /
 #   duplicate_focal_month_keys / missing_filled_with_zero
 
@@ -1393,7 +1520,7 @@ def ym_add(month: str, k: int) -> str:
 
 # ---------------------------------------------------------------- 装载
 
-# W1 bundle（P1.2-01 A1 + D-08 B）v4 面板列集（43 + PeerMAXraw_renorm/formula_id_max_renorm）
+# W1 bundle（sign.2-01 A1 + D-08 B）v4 面板列集（43 + PeerMAXraw_renorm/formula_id_max_renorm）
 
 
 # ---------------------------------------------------------------- 边表与权重变体

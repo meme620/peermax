@@ -29,7 +29,7 @@ v2（2026-10-19，断点续跑加固；**判据仅 A 段按上述 status 感知�
      （含 `verified` 逐行标记 = 该行是否现场重算），已存在则跳过（`--force` 覆盖），
      中断后重跑不重做已完成年；C 段直接复用该缓存。
 
-产物：`reports/data_gates/G0/s3_ma_fulltext_cache_verification.json`
+产物：`reports/data_gates/G0/network_business_fulltext_cache_verification.json`
 用法：
   python scripts/network_business_fulltext_cache_check.py [--workers 10] [--force]
 """
@@ -49,11 +49,12 @@ ROOT = Path(__file__).resolve().parents[1]
 
 import network_business_fulltext_panel_build as PB  # noqa: E402
 from network_business_cluster_grid import CORPORA, build_vectors_from_hits, load_refs  # noqa: E402
+from fileio import file_size
 
 PANEL = ROOT / 'data/processed/annual_fulltext_panel.parquet'
 HITS_DIR = ROOT / 'data/processed/annual_fulltext_hits'
 TMP_LIVE = ROOT / 'artifacts/tmp/ft_corr/live_hits'
-REPORT = ROOT / 'reports/data_gates/G0/s3_ma_fulltext_cache_verification.json'
+REPORT = ROOT / 'reports/data_gates/G0/network_business_fulltext_cache_verification.json'
 PROGRESS = ROOT / 'artifacts/tmp/fulltext_corr_progress.md'
 FULL_YEARS = [2017, 2018, 2019, 2020, 2021, 2022]
 SAMPLE_YEARS = [2023, 2024, 2025]
@@ -88,7 +89,7 @@ def main() -> int:
     psay(f'状态 = 开始；核验对象 = {PANEL.name} + {HITS_DIR.name}/ ；worker = {args.workers}')
 
     pan = pd.read_parquet(PANEL, columns=['firm_id', 'year', 'status', 'length', 'bytes', 'src_file'])
-    out = {'artifact': 's3_ma_fulltext_cache_verification', 'run_at': datetime.now(timezone.utc).isoformat(),
+    out = {'artifact': 'network_business_fulltext_cache_verification', 'run_at': datetime.now(timezone.utc).isoformat(),
            'purpose': 'F3 前置：命中缓存与面板的独立核验（缓存 == 现场重算）',
            'script_version': 'v2 (2026-10-19)',
            'criterion_A': 'status 感知（v2 修订）：status==ok 行 text/length/bytes 三重逐字节；'

@@ -1,4 +1,4 @@
-"""S3A Gate 1 输入 provenance 审计。
+"""analyst-network Gate 1 输入 provenance 审计。
 
 对应验收矩阵 Gate 1.3：
 - 登记预测、收益、市值、IPO、Drive controls、指数成员、SHIBOR、REV 的路径、日期、hash、缺口和 PIT 假设；
@@ -11,16 +11,18 @@
 - script_output         ：有脚本以写模式产生（to_csv/json.dump/write_text/open(...,'w')）
 - UNREGISTERED          ：以上都不是（必须为空才能 PASS）
 
-产出 JSON：reports/data_gates/G0/s3a_gate1_provenance_audit.json
+产出 JSON：reports/data_gates/G0/analyst_gate1_provenance_audit.json
 """
 import json
 import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from fileio import file_size
+from pricing_lib import file_shape, load_input_contracts
 
 ROOT = Path(__file__).resolve().parents[1]
-SPEC = ROOT / 'configs/s3a_final_spec.yaml'
+SPEC = ROOT / 'configs/analyst_spec.yaml'
 MANIFEST = ROOT / 'configs/version_manifest.yaml'
 PATH_RE = re.compile(r"['\"]((?:data|reports|artifacts)/[^'\"]*?\.(?:csv|pkl|json|txt|parquet|xlsx))['\"]")
 WRITE_RE = re.compile(r"to_csv|json\.dump|write_text|write_bytes|open\([^)]*['\"][wa]")
@@ -94,7 +96,7 @@ def scan_scripts():
         raise SystemExit('provenance 审计：未找到 analyst_* 脚本，扫描面无意义')
 
     # 产生方检测覆盖 scripts/ 全树（产生方可能不在 analyst_ 前缀脚本内，如 peermax_max_build.py）；
-    # 读取方检测仍只针对 S3A 脚本。
+    # 读取方检测仍只针对 analyst-network 脚本。
     produced_paths = set()
     produced_basenames = set()
     join_write_re = re.compile(r"(?:to_csv|to_pickle|write_text|write_bytes|json\.dump)\s*\([^)]*/\s*['\"]([^'\"]+)['\"]")
@@ -120,34 +122,30 @@ def scan_scripts():
 
 
 def verify_spec_inputs(spec):
+    """spec 输入身份 = configs/pricing_inputs.yaml 的 rows/columns 合同（sha 锚已退役）。
+
+    文件缺失 → MISSING；未登记合同或 rows 为空 → UNREGISTERED（fail-closed，不得当作通过）；
+    行数不符或缺登记列 → DIFF。
+    """
+    contracts = {e['file']: e for e in load_input_contracts().values()}
     rows = []
     for key, p in spec['inputs'].items():
-        exp = spec['provenance']['input_hashes'].get(p)
-        coll = spec['provenance'].get('input_collections', {}).get(p)
-        rec = {'key': key, 'path': p, 'exists': None, 'hash_status': None, 'method': None}
-        if coll:
-            d = ROOT / p.replace('/*.csv', '')
-            files = sorted(d.glob('*.csv')) if d.exists() else []
-            inner = file_size()
-            agg = file_size()
-            for f in files:
-                inner.update(f.name.encode()); inner.update(b'|')
-                inner.update(str(f.stat().st_size).encode()); inner.update(b'|')
-                agg.update(file_size(f.read_bytes()).hexdigest().encode())
-            rec.update({'exists': d.exists(), 'method': 'collection',
-                        'file_count': len(files),
-                        'file_count_expected': coll['file_count'],
-                        'collection_bytes': agg.hexdigest(),
-                        'collection_bytes_expected': coll['collection_bytes'],
-                        'hash_status': 'MATCH' if (agg.hexdigest() == coll['collection_bytes']
-                                                   and len(files) == coll['file_count']) else 'DIFF'})
-        else:
-            f = ROOT / p
-            exists = f.exists()
-            got = file_size(f.read_bytes()).hexdigest() if exists else None
-            rec.update({'exists': exists, 'method': 'file', 'bytes': got, 'bytes_expected': exp,
-                        'hash_status': ('MATCH' if got == exp else 'DIFF') if exists else 'MISSING',
-                        'bytes': f.stat().st_size if exists else None})
+        rec = {'key': key, 'path': p, 'exists': None, 'status': None, 'method': 'contract'}
+        f = ROOT / p
+        if not f.is_file():
+            rec.update({'exists': False, 'status': 'MISSING'})
+            rows.append(rec)
+            continue
+        entry = contracts.get(p)
+        if entry is None or entry.get('rows') is None:
+            rec.update({'exists': True, 'status': 'UNREGISTERED'})
+            rows.append(rec)
+            continue
+        n, cols = file_shape(f)
+        missing_cols = [c for c in (entry.get('columns') or []) if c not in cols]
+        rec.update({'exists': True, 'rows': n, 'rows_registered': int(entry['rows']),
+                    'columns_missing': missing_cols,
+                    'status': 'MATCH' if (n == int(entry['rows']) and not missing_cols) else 'DIFF'})
         rows.append(rec)
     return rows
 
@@ -180,11 +178,11 @@ def main():
             classified['mentioned_only'].append({'path': p, 'where': rec['mentioned_only'][:3]})
 
     inputs_check = verify_spec_inputs(spec)
-    bad_inputs = [r for r in inputs_check if r['hash_status'] != 'MATCH']
+    bad_inputs = [r for r in inputs_check if r['status'] != 'MATCH']
 
     report = {
         'spec_id': spec['spec_id'],
-        'spec_hash': file_size(spec_bytes),
+        'spec_hash': len(spec_bytes),
         'run_at': datetime.now(timezone.utc).isoformat(),
         'command': ' '.join(sys.argv),
         'status': None,
@@ -196,7 +194,7 @@ def main():
         },
     }
     report['status'] = 'PASS' if all(report['checks'].values()) else 'FAIL'
-    out = ROOT / 'reports/data_gates/G0/s3a_gate1_provenance_audit.json'
+    out = ROOT / 'reports/data_gates/G0/analyst_gate1_provenance_audit.json'
     out.write_text(json.dumps(report, ensure_ascii=False, indent=1), encoding='utf-8')
     print(json.dumps({'checks': report['checks'],
                       'spec_input_count': len(inputs_check),

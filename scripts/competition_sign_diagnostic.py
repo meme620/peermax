@@ -1,4 +1,4 @@
-"""S3「PC → 预期收益」系数反号 · 深度诊断 H1–H8（2026-10-21，只读既有产物 + 新建诊断产物）。
+"""network「PC → 预期收益」系数反号 · 深度诊断 H1–H8（2026-10-21，只读既有产物 + 新建诊断产物）。
 
 背景（既定事实，不重复验证）：原文（刘亚辉等 2021）PC = −HHI(团内销售收入)，PC 越大 = 竞争越激烈，
 PC → 预期收益 **为正**（表 4：+0.152/t=7.76、+0.130/t=5.40；表 3 H−L α3 +0.218/t=6.27）。
@@ -15,7 +15,7 @@ PC → 预期收益 **为正**（表 4：+0.152/t=7.76、+0.130/t=5.40；表 3 H
 == 纪律 ==
   只新建脚本/产物；不覆盖任何既有产物、不改 headline_value/冻结值/主口径网络；
   全部新产物落 `artifacts/tmp/pc_diag/`（本脚本 + 各 H 的 JSON）；最终报告落
-  `reports/audits/s3_pc_sign_diagnostics_20261021.{json,md}`（新建）。
+  `reports/audits/competition_sign_diagnostics_20261021.{json,md}`（新建）。
 
 == REV2 修订（2026-10-21，依独立复核意见 F1–F6；只改本诊断轮产物）==
   复核实测证据（采纳） = artifacts/tmp/review_diag/{rv_lib.py,A_injection.py,B_h2.py,C_h3h4.py,
@@ -68,7 +68,7 @@ DIAG = ROOT / 'artifacts/tmp/pc_diag'
 
 PROGRESS = ROOT / 'artifacts/tmp/pc_sign_diag_progress.md'
 
-PANEL = ROOT / 'data/processed/m1_common_sample_ma_teacher_v2.parquet'
+PANEL = ROOT / 'data/processed/pricing_sample_ma_teacher_v2.parquet'
 
 PC_DIR = ROOT / 'data/processed/network_ma_teacher'
 
@@ -86,9 +86,9 @@ SW2_MAP = ROOT / 'data/processed/sw2_industry_latest.csv'
 
 TIER_DIR = ROOT / 'artifacts/tmp/pc_rc'          # 既有（rootcause 轮）K 档缓存目录（只读复用）
 
-OUT_JSON = ROOT / 'reports/audits/s3_pc_sign_diagnostics_20261021.json'
+OUT_JSON = ROOT / 'reports/audits/competition_sign_diagnostics_20261021.json'
 
-OUT_MD = ROOT / 'reports/audits/s3_pc_sign_diagnostics_20261021.md'
+OUT_MD = ROOT / 'reports/audits/competition_sign_diagnostics_20261021.md'
 
 CONTROLS = ['size', 'bm', 'mom', 'rev', 'illiq']
 
@@ -170,7 +170,7 @@ def load_pc(pc_dir: Path = PC_DIR, years=PC_YEARS) -> pd.DataFrame:
 def load_panel() -> pd.DataFrame:
     cols = ['focal_id', 'month', 'network_version', 'R_next', 'next_R', 'R_next_postadj',
             'market_equity', 'size', 'bm', 'mom', 'rev', 'illiq', 'turnover',
-            'm1_in_fm_sample', 'm1_exclusion_reason', 'me_below_q10', 'me_q10_market',
+            'pricing_in_fm_sample', 'pricing_exclusion_reason', 'me_below_q10', 'me_q10_market',
             'AnalystCoverage', 'ind_l2_ret_vw', 'ind_l1_ret_vw', 'st_flag_focal', 'recent_ipo']
     d = pd.read_parquet(PANEL, columns=cols)
     d['text_year'] = pd.to_numeric(d['network_version'], errors='coerce')
@@ -213,7 +213,7 @@ def monthly_factors() -> pd.DataFrame:
 def make_samples(m: pd.DataFrame) -> dict:
     pc_ok = m['PC'].notna() & m['R_next'].notna()
     ctrl_ok = m[CONTROLS].notna().all(axis=1)
-    reg = m['m1_in_fm_sample'].astype(bool)
+    reg = m['pricing_in_fm_sample'].astype(bool)
     return {
         'registered': m[pc_ok & reg].copy(),
         'paper_like': m[pc_ok].copy(),
@@ -223,7 +223,7 @@ def make_samples(m: pd.DataFrame) -> dict:
 
 def fm(samp, ycol, xcols, weight_col=None, nw_lag=NW, min_n=None):
     if min_n is None:
-        min_n = int(param_value('m1_sample_and_spec_registry')['min_focal_count_per_month'])
+        min_n = int(param_value('sample_and_spec_registry')['min_focal_count_per_month'])
     blk, perm = fm_regression(samp, ycol, list(xcols), weight_col=weight_col,
                               min_n=min_n, nw_lag=nw_lag)
     blk['_per_month'] = perm
@@ -473,16 +473,16 @@ def run_H2(m, S, fmonth, panel) -> dict:
                f"（≤5e-9 写盘精度）；hhi_excl_self 列 = −HHI_excl_self：{[a.get('csv_col_equals_minus_HHI_excl') for a in audits]}")
 
     # ---- (2) 剔除自身变体：PC_x = −HHI_excl（符号按手核结果确定），重跑 FM
-    m2 = m.copy()
+    merged = m.copy()
     signs = [a.get('csv_col_equals_minus_HHI_excl') for a in audits if a.get('csv_col_equals_minus_HHI_excl') is not None]
     col_is_minus = bool(signs) and all(signs)
-    m2['PC_x'] = (pd.to_numeric(m2['hhi_excl_self'], errors='coerce') if col_is_minus
-                  else -pd.to_numeric(m2['hhi_excl_self'], errors='coerce'))
-    m2['PC_x'] = m2['PC_x'].where(m2['PC'].notna())
-    pc_ok = m2['PC_x'].notna() & m2['R_next'].notna()
-    ctrl_ok = m2[CONTROLS].notna().all(axis=1)
-    regx = m2[pc_ok & m2['m1_in_fm_sample'].astype(bool)]
-    paperx = m2[pc_ok]
+    merged['PC_x'] = (pd.to_numeric(merged['hhi_excl_self'], errors='coerce') if col_is_minus
+                  else -pd.to_numeric(merged['hhi_excl_self'], errors='coerce'))
+    merged['PC_x'] = merged['PC_x'].where(merged['PC'].notna())
+    pc_ok = merged['PC_x'].notna() & merged['R_next'].notna()
+    ctrl_ok = merged[CONTROLS].notna().all(axis=1)
+    regx = merged[pc_ok & merged['pricing_in_fm_sample'].astype(bool)]
+    paperx = merged[pc_ok]
     var = {}
     for tag, s in (('registered', regx), ('paper_like', paperx)):
         b1 = fm(s, 'R_next', ['PC_x'])
@@ -593,7 +593,7 @@ def run_H3(panel, fmonth) -> dict:
                             '且该区 PC 分布已明显偏离原文表 2（PC 中位 −0.059/−0.049/−0.036 vs 原文 −0.180），'
                             '而"与原文分布可比"的 K 区（tier≈10，K=826）同样为负')
     # 肘点探索既有产物
-    for f in ('s3_ma_K_explore.json', 's3_ma_K_explore2.json'):
+    for f in ('network_business_k_explore.json', 'network_business_k_explore_cluster_only.json'):
         p = ROOT / 'reports/data_gates/G0' / f
         if p.exists():
             try:
@@ -615,11 +615,11 @@ def run_H4(m, S, panel, fmonth) -> dict:
     ctrl5 = m[CONTROLS].notna().all(axis=1)
     ana_ok = m['AnalystCoverage'].notna()
     slices = {
-        'A_registered': pc_ok & m['m1_in_fm_sample'].astype(bool),
+        'A_registered': pc_ok & m['pricing_in_fm_sample'].astype(bool),
         'B_paper_like': pc_ok,
         'C_paper_like_ctrl5': pc_ok & ctrl5,
         'D_no_analyst_gate': pc_ok & ctrl5 & (~ana_ok),          # 仅因分析师覆盖缺失而被剔的行
-        'E_only_analyst_gate_excluded': pc_ok & (~m['m1_in_fm_sample'].astype(bool)),
+        'E_only_analyst_gate_excluded': pc_ok & (~m['pricing_in_fm_sample'].astype(bool)),
     }
     for tag, mask in slices.items():
         s = m[mask]
@@ -641,14 +641,14 @@ def run_H4(m, S, panel, fmonth) -> dict:
         psay('H4', f"变体 {tag} 状态 = ok：n = {row['n_rows']:,}、β = {row['fm_univariate']['beta_pct']}%"
                    f"（t = {row['fm_univariate']['t_nw']}）")
     # 微盘开关（面板内）
-    for tag, mask in (('F_registered_plus_microcap', pc_ok & (m['m1_in_fm_sample'].astype(bool) | m['me_below_q10'].astype(bool))),
-                      ('G_registered_excl_microcap', pc_ok & m['m1_in_fm_sample'].astype(bool))):
+    for tag, mask in (('F_registered_plus_microcap', pc_ok & (m['pricing_in_fm_sample'].astype(bool) | m['me_below_q10'].astype(bool))),
+                      ('G_registered_excl_microcap', pc_ok & m['pricing_in_fm_sample'].astype(bool))):
         s = m[mask]
         b1 = fm(s, 'R_next', ['PC'])
         variants[tag] = {'n_rows': int(len(s)), 'fm_univariate': {'beta_pct': pct(b1['coefs']['PC']['beta']),
                                                                   't_nw': r4(b1['coefs']['PC']['t_nw'])}}
         psay('H4', f"变体 {tag} 状态 = ok：n = {len(s):,}、β = {variants[tag]['fm_univariate']['beta_pct']}%")
-    # H：全 PC 宇宙（无 M1 筛选，无分析师门；收益取 monthly_returns_clean_v2）
+    # H：全 PC 宇宙（无 pricing_gate 筛选，无分析师门；收益取 monthly_returns_clean_v2）
     try:
         pc_all = load_pc(PC_DIR)
         pc_all = pc_all[pc_all['pc'].notna()]
@@ -677,7 +677,7 @@ def run_H4(m, S, panel, fmonth) -> dict:
             'n_months': int(full['month'].nunique()),
             'fm_univariate': {'beta_pct': pct(b1['coefs']['PC']['beta']), 't_nw': r4(b1['coefs']['PC']['t_nw']),
                               'n_months_used': b1['n_months_used']},
-            'note': 'PC 全宇宙（无 M1 筛选、无分析师门、无微盘剔除、无控制要求）；收益 = monthly_returns_clean_v2 原始月收益'}
+            'note': 'PC 全宇宙（无 pricing_gate 筛选、无分析师门、无微盘剔除、无控制要求）；收益 = monthly_returns_clean_v2 原始月收益'}
         psay('H4', f"变体 H_full_PC_universe 状态 = ok：n = {len(full):,}（{full['focal_id'].nunique()} 家）、"
                    f"β = {variants['H_full_PC_universe']['fm_univariate']['beta_pct']}%"
                    f"（t = {variants['H_full_PC_universe']['fm_univariate']['t_nw']}）")
@@ -791,10 +791,10 @@ def run_H6(m, S, fmonth) -> dict:
                f"bm {out['control_coefs_vs_paper']['registered']['coefs']['bm']}（原文 +0.339 / −0.358）")
 
     # (2) 行业 FE（月 × 申万二级 组内去均值）
-    m2 = reg.copy()
-    m2['sw2'] = sw2_asof(m2['month'], m2['focal_id'])
+    merged_reg = reg.copy()
+    merged['sw2'] = sw2_asof(merged['month'], merged['focal_id'])
     cols = ['R_next', 'PC'] + CONTROLS
-    dd = m2.dropna(subset=cols + ['sw2']).copy()
+    dd = merged_reg.dropna(subset=cols + ['sw2']).copy()
     counts = dd.groupby(['month', 'sw2'])['R_next'].transform('size')
     dd = dd[counts >= 5]
     for c in cols:
@@ -1231,20 +1231,20 @@ def run_H8(m, S, panel, fmonth) -> dict:
         'n_firm_year': int(len(fy)),
     }}
     for tag, s in (('registered', reg), ('paper_like', S['paper_like'])):
-        s2 = s.merge(fy[['focal_id', 'text_year', 'w_dist', 'w_dist_cap10', 'PC_qm']],
+        merged_fy = s.merge(fy[['focal_id', 'text_year', 'w_dist', 'w_dist_cap10', 'PC_qm']],
                      on=['focal_id', 'text_year'], how='left')
         for wtag in ('w_dist', 'w_dist_cap10'):
-            b = fm(s2, 'R_next', ['PC'], weight_col=wtag)
+            b = fm(merged_fy, 'R_next', ['PC'], weight_col=wtag)
             dist[f'{tag}|{wtag}'] = {'beta_pct': pct(b['coefs']['PC']['beta']),
                                      't_nw': r4(b['coefs']['PC']['t_nw']), 'n_months_used': b['n_months_used']}
-        b2 = fm(s2, 'R_next', ['PC'] + CONTROLS, weight_col='w_dist')
+        b2 = fm(merged_fy, 'R_next', ['PC'] + CONTROLS, weight_col='w_dist')
         dist[f'{tag}|w_dist+controls'] = {'PC_beta_pct': pct(b2['coefs']['PC']['beta']),
                                           'PC_t': r4(b2['coefs']['PC']['t_nw'])}
-        b3 = fm(s2, 'R_next', ['PC_qm'])
+        b3 = fm(merged_fy, 'R_next', ['PC_qm'])
         dist[f'{tag}|quantile_match'] = {'beta_pct': pct(b3['coefs']['PC_qm']['beta']),
                                          't_nw': r4(b3['coefs']['PC_qm']['t_nw']),
                                          'n_months_used': b3['n_months_used']}
-        p_qm = portfolio_key(s2, 'PC_qm', 5, 'EW', None, fmonth=fmonth)
+        p_qm = portfolio_key(merged_fy, 'PC_qm', 5, 'EW', None, fmonth=fmonth)
         dist[f'{tag}|quantile_match|quintile_EW'] = {'HL_raw_pct': p_qm.get('HL_raw_pct'),
                                                      'HL_raw_t': p_qm.get('HL_raw_t_nw'),
                                                      'alpha_a3_pct': p_qm.get('alpha_a3_pct'),
@@ -1337,7 +1337,7 @@ def assemble():
         p = DIAG / f'{tag}.json'
         parts[tag] = json.loads(p.read_text(encoding='utf-8')) if p.exists() else {'status': 'MISSING'}
     S = {
-        'artifact': 's3_pc_sign_diagnostics_20261021',
+        'artifact': 'competition_sign_diagnostics_20261021',
         'generated_at': '2026-10-21',
         'nature': '项目自建 PC 系数为负的只读诊断（复用既有产物 + 新建诊断脚本/产物；未改任何既有文件/冻结值/主口径）。'
                   '**2026-10-27 口径更正**：仅描述项目自建 PC（对手集合 = 同团全部成员），不是对原文 PC 的复现或证伪。',
@@ -1357,7 +1357,7 @@ def assemble():
             'no_sample_selection_no_tuning': True,
         },
         'inputs': {
-            'panel': 'data/processed/m1_common_sample_ma_teacher_v2.parquet',
+            'panel': 'data/processed/pricing_sample_ma_teacher_v2.parquet',
             'pc_dir': 'data/processed/network_ma_teacher/{2017..2022}_pc.csv',
             'k_tier_cache': 'artifacts/tmp/pc_rc/h1_net_t{5,10,20,30,44,60,80,120}/（既有只读复用）',
             'returns': 'data/processed/monthly_returns_clean_v2.csv（持有期口径）',
@@ -1374,7 +1374,7 @@ def assemble():
             'ours_fulltext_corpus': {'registered_EW_lag6_univariate': '-0.3926 (t=-1.1227)',
                                      'paper_like_EW_lag12_univariate': '-0.4194 (t=-2.0059)',
                                      'quintile_EW_alpha_a3': '-0.4974 (t=-2.0349)',
-                                     'src': 'reports/data_gates/G0/s3_pc_pricing_correspondence_fulltext.json'},
+                                     'src': 'reports/data_gates/G0/competition_pricing_correspondence_fulltext.json'},
             'note': '换语料不改变项目 PC 的点估计符号（历史读数，描述性）；本报告数值为 MD&A 主口径（除注明外）。'
                     'PC 与原文对手集合不可比，判定统一为「不可比/未复现」。',
         },
@@ -1546,13 +1546,13 @@ def assemble():
                      f"逐月负号占比 {h5.get('monthly_beta_sign_distribution', {}).get('share_negative')}；"
                      f"控制变量符号相反仅 3/5（size/bm/rev）→ 该窗口横截面定价结构不同；"
                      f"持有期折算月均不改善（{h7_hor}）→ 排除「信号延迟」型期间解释"},
-        {'candidate': '残余口径（原文 12 控制集 / S1–S7 样本筛选 / 原文肘点团结构不可得 / 分布匹配重加权）',
+        {'candidate': '残余口径（原文 12 控制集 / 原文样本筛除 样本筛选 / 原文肘点团结构不可得 / 分布匹配重加权）',
          'support': '弱–中（未穷尽；分布口径已用重加权检验，未使主读数转正）',
          'evidence': f"列(1) 单变量已为负 → 控制集翻转概率低；K 网格 11 档主读数层无正号；"
                      f"within-N 分箱内无一致正号（{ {k: v2.get('beta_pct') for k, v2 in wnb.items()} }）；"
                      f"分布匹配重加权（WLS β = {drr.get('registered|w_dist', {}).get('beta_pct')}%、"
                      f"分位匹配 β = {drr.get('registered|quantile_match', {}).get('beta_pct')}%）亦未转正且不显著；"
-                     f"原文 S1–S7 与 βMKT/IA/Roe/Lev/Disp/Ivol 未逐条复刻"},
+                     f"原文 原文样本筛除 与 βMKT/IA/Roe/Lev/Disp/Ivol 未逐条复刻"},
     ]
     S['retracted_conclusions'] = [
         '**撤回**：H8「PC 的横截面信息 = 团结构代理……残差化后负号消失」→ 复核三条反驳（原文收录）：'
@@ -1584,7 +1584,7 @@ def assemble():
         ],
         'pending': [
             '期间/制度（H5）：无正面证据；原文 2007–2016 窗口不可测（语料仅文本年 2017+）',
-            '残余口径：原文 12 控制集（βMKT/IA/Roe/Lev/Disp/Ivol + 证监会二级行业 HHI）、S1–S7 样本筛选、'
+            '残余口径：原文 12 控制集（βMKT/IA/Roe/Lev/Disp/Ivol + 证监会二级行业 HHI）、原文样本筛除 样本筛选、'
             '原文肘点团结构不可得',
             'H8 结构层（原「团结构代理」）：改正为**待定/未被识别**（过度控制方法论不成立；'
             f"分布匹配重加权（重要性 WLS β = {drr.get('registered|w_dist', {}).get('beta_pct')}%/t = "
@@ -1636,7 +1636,7 @@ def assemble():
         '原文肘点法的确切团结构（K 与团形）无法从表 2 唯一反推 → K 网格覆盖了"分布对齐"维度，'
         '但无法证明"原文团结构下符号会变"。',
         '原文 12 项控制集（βMKT 36 月滚动 / IA / Roe / Lev / Disp / Ivol / 证监会二级行业 HHI）与 '
-        'S1–S7 样本筛选（金融/综合类剔除、上市不足两年、词条数 <10 等）未逐条复刻。',
+        '原文样本筛除 样本筛选（金融/综合类剔除、上市不足两年、词条数 <10 等）未逐条复刻。',
         '**H8 结构层 = 待定/未被识别（原「团结构代理」结论已撤回）**：残差化路线属过度控制/bad control，'
         '不得作为根因；round-2 替代检验（恒等式分解 / 1/N 控制 / within-N 分箱 / 分布匹配重加权 / 1000 次团标签置换）'
         '均未提供正号或机制证据。',
@@ -1650,7 +1650,7 @@ def assemble():
         'PC 文本年扩至 2014–2022（事件月 ≈104）→ 检验 2015–2017 是否出现正号（以月块 bootstrap CI 为判据）；'
         '若仍无正号，则期间层也被压缩为"窗口内不可定案"。',
         '**规格补全（残余口径）**：构造 βMKT(36 月滚动)/IA/Roe/Lev/Disp/Ivol + 证监会二级行业 HHI，'
-        '复刻表 4 列(2) 的 12 控制集；同步按 S1–S7 逐条复刻样本（预计不翻转，列(1) 已为负）。',
+        '复刻表 4 列(2) 的 12 控制集；同步按 原文样本筛除 逐条复刻样本（预计不翻转，列(1) 已为负）。',
         '**功效补强（推断层）**：本轮 1000 次团标签置换 + MDE 已完成（单侧 p = '
         f"{pmp.get('p_one_sided_le_observed')}、MDE(80%) ≈ {pmd.get('mde80_pct')}%）→ 下一步是压 MDE："
         '延长文本年（同期间层实验）、提高月内有效截面、或改用重叠窗正确校正（HAC 以事件月聚合）。',
@@ -1672,8 +1672,8 @@ def make_md(S: dict) -> None:
         return f'| {x} | {y} |'
 
     md = []
-    md.append('# S3「项目自建 PC → 预期收益」系数为负 · 深度诊断 H1–H8（2026-10-21；2026-10-27 口径更正）\n')
-    md.append('> **2026-10-27 口径更正（Phase 0.2 / V-P1-2 + N-2）**：本报告的「负号/反号」分析仅针对**项目自建 PC**'
+    md.append('# network「项目自建 PC → 预期收益」系数为负 · 深度诊断 H1–H8（2026-10-21；2026-10-27 口径更正）\n')
+    md.append('> **2026-10-27 口径更正（Phase 0.2 口径复核）**：本报告的「负号/反号」分析仅针对**项目自建 PC**'
               '（对手集合 = 同团全部成员）的描述性排查，**不是对刘亚辉等（2021）PC 变量的复现或证伪**。'
               '原文第四步的对手集合 = 「任何与其相似度超过团内最小相似度的公司」（字面含团外），项目实现 = 同团成员'
               '（`methodology_execution_plan.md:2290` 已登记偏离）；二者不是同一对手集合。因此：① 本报告 H1–H8 的裁决与数值全部保留，'
@@ -2040,12 +2040,12 @@ def make_md(S: dict) -> None:
               '进度：`artifacts/tmp/pc_sign_diag_progress.md`；本报告两件。')
     md.append('- 复用（只读）：`artifacts/tmp/pc_rc/h1_net_t*/`（K 档 PC 缓存）、'
               '`data/processed/network_ma_teacher/{2017..2022}_pc.csv` + `clusters/`、'
-              '`data/processed/m1_common_sample_ma_teacher_v2.parquet`、`data/processed/monthly_returns_clean_v2.csv`、'
+              '`data/processed/pricing_sample_ma_teacher_v2.parquet`、`data/processed/monthly_returns_clean_v2.csv`、'
               '`data/processed/factor_returns_daily.csv`、`data/raw/drive/operating_revenue_annual.pkl`、'
               '`data/processed/sw2_industry_latest.csv`。')
     md.append('- 本轮新建（粗 K 档，未覆盖既有）：`artifacts/tmp/pc_rc/dcoarse_net_t{150,200,300}/`（仓库重建器新建 tag）、'
               '`artifacts/tmp/pc_rc/rc_rebuild_dcoarse.json`、`artifacts/tmp/pc_diag/{H1..H8}.json` + '
-              '`artifacts/tmp/pc_diag/{pc_report_dcoarse_t*,dcoarse_*,run_*,final_h3}.log`。')
+              '`artifacts/tmp/pc_diag/{pc_report_dcoarse_t*,dcoarse_*,run_*,h3_closeout}.log`。')
     md.append('- REV2 复核证据（只读引用，不在本轮重算其数值）：`artifacts/tmp/review_diag/{rv_lib.py,A_injection.py,'
               'B_h2.py,C_h3h4.py,D_h5.py,E_h6.py,F_h8.py,F2_h8_identity.py}` 及同名 JSON。')
     md.append('- 治理登记（REV2-F6，与本报告同轮）：本轮产物（诊断脚本 + 8 分片 + 报告两件 + dcoarse 证据）登记进 '
