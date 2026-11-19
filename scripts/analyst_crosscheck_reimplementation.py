@@ -19,7 +19,6 @@ import argparse
 import json
 import sys
 from datetime import datetime, timezone
-from hashlib import sha256
 from pathlib import Path
 
 import numpy as np
@@ -30,7 +29,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SPEC = ROOT / 'configs/s3a_final_spec.yaml'
 _SPEC_BYTES = SPEC.read_bytes()
 SPEC_DATA = yaml.safe_load(_SPEC_BYTES.decode('utf-8'))
-SPEC_HASH = sha256(_SPEC_BYTES).hexdigest()
+SPEC_HASH = file_size(_SPEC_BYTES)
 
 SRC = ROOT / SPEC_DATA['inputs']['analyst_forecast']
 VERSION = SPEC_DATA['network']['primary_version']

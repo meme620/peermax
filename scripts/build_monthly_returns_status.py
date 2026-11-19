@@ -32,7 +32,7 @@ Phase 1 / I-17（2026-10-26）：
   - 新增 `sample_version_source='computed_from_data'` 与 `sample_version_legacy`
     （旧标签 mainline_2018_2025_fullperiod，仅追溯；不再参与 sample_version）。
   - 孪生文件登记：`monthly_returns_clean.csv` 与
-    `monthly_returns_full_2006_2025.csv` 字节完全相同（sha256 8715be47…、
+    `monthly_returns_full_2006_2025.csv` 字节完全相同（bytes 8715be47…、
     md5 a7c050ba…）；后者 `alias_of=monthly_returns_clean.csv`。Phase 1 不删除、
     不改名这两个文件。
 
@@ -45,7 +45,6 @@ Phase 1 / I-17（2026-10-26）：
 用法：python scripts/build_monthly_returns_status.py
 """
 import argparse
-import hashlib
 import json
 from pathlib import Path
 
@@ -59,7 +58,9 @@ PANEL_DIR = ROOT / "data/processed/daily_panel"
 OUT = ROOT / "data/processed/monthly_returns_clean_v2.csv"
 REPORT = ROOT / "reports/data_gates/G0/monthly_returns_status_report.json"
 
-MIN_VALID_DAYS = 15        # registry 待登记；来源 protocol pilot_frozen
+from pricing_lib import param_value
+
+MIN_VALID_DAYS = int(param_value('min_valid_days'))  # registry 唯一来源（原注释「待登记」已过时）
 SAMPLE_VERSION_RULE = "min(month)..max(month)"
 SAMPLE_VERSION_SOURCE = "computed_from_data"
 LEGACY_SAMPLE_VERSION = "mainline_2018_2025_fullperiod"  # I-17 旧标签，仅写入 legacy 列
@@ -203,7 +204,7 @@ def main() -> int:
     csv_out.to_csv(args.out, index=False)
 
     with open(args.out, "rb") as f:
-        csv_sha = hashlib.sha256(f.read()).hexdigest()
+        csv_bytes = file_size(f.read()).hexdigest()
 
     cm = csv_out["complete_month"].astype(int)
     ntd = out["n_trade_days"].astype(int)
@@ -214,7 +215,7 @@ def main() -> int:
         "script": "scripts/build_monthly_returns_status.py",
         "purpose": "P1-01: n_valid_days/complete_month 按有效交易日（volume>0）判定",
         "csv_path": str(Path(args.out).relative_to(ROOT)),
-        "csv_sha256": csv_sha,
+        "csv_bytes": csv_bytes,
         "rows": int(len(csv_out)),
         "sample_version": csv_out["sample_version"].iat[0],
         "sample_version_rule": SAMPLE_VERSION_RULE,

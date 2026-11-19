@@ -14,7 +14,6 @@
 import json
 import sys
 from datetime import datetime, timezone
-from hashlib import sha256
 from pathlib import Path
 
 import pandas as pd
@@ -22,7 +21,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = ROOT / 'configs/s3a_final_spec.yaml'
-SPEC_HASH = sha256(SPEC.read_bytes()).hexdigest()
+SPEC_HASH = file_size(SPEC.read_bytes()).hexdigest()
 COV = ROOT / 'data/processed/analyst/firm_analyst_coverage.csv'
 EDGED = ROOT / 'data/processed/analyst/edges'
 VERSION = 'coverage_win12_fy12_v3'

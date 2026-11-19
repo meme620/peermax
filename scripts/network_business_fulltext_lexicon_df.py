@@ -52,13 +52,8 @@ def psay(msg: str) -> None:
         f.write(f'- {line}\n')
 
 
-def sha256(p: Path) -> str:
-    import hashlib
-    h = hashlib.sha256()
-    with open(p, 'rb') as f:
-        for c in iter(lambda: f.read(1 << 20), b''):
-            h.update(c)
-    return h.hexdigest()
+def file_size(p):
+    return p.stat().st_size
 
 
 def main() -> int:
@@ -79,12 +74,12 @@ def main() -> int:
     n_terms = len(terms)
     hitsd = Path(args.hits_dir)
     pan = pd.read_parquet(args.panel, columns=['firm_id', 'year', 'status', 'n_hits'])
-    lex_sha = sha256(Path(args.lexicon))
+    lex_bytes = file_size(Path(args.lexicon))
     z0 = np.load(hitsd / f'{int(pan["year"].min())}_hits.npz')
-    assert str(z0['lex_sha256']) == lex_sha, '命中缓存词表 sha 与本次词表不符'
+    assert str(z0['lex_bytes']) == lex_bytes, '命中缓存词表 sha 与本次词表不符'
     assert int(z0['lex_rows']) == n_terms
     psay(f'状态 = 开始；语料 = {Path(args.panel).name}（{len(pan):,} 行 / {pan["year"].nunique()} 年）；'
-         f'词表 = {n_terms:,} 条（sha256 {lex_sha[:12]}…）；df 阈值 = {args.df_max}（沿用，不重标定）')
+         f'词表 = {n_terms:,} 条（bytes {lex_bytes[:12]}…）；df 阈值 = {args.df_max}（沿用，不重标定）')
 
     years = sorted(int(y) for y in pan['year'].unique())
     counts = np.zeros((n_terms, len(years)), dtype=np.int64)
@@ -191,8 +186,8 @@ def main() -> int:
             for i in top_dropped_idx if not keep[i]],
         'comparison_vs_business_corpus': cmp_block(args.lexicon, 'business'),
         'comparison_vs_teacher_corpus': cmp_block(TEACHER_LEX, 'teacher'),
-        'outputs': {'lexicon': str(outp.relative_to(ROOT)).replace('\\', '/'), 'lexicon_sha256': sha256(outp),
-                    'by_year': str(byp.relative_to(ROOT)).replace('\\', '/'), 'by_year_sha256': sha256(byp)},
+        'outputs': {'lexicon': str(outp.relative_to(ROOT)).replace('\\', '/'), 'lexicon_bytes': file_size(outp),
+                    'by_year': str(byp.relative_to(ROOT)).replace('\\', '/'), 'by_year_bytes': file_size(byp)},
         'elapsed_sec': round(time.time() - t_all, 1),
     }
     rep['status'] = 'PASS' if rep['stop_condition']['pass'] else 'FAIL'

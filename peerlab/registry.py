@@ -67,7 +67,7 @@ EXPERIMENTS: tuple[Experiment, ...] = (
         id='estimation-sample',
         title='M1 样本构建（run-all 只跑一次）',
         steps=(Step('scripts/pricing_sample_build.py'),),
-        requires=(REGISTRY_CONFIG, 'data/processed'),
+        requires=(REGISTRY_CONFIG, 'data/processed/monthly_pricing_panel_ma_teacher.csv'),
         outputs=(
             'reports/data_gates/G0/s3_m1_sample_report*.json',
             'data/processed/m1_common_sample_*.parquet',
@@ -79,7 +79,8 @@ EXPERIMENTS: tuple[Experiment, ...] = (
         id='network-business-text',
         title='M-A 产品市场竞争网络构边（老师 MD&A 语料）',
         steps=(Step('scripts/network_business_edges_build.py', ('--corpus', 'teacher')),),
-        requires=('configs/version_manifest.yaml', 'data/processed'),
+        requires=('configs/version_manifest.yaml', 'data/raw/teacher/mda_data_2023.csv',
+                  'data/processed/product_lexicon_v2_teacher.csv'),
         outputs=('data/processed/network_ma_teacher/**',),
         runtime_hint='分钟级',
     ),
@@ -91,7 +92,8 @@ EXPERIMENTS: tuple[Experiment, ...] = (
             Step('scripts/network_tau_calibrate.py'),
             Step('scripts/network_mda_edges_build.py', ('--year', '2021')),
         ),
-        requires=(REGISTRY_CONFIG, 'data/raw/teacher/mda_data_2023.csv'),
+        requires=(REGISTRY_CONFIG, 'data/raw/teacher/mda_data_2023.csv',
+                  'data/processed/teacher_mda_panel.csv'),
         outputs=(
             'data/processed/network_mb_teacher/**',
             'reports/data_gates/G0/s3_b1_tau_calibration*.json',
@@ -113,7 +115,7 @@ EXPERIMENTS: tuple[Experiment, ...] = (
                 ),
             ),
         ),
-        requires=(REGISTRY_CONFIG, 'data/processed/network_ma_teacher'),
+        requires=(REGISTRY_CONFIG, 'data/processed/network_ma_teacher', 'data/processed/daily_panel'),
         outputs=(
             'data/processed/monthly_pricing_panel_*_v4.csv',
             'reports/data_gates/G0/s4_step2_*_v4_report.json',
@@ -124,7 +126,7 @@ EXPERIMENTS: tuple[Experiment, ...] = (
         id='fm-main-table',
         title='M1 主表：Fama-MacBeth + horse race',
         steps=(Step('scripts/pricing_fm_main.py', ('--sample-version', 'v3')),),
-        requires=(REGISTRY_CONFIG, 'data/processed'),
+        requires=(REGISTRY_CONFIG, 'data/processed/m1_common_sample_ma_teacher_v3.parquet'),
         outputs=(
             'reports/data_gates/G0/s3_m1_pricing_table*.json',
             'reports/data_gates/G0/s3_m1_pricing_table*.md',
@@ -142,8 +144,8 @@ EXPERIMENTS: tuple[Experiment, ...] = (
     Experiment(
         id='portfolio-sorts',
         title='M1 组合表：五分位/十分位 spread',
-        steps=(Step('scripts/pricing_portfolio_sorts.py', ('--sample-version', 'v2')),),
-        requires=(REGISTRY_CONFIG, 'data/processed'),
+        steps=(Step('scripts/pricing_portfolio_sorts.py', ('--sample-version', 'v3')),),
+        requires=(REGISTRY_CONFIG, 'data/processed/m1_common_sample_ma_teacher_v3.parquet'),
         outputs=(
             'reports/data_gates/G0/s3_m1_portfolio_deciles*.json',
             'reports/data_gates/G0/s3_m1_diagnostics*.json',
@@ -158,7 +160,7 @@ EXPERIMENTS: tuple[Experiment, ...] = (
             Step('scripts/pricing_robustness_placebo.py'),
             Step('scripts/pricing_length_industry_control.py'),
         ),
-        requires=(REGISTRY_CONFIG, 'data/processed'),
+        requires=(REGISTRY_CONFIG, 'data/processed/m1_common_sample_ma_teacher_v3.parquet'),
         outputs=(
             'reports/data_gates/G0/s3_m1_robustness_placebo.json',
             'reports/data_gates/G0/s3_m1_length_control.json',
@@ -170,7 +172,9 @@ EXPERIMENTS: tuple[Experiment, ...] = (
         id='gate-report',
         title='M1 数据门报告',
         steps=(Step('scripts/pricing_gate_report.py'),),
-        requires=(REGISTRY_CONFIG, 'data/processed'),
+        requires=(REGISTRY_CONFIG,
+                  'reports/data_gates/G0/s3_m1_pricing_table.json',
+                  'reports/data_gates/G0/s3_m1_portfolio_deciles.json'),
         outputs=(
             'reports/data_gates/G0/s3_m1_gate_report*.json',
             'reports/data_gates/G0/s3_m1_gate_report*.md',
@@ -191,7 +195,7 @@ EXPERIMENTS: tuple[Experiment, ...] = (
         id='density-null',
         title='网络密度零模型（随机重连，随 seed 变化）',
         steps=(Step('scripts/network_density_null.py'),),
-        requires=(REGISTRY_CONFIG, 'data/processed'),
+        requires=(REGISTRY_CONFIG, 'data/processed/network_ma_teacher'),
         outputs=('reports/data_gates/G0/s3_network_density_null.json',),
         accepts_seed=True,
         runtime_hint='分钟级到小时级（R=1000 重连）',
@@ -206,3 +210,91 @@ def get(exp_id: str) -> Experiment:
         return BY_ID[exp_id]
     except KeyError:
         raise KeyError(f'未知实验 {exp_id!r}；可选：{", ".join(BY_ID)}') from None
+
+# 每个实验的 purpose 与 notes：实验 spec 从 md 迁到代码，peerlab experiments 直接打印，lint 校验非空。
+EXPERIMENT_NOTES: dict[str, dict] = {
+    'estimation-sample': {
+        'purpose': '构建 M1/S5 估计样本（四列口径，v3 为主）',
+        'notes': (
+            '参数：--v2-report-only、--force/--force-reason、--rebuild-amount-cache',
+            '口径：完整月 n_valid_days>=15、microcap 形成月 q10、次新股 <6 月、IQR 池化登记值',
+            '坑：缺 registry 导入即 SystemExit(2)；覆盖既有样本必须给 --force-reason',
+        ),
+    },
+    'network-business-text': {
+        'purpose': 'M-A 产品市场网络构边（--corpus teacher 为主口径）',
+        'notes': (
+            '上游：text_business_extract -> network_business_cluster_grid -> cluster_freeze',
+            '产物：data/processed/network_ma_teacher/，不覆盖 network_ma/',
+            '坑：本实验 steps 只做构边，聚类冻结要先跑；缺聚类目录会 blocked',
+        ),
+    },
+    'network-mda-text': {
+        'purpose': 'M-B 老师 MD&A 语料的 TF-IDF 文本网络',
+        'notes': (
+            '链路：network_mda_full_matrix -> network_tau_calibrate -> network_mda_edges_build',
+            '产物：data/processed/network_mb_teacher/；network_mb_stub/ 只是占位产物',
+            '坑：不给 --tau 走占位模式，产物不入分析',
+        ),
+    },
+    'peermax-panel': {
+        'purpose': 'S4 MAX/PeerMAX 定价面板（主口径 ma_teacher）',
+        'notes': (
+            '上游：两条网络 + 日/月收益 + 股本；缺 network_ma_teacher 即 blocked',
+            '主口径 ma_teacher，mb_teacher 为方法稳健列',
+            '验收：peermax_panel_acceptance 的 C1 三轮全过',
+        ),
+    },
+    'fm-main-table': {
+        'purpose': 'M1 Fama-MacBeth 主表与 distinctness horse race',
+        'notes': (
+            '参数：--sample-version 缺省 v3、--out-suffix _s{seed}',
+            'registry：nw_lag、min_focal_count_per_month、min_effective_month_count、iqr_pool_value',
+            '验收：n_months_used 与样本报告一致',
+        ),
+    },
+    'portfolio-sorts': {
+        'purpose': '五分位/十分位组合表与 spread',
+        'notes': (
+            '参数：--sample-version 缺省 v2（与 fm-main-table 的 v3 不同，属既有口径）',
+            'registry：portfolio_breakpoints、K_Spread_M1',
+            '验收：spread 与连续变量系数同号',
+        ),
+    },
+    'robustness-checks': {
+        'purpose': 'placebo、篇幅控制、行业吸收',
+        'notes': (
+            '参数：--sample-version 缺省 v2',
+            '产物：G0/s3_m1_robustness_placebo.json、s3_m1_length_control.json、s3_m1_industry_absorb.json',
+            '验收：placebo 不显著；行业吸收后符号方向与主表一致',
+        ),
+    },
+    'gate-report': {
+        'purpose': 'M1-1…M1-5 汇总成 S5_status 与停机动作',
+        'notes': (
+            '参数：--out-suffix 与 --input-suffix 成对，读同种子上游产物',
+            '上游缺失记 NOT_RUN，不中断整份报告',
+            '验收：无 fail 项，NOT_RUN 逐条有原因',
+        ),
+    },
+    'shadow-inference': {
+        'purpose': 'Phase3 shadow 推断层（bootstrap，随种子变化）',
+        'notes': (
+            '参数：--seed（缺省 20261026；本仓按全局 5 seed 跑）',
+            '产物落 artifacts/phase3/，不进 reports/data_gates/G0',
+            '验收：四个 CSV 齐全，分层读数与主表方向一致',
+        ),
+    },
+    'density-null': {
+        'purpose': '网络密度零模型（同 N 同 E 随机重连）',
+        'notes': (
+            '参数：--reps 缺省读 registry rewiring_reps=1000，冒烟用 --reps 10',
+            '真随种子变化；产物 G0/s3_network_density_null.json',
+            '验收：观测密度与零分布同时落盘，R 与 seed 记在产物里',
+        ),
+    },
+}
+
+
+def notes_for(exp_id: str) -> dict:
+    return EXPERIMENT_NOTES.get(exp_id, {'purpose': '', 'notes': ()})

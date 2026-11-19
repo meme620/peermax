@@ -36,7 +36,7 @@ import numpy as np
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
-from pricing_lib import assert_m1_inputs_sha, sha256_file  # noqa: E402
+from pricing_lib import assert_m1_inputs, file_size  # noqa: E402
 
 REPD = ROOT / 'reports/data_gates/G0'
 PANELS = {'ma': ROOT / 'data/processed/monthly_pricing_panel_ma.csv',
@@ -91,22 +91,23 @@ def main(argv=None):
     panels = {args.use_case: ROOT / args.panel}
     nets = {args.use_case: (ROOT / args.net_dir) if args.net_dir else NETS[args.use_case]}
     # 07 §8.8：报告登记 script/sha 与 input_anchors（9 个 M1 输入锚 + 被验收面板/参照面板）。
-    m1_ledger = assert_m1_inputs_sha()
+    m1_ledger = assert_m1_inputs()
     input_anchors = [
-        {'input': e['input'], 'file': e['file'], 'sha256': e['sha256'],
-         'anchor_sha256': e['anchor_sha256'], 'anchor_source': e['anchor_source']}
+        {'input': e['input'], 'file': e['file'], 'rows': e['rows'],
+         'rows_registered': e['rows_registered'],
+         'rows_match_registered': e['rows_match_registered']}
         for e in m1_ledger
     ]
     input_anchors.append({'input': 'acceptance_panel',
                           'file': _rel(panels[args.use_case]),
-                          'sha256': sha256_file(panels[args.use_case])})
+                          'bytes': file_size(panels[args.use_case])})
     if args.ref_panel:
         input_anchors.append({'input': 'acceptance_ref_panel',
                               'file': _rel(ROOT / args.ref_panel),
-                              'sha256': sha256_file(ROOT / args.ref_panel)})
+                              'bytes': file_size(ROOT / args.ref_panel)})
     out = {'run_at': datetime.now(timezone.utc).isoformat(),
            'script': _rel(Path(__file__)),
-           'script_sha256': sha256_file(Path(__file__)),
+           'script_bytes': file_size(Path(__file__)),
            'input_anchors': input_anchors,
            'panels': {}, 'mode': 'single:%s' % args.panel}
     # 载入底层数据（供 R2）

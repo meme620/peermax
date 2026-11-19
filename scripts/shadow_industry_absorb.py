@@ -56,8 +56,8 @@ from datetime import datetime, timezone
 import numpy as np
 import pandas as pd
 from pricing_lib import (
-    assert_m1_inputs_sha, fm_regression, newey_west, param_value,
-    require, sha256_file, vif_table,
+    assert_m1_inputs, fm_regression, newey_west, param_value,
+    require, file_size, vif_table,
 )
 from fileio import assert_path_allowed, json_default, write_csv_rows, write_json_atomic, write_parquet_atomic
 
@@ -228,32 +228,32 @@ def log(msg: str) -> None:
     print(f'[{time.strftime("%H:%M:%S")}] {msg}', flush=True)
 
 def anchors_snapshot(tag: str) -> dict:
-    ledger = assert_m1_inputs_sha()
-    extra = {k: {'file': str(v.relative_to(ROOT)).replace('\\', '/'), 'sha256': sha256_file(v)}
+    ledger = assert_m1_inputs()
+    extra = {k: {'file': str(v.relative_to(ROOT)).replace('\\', '/'), 'bytes': file_size(v)}
              for k, v in EXTRA_INPUTS.items()}
     clusters = {}
     for y in YEARS:
         p = HEADLINE_NET / 'clusters' / f'{y}_clusters.csv'
-        clusters[p.relative_to(ROOT).as_posix()] = sha256_file(p)
+        clusters[p.relative_to(ROOT).as_posix()] = file_size(p)
     snap = {
         'tag': tag,
         'run_at': datetime.now(timezone.utc).isoformat(),
-        'm1_inputs_9': {r['input']: r['sha256'] for r in ledger},
+        'm1_inputs_9': {r['input']: r['rows'] for r in ledger},
         'm1_inputs_ledger': ledger,
         'extra_inputs': extra,
-        'headline_clusters_sha': clusters,
+        'headline_clusters_bytes': clusters,
     }
     return snap
 
 def compare_anchors(pre: dict, post: dict) -> dict:
     diffs = []
-    for sect in ('m1_inputs_9', 'headline_clusters_sha'):
+    for sect in ('m1_inputs_9', 'headline_clusters_bytes'):
         a, b = pre.get(sect) or {}, post.get(sect) or {}
         for k in sorted(set(a) | set(b)):
             if a.get(k) != b.get(k):
                 diffs.append({'section': sect, 'key': k, 'pre': a.get(k), 'post': b.get(k)})
-    a = {k: v.get('sha256') for k, v in (pre.get('extra_inputs') or {}).items()}
-    b = {k: v.get('sha256') for k, v in (post.get('extra_inputs') or {}).items()}
+    a = {k: v.get('bytes') for k, v in (pre.get('extra_inputs') or {}).items()}
+    b = {k: v.get('bytes') for k, v in (post.get('extra_inputs') or {}).items()}
     for k in sorted(set(a) | set(b)):
         if a.get(k) != b.get(k):
             diffs.append({'section': 'extra_inputs', 'key': k, 'pre': a.get(k), 'post': b.get(k)})
@@ -625,7 +625,7 @@ def main():
     pre = anchors_snapshot('pre')
     write_json(ANCHOR_PRE, pre)
     log(f'3.5 preflight 完成：9 锚 MATCH；extra={len(pre["extra_inputs"])}；'
-        f'headline clusters={len(pre["headline_clusters_sha"])}')
+        f'headline clusters={len(pre["headline_clusters_bytes"])}')
 
     reg = param_value('m1_sample_and_spec_registry')
     min_n = int(reg['min_focal_count_per_month'])
@@ -1055,14 +1055,14 @@ def main():
 
     # ---- 输出 sha
     outputs = {
-        '3.5_industry_absorb.csv': sha256_file(ABSORB_CSV),
-        '3.5_collinearity.csv': sha256_file(COLLIN_CSV),
-        'm1_peer_resid_p3shadow.parquet': sha256_file(RESID_PARQUET),
-        '3.5_anchor_pre.json': sha256_file(ANCHOR_PRE),
-        '3.5_anchor_post.json': sha256_file(ANCHOR_POST),
+        '3.5_industry_absorb.csv': file_size(ABSORB_CSV),
+        '3.5_collinearity.csv': file_size(COLLIN_CSV),
+        'm1_peer_resid_p3shadow.parquet': file_size(RESID_PARQUET),
+        '3.5_anchor_pre.json': file_size(ANCHOR_PRE),
+        '3.5_anchor_post.json': file_size(ANCHOR_POST),
     }
     if cross_rows:
-        outputs['3.5_cluster_industry_cross.csv'] = sha256_file(CROSS_CSV)
+        outputs['3.5_cluster_industry_cross.csv'] = file_size(CROSS_CSV)
 
     counts = {
         'task': 'Phase 3.5 N-5/A12 行业吸收残差化 shadow',

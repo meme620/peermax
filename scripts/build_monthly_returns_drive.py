@@ -30,11 +30,17 @@ from fileio import read_pickle
 ROOT = Path(__file__).resolve().parents[1]
 DRIVE_PX = ROOT / "data/raw/drive/daily_close_none_20260630.pkl"
 SHIPPED = ROOT / "data/processed/monthly_returns_clean.csv"
-OUT = ROOT / "artifacts/monthly_returns_drive_rebuild.csv"
+PX_POST = ROOT / "data/raw/drive/daily_adj_close_post_20260630.pkl"
+REPORT = ROOT / "reports/data_gates/G0/s2_return_convention.json"
+CLIFF = -0.215  # A 股涨跌停制度下不可能的日跌幅，出现即为公司行为
+CONVENTIONS = {'post_adjusted': PX_POST, 'raw': DRIVE_PX}
+OUT = ROOT / "data/processed/monthly_returns_clean.csv"
 
 
-def build(with_status: bool) -> pd.DataFrame:
-    px = read_pickle(DRIVE_PX)
+def build(with_status: bool, convention: str = 'post_adjusted') -> pd.DataFrame:
+    if convention not in CONVENTIONS:
+        raise SystemExit(f'[STOP] 未知收益口径 {convention!r}；可选 {sorted(CONVENTIONS)}')
+    px = read_pickle(CONVENTIONS[convention])
     me = px.resample("ME").last()
     cnt = px.notna().resample("ME").sum()
     ret = me / me.shift(1) - 1.0
@@ -60,35 +66,52 @@ def build(with_status: bool) -> pd.DataFrame:
     return out.sort_values(["month", "firm_id"]).reset_index(drop=True)
 
 
+def cliff_stats(px) -> dict:
+    r = px.pct_change(fill_method=None)
+    bad = r < CLIFF
+    return {'cells_below_cliff': int(bad.to_numpy().sum()),
+            'firm_days_below_cliff': int(bad.any(axis=0).sum()),
+            'cliff_threshold': CLIFF}
+
+
+def write_report(convention: str, stats: dict, rows: int) -> None:
+    import json
+    REPORT.parent.mkdir(parents=True, exist_ok=True)
+    REPORT.write_text(json.dumps({
+        'return_convention': convention,
+        'source_file': str(CONVENTIONS[convention].relative_to(ROOT)),
+        'rows': rows,
+        'cliff_stats': stats,
+        'note': 'post_adjusted = 后复权收盘（含公司行为调整）；raw = 未复权，除权日断崖保留，仅作敏感性',
+    }, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--with-status", action="store_true")
+    ap.add_argument("--convention", choices=sorted(CONVENTIONS), default='post_adjusted')
     args = ap.parse_args()
-    out = build(args.with_status)
+    stats = cliff_stats(read_pickle(CONVENTIONS[args.convention]))
+    out = build(args.with_status, args.convention)
     OUT.parent.mkdir(parents=True, exist_ok=True)
     out.to_csv(OUT, index=False)
-    print(f"rebuilt rows={len(out)} -> {OUT}")
+    write_report(args.convention, stats, len(out))
+    print(f"rebuilt rows={len(out)} convention={args.convention} -> {OUT}")
 
-    ship = pd.read_csv(SHIPPED)
-    key = ["firm_id", "month"]
-    m = ship.merge(out[key + ["R"]], on=key, how="outer",
-                   suffixes=("_ship", "_reb"), indicator=True)
-    both = m[m["_merge"] == "both"]
-    only_s = int((m["_merge"] == "left_only").sum())
-    only_r = int((m["_merge"] == "right_only").sum())
-    diff = (both["R_ship"] - both["R_reb"]).abs()
-    bad = int((diff > 1e-9).sum())
-    print(f"shipped rows={len(ship)} | matched={len(both)} "
-          f"only_shipped={only_s} only_rebuilt={only_r} R_mismatch(>1e-9)={bad}")
-    if len(ship) == len(out) and only_s == 0 and only_r == 0 and bad == 0:
-        print("RECONCILE: EXACT MATCH（重建与交付逐位一致）")
-        return 0
-    print("RECONCILE: MISMATCH — 交付面板非本口径精确重建，登记差异后决定")
-    if bad:
-        print(both.loc[diff > 1e-9, key].head(10))
-    if only_s or only_r:
-        print(m[m["_merge"] != "both"].head(10))
-    return 1
+    # 独立对拍：后复权口径应与老师交付的 monthly_returns_adj.csv 逐位一致（不再与自身对账）
+    teacher = ROOT / "data/raw/drive/monthly_returns_adj.csv"
+    if args.convention == 'post_adjusted' and teacher.is_file():
+        t = pd.read_csv(teacher, dtype={'firm_id': str}).rename(columns={'R_adj': 'R'})
+        # teacher 文件用裸 6 位代码；本仓 firm_id 为 sz/sh 前缀
+        t['firm_id'] = t['firm_id'].str.zfill(6).map(
+            lambda c: ('sh' if c[0] in '69' else 'sz') + c)
+        m = out.merge(t, on=['firm_id', 'month'], how='inner', suffixes=('_new', '_tch'))
+        d = (m['R_new'] - m['R_tch']).abs()
+        worse = int((d > 1e-9).sum())
+        print(f"对拍 teacher: matched={len(m)} max|diff|={float(d.max()):.3e} mismatched={worse}")
+        if worse:
+            return 1
+    return 0
 
 
 if __name__ == "__main__":

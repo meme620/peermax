@@ -1343,7 +1343,7 @@ def assemble():
                   '**2026-10-27 口径更正**：仅描述项目自建 PC（对手集合 = 同团全部成员），不是对原文 PC 的复现或证伪。',
         'comparability': {
             'comparable_to_paper': False,
-            'registered_deviation': 'docs/methodology/methodology_execution_plan.md:2290',
+            'registered_deviation': 'methodology_execution_plan:2290',
             'project_rule': 'same_cluster_members（同团全部成员）',
             'paper_rule': '任何与其相似度超过团内最小相似度的公司（字面含团外）',
             'consequence': 'PC 不是原文变量的严格复现；判定 = 不可比/未复现（对手集合口径不同）；'
@@ -1688,7 +1688,7 @@ def make_md(S: dict) -> None:
               '补做复核指定替代检验（恒等式分解 / 1/N 控制 / within-N 分箱 / 分布匹配重加权 / 1000 次团标签置换 / 功效-MDE）。')
     md.append('> **判据（先登记，REV2 追加）**：成立 = 主读数层 PC 系数 ≥ 0 且 4 子层 ≥3 层同向转正；'
               '部分 = 向 0 移动 ≥50% 仍为负；排除 = 移动 <25% 或同号；待定 = 数据不可得/证据冲突。')
-    md.append('> **背景靶子（不可直接对表）**：`docs/literature/A股产品市场竞争.pdf` 表 4 列(1) +0.152（t=7.76）/ 列(2) +0.130（t=5.40）'
+    md.append('> **背景靶子（不可直接对表）**：`ref/teacher-materials/A股产品市场竞争.pdf` 表 4 列(1) +0.152（t=7.76）/ 列(2) +0.130（t=5.40）'
               '；现行读数 = `reports/data_gates/G0/competition_pricing_correspondence.{json,md}`（判定 = 不可比/未复现）。\n')
     md.append('## 0. 裁决总表\n')
     md.append('| # | 假设 | 判定 | 关键数字 |')

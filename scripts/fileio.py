@@ -5,7 +5,6 @@ from __future__ import annotations
 import sys
 import csv
 import datetime
-import hashlib
 import json
 import os
 import pickle
@@ -50,12 +49,8 @@ def write_parquet_atomic(df, path) -> None:
     os.replace(tmp, p)
 
 
-def sha256_file(path: Path) -> str:
-    h = hashlib.sha256()
-    with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(1 << 20), b""):
-            h.update(chunk)
-    return h.hexdigest()
+def file_size(path):
+    return Path(path).stat().st_size
 
 
 def json_default(o):

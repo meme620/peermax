@@ -77,7 +77,7 @@ def main():
 
     res.update({
         'spec_id': _SPEC['spec_id'],
-        'spec_hash': __import__('hashlib').sha256(SPEC.read_bytes()).hexdigest(),
+        'spec_hash': __import__('sizes').file_size(SPEC.read_bytes()).hexdigest(),
         'input_hashes': _SPEC['provenance']['input_hashes'],
         'input_cf': str(cf_path),
         'run_at': __import__('datetime').datetime.now(__import__('datetime').timezone.utc).isoformat(),

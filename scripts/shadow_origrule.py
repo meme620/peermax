@@ -34,7 +34,7 @@
   artifacts/phase3/3.3_origrule_readout.csv                   逐年 × {headline,p3asof} × {2 规则} 读数
   artifacts/phase3/3.3_counts.json                            计数/对账/结论/锚台账
   artifacts/phase3/3.3_anchor_{pre,post}.json                 9 锚 + headline 45 文件 sha 台账（+3.1 产物）
-  artifacts/phase3/3.3_output_sha.json                        本次 shadow 产物 sha
+  artifacts/phase3/3.3_output_bytes.json                        本次 shadow 产物 sha
 
 用法
 ----
@@ -58,7 +58,7 @@ from datetime import datetime, timezone
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import normalize
-from pricing_lib import assert_m1_inputs_sha, require, sha256_file
+from pricing_lib import assert_m1_inputs, require, file_size
 from network_business_lexicon import build_automaton, load_lexicon
 from network_business_cluster_grid import build_vectors, load_refs
 
@@ -95,7 +95,7 @@ ANCHOR_PRE = ART / '3.3_anchor_pre.json'
 
 ANCHOR_POST = ART / '3.3_anchor_post.json'
 
-OUTPUT_SHA = ART / '3.3_output_sha.json'
+OUTPUT_SHA = ART / '3.3_output_bytes.json'
 
 SHADOW_VERSION = 'p3shadow_v1'
 
@@ -658,36 +658,36 @@ def sha_ledger_dir(d: Path) -> dict:
     out = {}
     for p in sorted(Path(d).rglob('*')):
         if p.is_file():
-            out[p.relative_to(ROOT).as_posix()] = sha256_file(p)
+            out[p.relative_to(ROOT).as_posix()] = file_size(p)
     return out
 
 def anchors_snapshot(tag: str) -> dict:
-    ledger = assert_m1_inputs_sha()
-    extra = {k: {'file': str(Path(v).relative_to(ROOT)).replace('\\', '/'), 'sha256': sha256_file(v)}
+    ledger = assert_m1_inputs()
+    extra = {k: {'file': str(Path(v).relative_to(ROOT)).replace('\\', '/'), 'bytes': file_size(v)}
              for k, v in {'product_lexicon_v2_teacher': TEACHER_LEXICON,
                           'operating_revenue_annual': REVENUE_PKL,
                           'sw2_industry_latest': SW2_LATEST,
                           'sw2_asof_map_p3shadow': ASOF_MAP_PARQUET}.items() if Path(v).is_file()}
     snap = {
         'tag': tag, 'run_at': datetime.now(timezone.utc).isoformat(),
-        'm1_inputs_9': {r['input']: r['sha256'] for r in ledger},
+        'm1_inputs_9': {r['input']: r['rows'] for r in ledger},
         'm1_inputs_ledger': ledger,
         'extra_inputs': extra,
-        'headline_network_sha': sha_ledger_dir(HEADLINE_NET),
-        'p3asof_network_sha': sha_ledger_dir(P3ASOF_NET) if P3ASOF_NET.is_dir() else {},
+        'headline_network_bytes': sha_ledger_dir(HEADLINE_NET),
+        'p3asof_network_bytes': sha_ledger_dir(P3ASOF_NET) if P3ASOF_NET.is_dir() else {},
         'note': 'headline 网络目录（data/processed/network_ma_teacher/）全文件 sha + 3.1 产物目录只读复验；'
                 '本步不写任何 headline/3.1 文件（输出路径守卫硬门）',
     }
-    snap['headline_network_n_files'] = len(snap['headline_network_sha'])
+    snap['headline_network_n_files'] = len(snap['headline_network_bytes'])
     return snap
 
 def compare_anchors(pre: dict, post: dict) -> dict:
     diffs = []
-    for sect in ('m1_inputs_9', 'extra_inputs', 'headline_network_sha', 'p3asof_network_sha'):
+    for sect in ('m1_inputs_9', 'extra_inputs', 'headline_network_bytes', 'p3asof_network_bytes'):
         a, b = pre.get(sect) or {}, post.get(sect) or {}
         if isinstance(a, dict) and a and isinstance(list(a.values())[0], dict):
-            a = {k: v.get('sha256') for k, v in a.items()}
-            b = {k: v.get('sha256') for k, v in b.items()}
+            a = {k: v.get('bytes') for k, v in a.items()}
+            b = {k: v.get('bytes') for k, v in b.items()}
         for k in sorted(set(a) | set(b)):
             if a.get(k) != b.get(k):
                 diffs.append({'section': sect, 'key': k, 'pre': a.get(k), 'post': b.get(k)})
@@ -699,7 +699,7 @@ def output_sha_ledger() -> dict:
     sha, absent = {}, []
     for p in files:
         if Path(p).is_file():
-            sha[Path(p).relative_to(ROOT).as_posix()] = sha256_file(p)
+            sha[Path(p).relative_to(ROOT).as_posix()] = file_size(p)
         else:
             absent.append(Path(p).relative_to(ROOT).as_posix())
     out = {'n_files': len(sha), 'absent_files': absent, 'sha': sha,
@@ -713,7 +713,7 @@ def output_sha_ledger() -> dict:
             data_files = [Path(SHADOW_CSV).relative_to(ROOT).as_posix(),
                           Path(SHADOW_META).relative_to(ROOT).as_posix(),
                           Path(READOUT_CSV).relative_to(ROOT).as_posix()]
-            cmp_ = {k: {'prior_sha': prior['sha'].get(k), 'sha': sha.get(k),
+            cmp_ = {k: {'prior_bytes': prior['sha'].get(k), 'sha': sha.get(k),
                         'match': prior['sha'].get(k) == sha.get(k)} for k in data_files}
             out['data_artifact_reproducibility'] = {
                 'prior_ledger_n_files': prior.get('n_files'),
@@ -839,7 +839,7 @@ def main():
         counts['anchor_pre'] = anchors_snapshot('pre')
         write_json(ANCHOR_PRE, counts['anchor_pre'])
         log(f'preflight：9 锚 + {counts["anchor_pre"]["headline_network_n_files"]} 个 headline 网络文件 sha'
-            f' + {len(counts["anchor_pre"]["p3asof_network_sha"])} 个 3.1 产物 sha 已记录')
+            f' + {len(counts["anchor_pre"]["p3asof_network_bytes"])} 个 3.1 产物 sha 已记录')
 
     if 'readout' in steps:
         terms, lmeta = load_lexicon(TEACHER_LEXICON)
@@ -995,7 +995,7 @@ def main():
             print('[HARD-GATE] headline/输入锚发生变化；停机（禁止重算覆盖）', file=sys.stderr, flush=True)
             raise SystemExit(2)
         log(f'postflight：锚对比 {cmp_["status"]}（headline {post["headline_network_n_files"]} 文件 + '
-            f'9 锚 + 3.1 产物 {len(post["p3asof_network_sha"])} 文件）')
+            f'9 锚 + 3.1 产物 {len(post["p3asof_network_bytes"])} 文件）')
 
     counts['elapsed_sec_total'] = round(time.time() - t_all, 1)
     write_json(COUNTS_JSON, counts)

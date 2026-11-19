@@ -33,7 +33,6 @@ from __future__ import annotations
 
 import argparse
 import csv
-import hashlib
 import json
 import sys
 import time
@@ -55,12 +54,8 @@ ORIG_DF_REPORT = ROOT / 'reports/data_gates/G0/product_lexicon_df_report.json'
 DF_MAX = 0.25
 
 
-def sha256(path: Path) -> str:
-    h = hashlib.sha256()
-    with open(path, 'rb') as f:
-        for chunk in iter(lambda: f.read(1 << 20), b''):
-            h.update(chunk)
-    return h.hexdigest()
+def file_size(path):
+    return path.stat().st_size
 
 
 def count_docs(corpus: str, terms: list[str], automaton):
@@ -247,9 +242,9 @@ def main():
         'comparison_with_original': cmp_block,
         'outputs': {
             'lexicon': str(outp.relative_to(ROOT)).replace('\\', '/'),
-            'lexicon_sha256': sha256(outp),
+            'lexicon_bytes': file_size(outp),
             'by_year': str(byp.relative_to(ROOT)).replace('\\', '/'),
-            'by_year_sha256': sha256(byp),
+            'by_year_bytes': file_size(byp),
             'original_df_report': str(ORIG_DF_REPORT.relative_to(ROOT)).replace('\\', '/'),
         },
         'elapsed_sec': round(time.time() - t_all, 1),

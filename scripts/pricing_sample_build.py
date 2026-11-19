@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """A1–A5：M1（S5）输入合同核验、下月 outcome、控制变量、baseline 构造与样本冻结。
 
-对应 docs/methodology/methodology_execution_plan.md §5.7A P1.1–P1.3 / P1.5 / P2.1–P2.2 / P3.1。
+对应主仓库 methodology_execution_plan §5.7A（原型见 git 历史） P1.1–P1.3 / P1.5 / P2.1–P2.2 / P3.1。
 
 2026-10-10 Phase A 复核修复批（I2/I3/I6）：
   I2  四列统一施加 registry sample_start/sample_end 事件月窗口 2015-01..2023-12
@@ -21,10 +21,10 @@ Phase 1 I-16（2026-10-26）：样本窗口元数据拆分为三列（只改生�
                         的 min..max（当前 teacher 2015-05..2023-12；ma/mb 2018-05..2023-12）；
                         无任何可用月 → NO_NETWORK_VERSION（显式哨兵，不伪造窗口）
 
-产出（v2 为 headline，v1 文件不覆盖）：
+产出（v3 为 headline，v1/v2 文件不覆盖）：
   reports/data_gates/G0/s3_m1_sample_report.json（含 v1 superseded 与 v2 headline 两版）
   reports/data_gates/G0/s3_m1_sample_report_v2.json（I7：v2 专用报告；--v2-report-only 只读生成）
-  data/processed/m1_common_sample_{ma_teacher,mb_teacher,ma,mb}_v2.parquet
+  data/processed/m1_common_sample_{ma_teacher,mb_teacher,ma,mb}_v3.parquet
   data/processed/m1_s5_v2_sample_summary.json（I7：m1_s5_v2 汇总件）
   data/processed/m1_weight_variants_{ma_teacher,mb_teacher}.parquet（不变，重算核验）
 用法：python scripts/pricing_sample_build.py
@@ -40,7 +40,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from pricing_lib import HARD_GATE_KEYS, IQR_POOL_REGISTERED, IQR_POOL_REGISTERED_SOURCE, IQR_POOL_RULE_ID, ILLIQ_FORMULA_ID, AMOUNT_CACHE_NAME, M1_SAMPLE_VERSION_V1, M1_SAMPLE_VERSION_V2, M1_SAMPLE_VERSION_V3, OUT_DIR, PANELS, ROOT, SAMPLE_DIR, SAMPLE_WINDOW_END, SAMPLE_WINDOW_START, add_weight_rules, aggregate_edges, assert_m1_contract, assert_m1_inputs_sha, code6, load_analyst_derived, load_chars, load_edges, load_amount_100m_cached, load_me, load_panel, load_postadj, load_registry, load_returns_raw, load_returns_v2, load_src_month, load_st, load_sw2, load_turnover_drive, months_between, param_value, progress, require, sample_path, sample_window_bounds, sha256_file, winsor_bounds, winsorize_by_month, write_json, ym_add
+from pricing_lib import HARD_GATE_KEYS, IQR_POOL_REGISTERED, IQR_POOL_REGISTERED_SOURCE, IQR_POOL_RULE_ID, ILLIQ_FORMULA_ID, AMOUNT_CACHE_NAME, M1_SAMPLE_VERSION_V1, M1_SAMPLE_VERSION_V2, M1_SAMPLE_VERSION_V3, OUT_DIR, PANELS, ROOT, SAMPLE_DIR, SAMPLE_WINDOW_END, SAMPLE_WINDOW_START, add_weight_rules, aggregate_edges, assert_m1_contract, assert_m1_inputs, code6, load_analyst_derived, load_chars, load_edges, load_amount_100m_cached, load_me, load_panel, load_postadj, load_registry, load_returns_raw, load_returns_v2, load_src_month, load_st, load_sw2, load_turnover_drive, months_between, param_value, progress, require, sample_path, sample_window_bounds, file_size, winsor_bounds, winsorize_by_month, write_json, ym_add
 
 # Phase 1 I-5：winsor 边界与样本窗口一律来自 registry（当前 [0.01,0.99] / 2015-01..2023-12，
 # 与旧硬编码逐值相同 → 零数值变化）。导入即校验，非法 registry 值 SystemExit(2)。
@@ -356,7 +356,7 @@ def check_panel_contracts() -> dict:
             'support_rows': int(sup.sum()), 'no_support_rows': int((~sup).sum()),
             'support_missing_not_zero_ok': miss_no_zero,
             'data_status_counts': df['data_status'].value_counts(dropna=False).to_dict(),
-            'sha256': sha256_file(path),
+            'bytes': file_size(path),
         }
         progress(f'A1 {key}: rows={n_rows} PIT违规={pit_bad} dup={dup} '
                  f'版本映射ok={bool(ver_ok)} 缺失填0={zeros}')
@@ -408,8 +408,8 @@ def main(argv=None):
     force = bool(args.force)
     force_reason = (args.force_reason or '').strip() or None
     # Phase 1 I-3：读取任何 M1 输入之前，先核验全部 M1 主输入（9 个）与 manifest
-    # sha256 锚；缺失条目/缺失 sha/字节不一致 → SystemExit(2)（无 CLI 绕过开关）。
-    input_sha_ledger = assert_m1_inputs_sha()
+    # bytes 锚；缺失条目/缺失 sha/字节不一致 → SystemExit(2)（无 CLI 绕过开关）。
+    input_sha_ledger = assert_m1_inputs()
     months = months_between(SAMPLE_WINDOW_START, SAMPLE_WINDOW_END)
     progress('A1 开始：输入与 PIT 合同核验（四列面板 + 共享输入装载）')
     ret = load_returns_v2()
@@ -437,7 +437,7 @@ def main(argv=None):
     illiq, amount_cache = load_amount_100m_cached(
         cache_dir=cache_dir, rebuild=bool(args.rebuild_amount_cache))
     progress(f'A3 Liquidity 自算缓存 {amount_cache["cache_status"]}（{len(illiq):,} 行；'
-             f'{amount_cache["liquidity_formula_id"]}；输入 sha {amount_cache["source_sha256"][:12]}…）')
+             f'{amount_cache["liquidity_formula_id"]}；输入 sha {amount_cache["source_bytes"][:12]}…）')
     turnover = load_turnover_drive()
     progress(f'A3 Turnover（Drive daily_turnover_rate）就绪（{len(turnover):,} 行）')
     st = load_st()
@@ -518,7 +518,7 @@ def main(argv=None):
                            'listing_date_source': 'data/processed/firm_id_map.csv（code6 → ipo_date）',
                            'rule': f'上市 < {RECENT_IPO_MONTHS} 月（按事件月首日 − ipo_date，天数/30.4）排除',
                            'missing_value_handling': 'ipo_date 缺失 → 不排除（fillna(False)）'},
-            'st': {'registry_value': FILTERS['st_exclusion'],
+            'st': {'registry_value': FILTERS['st_stratify'],
                    'status': 'REGISTERED_DEVIATION_SCOPE（spec.sample_filters.st_primary_current=include_st）',
                    'note': 'M1 主样本含 ST，按 focal 侧 ST 分层并报（A9 m1_rob_st）；不额外剔除'},
             'liquidity': {'status': 'NOT_EXECUTABLE_NO_REGISTERED_THRESHOLD',
@@ -626,6 +626,12 @@ def main(argv=None):
                  & (df['PeerReturn'].notna()) & (~ctrl_missing))
         iqr_pool = float(df.loc[uni_t, 'PeerMAXraw'].quantile(.75) -
                          df.loc[uni_t, 'PeerMAXraw'].quantile(.25))
+        iqr_tol = float(param_value('iqr_drift_tolerance'))
+        if IQR_POOL_REGISTERED > 0 and abs(iqr_pool - IQR_POOL_REGISTERED) / IQR_POOL_REGISTERED > iqr_tol:
+            raise SystemExit(
+                f'[STOP] {key}: treatment-only IQR={iqr_pool:.8f} 与登记值 '
+                f'{IQR_POOL_REGISTERED:.8f} 相对漂移超过 {iqr_tol:.0%}；'
+                '先复核 registry iqr_pool_value 再重跑')
         iqr_final = float(df.loc[universe_T, 'PeerMAXraw'].quantile(.75) -
                           df.loc[universe_T, 'PeerMAXraw'].quantile(.25))
         n_by_month = df.loc[universe_T].groupby('month')['focal_id'].nunique()
@@ -1027,7 +1033,7 @@ def v2_report_only() -> None:
             'delta_eligible_rows': s2['eligible_rows'] - s1['eligible_rows'],
             'pit_violations_strict_lt': integrity[key]['pit_violations_strict_lt'],
             'missing_filled_with_zero_total': integrity[key]['missing_filled_with_zero_total'],
-            'sha256': sha256_file(sample_path(key, 'v2')),
+            'bytes': file_size(sample_path(key, 'v2')),
         }
         print(f'[F1-3] {key}: v1 eligible={s1["eligible_rows"]:,}/{s1["rows_total"]:,} '
               f'({s1["fm_months_count"]} 月 {s1["fm_first_month"]}..{s1["fm_last_month"]}) -> '
@@ -1128,9 +1134,9 @@ def v2_report_only() -> None:
         },
         'files': {
             'v2_samples': {k: {'path': str(sample_path(k, 'v2').relative_to(ROOT)),
-                               'sha256': sha256_file(sample_path(k, 'v2'))} for k in PANELS},
+                               'bytes': file_size(sample_path(k, 'v2'))} for k in PANELS},
             'v1_samples_superseded': {k: {'path': str(sample_path(k, 'v1').relative_to(ROOT)),
-                                          'sha256': sha256_file(sample_path(k, 'v1'))}
+                                          'bytes': file_size(sample_path(k, 'v1'))}
                                       for k in PANELS},
             'v1_report_archived': 'archive/phaseA_v1_tables_20261010/s3_m1_sample_report.json'
                                   '（v1 基线报告原件；当前 reports/data_gates/G0/s3_m1_sample_report.json'

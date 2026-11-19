@@ -1,0 +1,147 @@
+data_contracts_version: 1.0.0
+meta:
+  baseline_date: '2026-11-19'
+  snapshot: drive-20260630 / teacher-mda-2022 / monthly-2026-06
+  source: 由 2026-11-19 审核 A1-A8 实测值冻结；数据换快照时必须同步本文件并升版本
+contracts:
+  - id: a1_schema
+    title: 原始文件形状、dtype、索引与时间跨度
+    kind: wide_schema
+    files:
+      - path: data/raw/drive/daily_close_none_20260630.pkl
+        rows: 6417
+        cols: 5535
+        start: '2000-01-04'
+        end: '2026-06-30'
+      - path: data/raw/drive/daily_adj_close_post_20260630.pkl
+        rows: 6178
+        cols: 5535
+        start: '2001-01-02'
+        end: '2026-06-30'
+      - path: data/raw/drive/daily_total_amount_20260630.pkl
+        rows: 6176
+        cols: 5535
+        start: '2001-01-04'
+        end: '2026-06-30'
+      - path: data/raw/drive/daily_turnover_rate_20260630.pkl
+        rows: 6417
+        cols: 5534
+        start: '2000-01-04'
+        end: '2026-06-30'
+      - path: data/raw/drive/daily_a_share_market_val_3_20260630.pkl
+        rows: 6176
+        cols: 5554
+        start: '2001-01-04'
+        end: '2026-06-30'
+    csvs:
+      - path: data/raw/drive/monthly_returns_adj.csv
+        rows: 874618
+        columns: [month, firm_id, R_adj]
+      - path: data/raw/teacher/mda_data_2023.csv
+        rows: 33315
+        columns: [f_id, f_stock_id, f_year, f_chapter_content]
+    rules:
+      index_sorted: true
+      index_unique: true
+      columns_unique: true
+      dtype_kinds: [f, b, i, u, O]
+    tolerance:
+      rows: 0
+      cols: 0
+
+  - id: a2_universe
+    title: 股票池对齐
+    kind: universe
+    base:
+      path: data/raw/drive/daily_close_none_20260630.pkl
+      code_suffix: ''
+    sources:
+      - path: data/raw/teacher/mda_data_2023.csv
+        code_col: f_stock_id
+        min_ratio: 0.95
+      - path: data/raw/drive/monthly_returns_adj.csv
+        code_col: firm_id
+        min_ratio: 0.999
+
+  - id: a3_pit
+    title: 快照与 PIT 边界
+    kind: pit
+    max_index_date:
+      data/raw/drive/daily_close_none_20260630.pkl: '2026-06-30'
+      data/raw/drive/daily_adj_close_post_20260630.pkl: '2026-06-30'
+    max_month:
+      data/raw/drive/monthly_returns_adj.csv: '2026-06'
+    max_year:
+      data/raw/teacher/mda_data_2023.csv: 2022
+    available_at_rule: '{text_year+1}-04-30'
+
+  - id: a4_units
+    title: 量纲与取值范围
+    kind: ranges
+    series:
+      - path: data/raw/drive/daily_turnover_rate_20260630.pkl
+        median_min: 0.1
+        median_max: 5.0
+        q999_max: 100.0
+      - path: data/raw/drive/daily_total_amount_20260630.pkl
+        median_min: 10000.0
+        median_max: 100000000.0
+      - path: data/raw/drive/daily_a_share_market_val_3_20260630.pkl
+        median_min: 100000000.0
+        median_max: 100000000000.0
+
+  - id: a5_cliffs
+    title: 除权断崖残留
+    kind: cliffs
+    cliff_threshold: -0.215
+    post_adjusted:
+      path: data/raw/drive/daily_adj_close_post_20260630.pkl
+      max_cells: 250
+      review_queue: reports/data_contracts/G0/a5_cliff_cells.csv
+    raw:
+      path: data/raw/drive/daily_close_none_20260630.pkl
+    monthly:
+      path: data/processed/monthly_returns_clean.csv
+      tolerance: 1.0e-9
+
+  - id: a6_limit_flags
+    title: 涨跌停派生口径与供应商 flag 一致
+    kind: limit_agreement
+    price: data/raw/drive/daily_close_none_20260630.pkl
+    flag: data/raw/drive/daily_limit_up_flag_20260630.pkl
+    st: data/raw/drive/stock_st_flag_20260630.pkl
+    thresholds:
+      main: 0.095
+      main_st: 0.045
+    start: '2018-01-01'
+    end: '2025-12-31'
+    min_agreement: 0.999
+
+  - id: a7_return_series
+    title: 自建月收益与老师交付序列对拍
+    kind: series_match
+    left:
+      path: data/processed/monthly_returns_clean.csv
+      code_col: firm_id
+      value_col: R
+    right:
+      path: data/raw/drive/monthly_returns_adj.csv
+      code_col: firm_id
+      value_col: R_adj
+    min_corr: 0.999
+    max_abs_diff: 1.0e-9
+
+  - id: a8_flag_coverage
+    title: flag 面板覆盖率与取值域
+    kind: coverage
+    flags:
+      - path: data/raw/drive/daily_limit_up_flag_20260630.pkl
+        min_nonnull: 0.99
+      - path: data/raw/drive/daily_limit_down_flag_20260630.pkl
+        min_nonnull: 0.99
+      - path: data/raw/drive/stock_st_flag_20260630.pkl
+        min_nonnull: 0.98
+      - path: data/raw/drive/stock_suspend_flag_20260630.pkl
+        min_nonnull: 0.98
+      - path: data/raw/drive/new_stock_flag_20260630.pkl
+        min_nonnull: 0.50

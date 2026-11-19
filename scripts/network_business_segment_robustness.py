@@ -8,7 +8,7 @@
 
 口径真源：
   - `reports/audits/s3_remaining_workplan_20261011.md` 第一梯队 4
-  - `docs/methodology/methodology_execution_plan.md` §8 B″11-3
+  - 主仓库 methodology_execution_plan §8 B″11-3
   - `reports/audits/s3_network_open_items_plan_20261006.md` §3-①A（含 2026-10-06 二修：两版本切分、
     版本 2 后段 2 年停机例外、下游只能 2018–2020 vs 2021–2023、措辞「两网下游未反向（描述性）」）
 

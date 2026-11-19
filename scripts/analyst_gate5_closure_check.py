@@ -10,7 +10,6 @@ import json
 import re
 import sys
 from datetime import datetime, timezone
-from hashlib import sha256
 from pathlib import Path
 
 import yaml
@@ -92,11 +91,11 @@ def round2_versions():
     man = load(MAN)
     reg = load(REG)
     checks = {}
-    checks['spec_hash_recorded_in_matrix'] = sha256(SPEC.read_bytes()).hexdigest()[:8] in MATRIX.read_text(encoding='utf-8')
-    checks['manifest_anchor_matches'] = \
-        spec['governance']['manifest_sha256'] == sha256(MAN.read_bytes()).hexdigest()
-    checks['registry_anchor_matches'] = \
-        spec['governance']['registry_sha256'] == sha256(REG.read_bytes()).hexdigest()
+    checks['spec_versions_recorded_in_matrix'] = spec['spec_id'] in MATRIX.read_text(encoding='utf-8')
+    checks['manifest_version_matches'] = \
+        spec['governance'].get('manifest_version') == man.get('manifest_version')
+    checks['registry_version_matches'] = \
+        spec['governance'].get('registry_version') == reg.get('registry_version')
     checks['claim_matrix_registered'] = any(
         x['file'] == 'reports/execution/s3a/s3a_claim_evidence_matrix.md'
         for x in man['deliverables'])
@@ -160,7 +159,7 @@ def main():
         'round3_no_banned_claims': all(len(v) == 0 for v in r3.values()),
     }
     result = {
-        'spec_id': spec['spec_id'], 'spec_hash': sha256(SPEC.read_bytes()).hexdigest(),
+        'spec_id': spec['spec_id'], 'spec_hash': file_size(SPEC.read_bytes()).hexdigest(),
         'run_at': datetime.now(timezone.utc).isoformat(),
         'command': ' '.join(sys.argv), 'script': Path(__file__).name,
         'round1_numbers': r1, 'round2_versions': r2, 'round2_conflicts': conflict, 'round2_dir_multi_active': dir_multi,

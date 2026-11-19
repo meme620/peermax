@@ -7,7 +7,7 @@ import json
 import sys
 from pathlib import Path
 
-from . import collect, doctor, gates, imports, lint, registry, runner
+from . import collect, data_contracts, doctor, gates, imports, lint, registry, runner
 
 ROOT = Path(__file__).resolve().parents[1]
 RESULT_DIR = ROOT / 'result'
@@ -181,6 +181,34 @@ def cmd_gate(args) -> int:
     return 0
 
 
+def cmd_contracts(args) -> int:
+    only = [x.strip() for x in args.only.split(',')] if args.only else None
+    if only:
+        unknown = [x for x in only if x not in data_contracts.CHECKS]
+        if unknown:
+            print('未知 contract：' + ', '.join(unknown) + '；可选：' + ', '.join(sorted(data_contracts.CHECKS)))
+            return 2
+    results = data_contracts.run_contracts(ROOT, only=only)
+    if args.json:
+        print(json.dumps(results, ensure_ascii=False, indent=2))
+    else:
+        counts = {s: sum(1 for r in results if r['status'] == s) for s in ('pass', 'fail', 'blocked')}
+        print('数据契约 ' + str(len(results)) + ' 条：pass ' + str(counts['pass']) +
+              '，fail ' + str(counts['fail']) + '，blocked ' + str(counts['blocked']))
+        for item in results:
+            print('  ' + item['status'].ljust(8) + item['contract'].ljust(18) + item['title'])
+            if item['blocked']:
+                print('            ' + item['blocked'])
+            for problem in item['problems']:
+                print('            ' + problem)
+    statuses = {r['status'] for r in results}
+    if 'fail' in statuses:
+        return 1
+    if 'blocked' in statuses:
+        return 2
+    return 0
+
+
 def cmd_report(args) -> int:
     written = collect.aggregate(RESULT_DIR)
     if not written:
@@ -190,6 +218,38 @@ def cmd_report(args) -> int:
         print('写入 ' + str(path.relative_to(ROOT)))
     return 0
 
+
+def cmd_spec(args) -> int:
+    from . import spec
+    if args.summary:
+        print(json.dumps(spec.summary(ROOT), ensure_ascii=False, indent=2))
+        return 0
+    problems = spec.validate(ROOT)
+    if problems:
+        for problem in problems:
+            print('  ' + problem)
+        return 1
+    stats = spec.summary(ROOT)
+    print('spec 校验通过：' + '  '.join(str(k) + '=' + str(v) for k, v in stats.items()))
+    return 0
+
+
+def cmd_experiments(args) -> int:
+    for exp in registry.EXPERIMENTS:
+        note = registry.notes_for(exp.id)
+        print(exp.id + '  ' + exp.title)
+        print('  purpose: ' + note['purpose'])
+        for line in note['notes']:
+            print('  - ' + line)
+        for step in exp.steps:
+            print('  step: ' + ' '.join((step.script,) + step.args))
+        if exp.requires:
+            print('  requires: ' + ', '.join(exp.requires))
+        if exp.outputs:
+            print('  outputs: ' + ', '.join(exp.outputs))
+        print('  scope: ' + exp.scope + '  种子敏感: ' + ('是' if exp.accepts_seed else '否') + '  耗时: ' + exp.runtime_hint)
+        print('')
+    return 0
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog='peerlab', description='PeerMAX 实验执行与结果聚合')
@@ -230,6 +290,18 @@ def build_parser() -> argparse.ArgumentParser:
     p_gate.add_argument('--only', default=None, help='逗号分隔的门 id')
     p_gate.add_argument('--json', action='store_true')
     p_gate.set_defaults(func=cmd_gate)
+
+    p_contracts = sub.add_parser('data-contracts', help='A1-A8 数据契约（spec/data_contracts.yaml 驱动）')
+    p_contracts.add_argument('--only', default=None, help='逗号分隔的 contract id')
+    p_contracts.add_argument('--json', action='store_true')
+    p_contracts.set_defaults(func=cmd_contracts)
+
+    p_spec = sub.add_parser('spec', help='校验 spec/*.yaml 与 registry 的引用可解析')
+    p_spec.add_argument('--summary', action='store_true')
+    p_spec.set_defaults(func=cmd_spec)
+
+    p_exp = sub.add_parser('experiments', help='打印实验 spec（purpose / notes / steps / 产物）')
+    p_exp.set_defaults(func=cmd_experiments)
 
     p_report = sub.add_parser('report', help='重算 result/tables 与 summary')
     p_report.set_defaults(func=cmd_report)

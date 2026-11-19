@@ -575,7 +575,7 @@ def build_md(o: dict) -> str:
     L.append('| 检验 | 假设 | 主读数层读数（登记样本） | 是否改变「反号」结论 | 是否能解释掉负号 | 判定 |')
     L.append('|---|---|---|---|---|---|')
     def esc2(x):
-        return str(x).replace('|', '\|')
+        return str(x).replace('|', '\\|')
 
     order = ['T1', 'T2', 'T3', 'T4', 'T5', 'T5B', 'T6']
     for k in order:
@@ -590,7 +590,7 @@ def build_md(o: dict) -> str:
     L.append('| 检验 | 规格 | β（%） | t(NW) | 备注 |')
     L.append('|---|---|---|---|---|')
     def esc(x):
-        return str(x).replace('|', '\|')
+        return str(x).replace('|', '\\|')
 
     for r in o['summary_table']:
         L.append(f"| {r['test']} | {esc(r['spec'])} | {_dt(r['beta_pct'])} | {_dt(r['t_nw'])} | "

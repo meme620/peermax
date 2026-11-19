@@ -1,0 +1,241 @@
+# 研究设计 spec：口径、判据、红线。由 peerlab spec 校验：引用必须解析到脚本、registry 参数、gate 或测试。
+version: 1
+
+question: 产品市场同侪的极端日收益（raw MAX）是否预测关联公司下月更低收益，并沿注意力-交易压力-回吐路径传导。
+
+routes:
+  - id: A
+    title: 主线 A：月度定价事实 + raw MAX 事件路径
+    headline: true
+  - id: B
+    title: 升级线 B：榜单 assignment 到实际展示的可见性识别
+    headline: false
+    blocked_by: G4
+
+variables:
+  - name: rraw
+    definition: 公司行为修正后的日收益，不做市场/行业调整
+    implemented_by: [daily_panel_build, build_daily_returns]
+  - name: MAXraw
+    definition: 月内最大 rraw，仅取有效交易日；停牌日不填 0
+    implemented_by: [peermax_max_build]
+  - name: PeerMAXraw
+    definition: 事前网络权重加权的 peer MAX，唯一 headline treatment
+    implemented_by: [peermax_panel_build]
+  - name: w_ij
+    definition: 事前相似度行归一权重；无支持标 no-network-support，不填 0
+    implemented_by: [network_business_edges_build, network_mda_edges_build]
+  - name: OwnMAXraw
+    definition: focal 自身月内最大日收益，控制变量
+    implemented_by: [pricing_sample_build]
+  - name: PeerReturn
+    definition: 同一网络加权的 peer 月累计收益
+    implemented_by: [pricing_sample_build]
+  - name: PeerIVOL
+    definition: FF4 残差特质波动，前 252 日窗口
+    implemented_by: [pricing_sample_build, factor_build]
+  - name: PeerSkew
+    definition: peer 日收益偏度
+    implemented_by: [pricing_sample_build]
+  - name: PeerID
+    definition: Da-Gurun-Warachka 信息离散度
+    implemented_by: [pricing_sample_build]
+  - name: NetworkDegree
+    definition: 分析师共同覆盖网络度数（不是产品网络度数）
+    implemented_by: [analyst_derived_build]
+  - name: DisplayedPeerMAX
+    definition: 仅在 argmax source-month 实际展示可观测时分解，否则 missing
+    implemented_by: [peermax_panel_build]
+
+sample:
+  window: [sample_start, sample_end]
+  complete_month: min_valid_days
+  filters: sample_filter_thresholds
+  iqr_scale: iqr_pool_value
+  pit_rule: available_at 严格小于 month；事件前控制只取 t-1 及更早
+  missing_states: [missing, not_covered, not_matched, unknown_timing]
+  immutable_versions: [m1_s5_v1_2015_2023, m1_s5_v2_2015_2023, m1_s5_v3_20261115, m1_s5_v4_20261116]
+
+m1_gates:
+  - id: M1-1
+    rule: beta_FM < 0（EW 与 VW 并报）
+    registry_key: null
+    enforced_by: [script:pricing_gate_report]
+  - id: M1-2
+    rule: 单侧 p < alpha_m1
+    registry_key: alpha_m1
+    enforced_by: [script:pricing_gate_report]
+  - id: M1-3
+    rule: abs(beta * IQR_pool) >= K_Econ_M1
+    registry_key: K_Econ_M1
+    enforced_by: [script:pricing_gate_report]
+  - id: M1-4
+    rule: abs(spread_quintile) >= K_Spread_M1
+    registry_key: K_Spread_M1
+    enforced_by: [script:pricing_gate_report]
+  - id: M1-5
+    rule: abs(beta_EW - beta_VW) <= K_Consist_M1，且符号一致、均显著、TOST 等价
+    registry_key: K_Consist_M1
+    enforced_by: [script:pricing_gate_report]
+
+data_gates:
+  - id: G1
+    requires: 日/月收益、交易日历、公司行为调整
+    enforced_by: [gate:daily-returns-board, gate:share-capital-chain]
+    on_fail: 停月度定价
+  - id: G2
+    requires: size/BM/momentum/流动性、分析师覆盖、网络度数
+    enforced_by: [gate:firm-chars-analyst-cov]
+    on_fail: 停 distinctness horse race
+  - id: G3
+    requires: 事前网络边表与支持标记
+    enforced_by: [gate:edge-build-report, gate:mda-source-identity]
+    on_fail: 停 peer exposure
+  - id: G4
+    requires: 榜单 rank/cutoff/actual_display/规则版本
+    enforced_by: []
+    on_fail: 升级线 B BLOCKED，主线 A 不受影响
+  - id: G5
+    requires: 有独立时间戳的 attention
+    enforced_by: []
+    on_fail: 只保留 proxy/path evidence
+  - id: G6
+    requires: 买卖方向或投资者分类
+    enforced_by: []
+    on_fail: 停 attention 到 order-flow
+  - id: G7
+    requires: 公告、新闻、分析师修正、后续业绩
+    enforced_by: []
+    on_fail: 保留 information-diffusion 模糊
+  - id: G8
+    requires: 市场/行业/因子基准、factor_returns_daily
+    enforced_by: []
+    on_fail: 停 reversal 检验
+
+constraints:
+  - id: C1
+    rule: scripts/ 平铺一层，仓库根只用 parents[1] 定位
+    enforced_by: [lint:check_script_sources]
+    violation: 读不到 registry、写到错误目录
+  - id: C2
+    rule: 改脚本名要同步注册表、测试与文档里的脚本字面量
+    enforced_by: [lint:check_script_literals]
+    violation: smoke 报缺脚本、测试 FileNotFoundError
+  - id: C3
+    rule: 同目录 import 直接 import 模块名，禁 sys.path.insert 与裸 except
+    enforced_by: [lint:check_hygiene, lint:check_local_imports]
+    violation: ImportError 且不降级
+  - id: C4
+    rule: 文本读写显式 encoding
+    enforced_by: [lint:check_text_io_encoding]
+    violation: 换平台按 locale 解码，数字静默变化
+  - id: C5
+    rule: registry 与 manifest 的 sha 锚不许回退实测值
+    enforced_by: [test:tests/test_manifest_input_guard.py]
+    violation: SystemExit(2)；回填等于伪造锚
+  - id: C6
+    rule: 命名禁阶段代号、版本号、序号与数字前缀
+    enforced_by: [lint:check_paths]
+    violation: 旧命名回流
+
+red_lines:
+  - id: R1
+    rule: 缺 actual_display 时写 V=D，或把统计分位数当制度 cutoff
+    enforced_by: []
+  - id: R2
+    rule: 把 Jackpot(q) 写成实际展示、主识别 assignment 或 monthly MAX 的等价替代
+    enforced_by: []
+  - id: R3
+    rule: 事件后字段进入 recognizability、事件分类、样本筛选或 pre-treatment 控制
+    enforced_by: [test:tests/test_available_at_guard.py]
+  - id: R4
+    rule: 同一 focal-date outcome 复制到多条 source-event 行
+    enforced_by: []
+  - id: R5
+    rule: 没有可比日内时间戳却写 source-before-focal
+    enforced_by: []
+  - id: R6
+    rule: 固定交易日窗口、event-to-month-end、next-month 三种 horizon 混进同一张表
+    enforced_by: []
+  - id: R7
+    rule: 把缺 bridge_key 的日度结果解释为下月系数
+    enforced_by: []
+  - id: R8
+    rule: 把 synthetic 或契约测试的通过写成 empirical pass
+    enforced_by: []
+  - id: R9
+    rule: 未冻结 SESOI、聚类或检验族就写等价、吸收或无效应
+    enforced_by: []
+  - id: R10
+    rule: 把搜索、换手、小单称为 retail investor 行为，或把未来低收益单独称为 reversal
+    enforced_by: []
+
+data_contracts:
+  - id: a1_schema
+    requires: 原始文件形状、dtype、索引与时间跨度
+    enforced_by: [contract:a1_schema]
+    on_fail: 停对应数据的全部阶段
+  - id: a2_universe
+    requires: 股票池对齐（MD&A / 月收益 / 基准矩阵）
+    enforced_by: [contract:a2_universe]
+    on_fail: 停依赖该池的阶段
+  - id: a3_pit
+    requires: 快照边界与 PIT 月份/年份上限
+    enforced_by: [contract:a3_pit]
+    on_fail: 停月度定价
+  - id: a4_units
+    requires: 量纲与取值范围（换手率 / 成交额 / 市值）
+    enforced_by: [contract:a4_units]
+    on_fail: 停 S2 面板
+  - id: a5_cliffs
+    requires: 除权断崖残留与派生月收益一致性
+    enforced_by: [contract:a5_cliffs]
+    on_fail: 停月度定价
+  - id: a6_limit_flags
+    requires: 涨跌停派生口径与供应商 flag 一致率
+    enforced_by: [contract:a6_limit_flags]
+    on_fail: 停 MAX 资格判定
+  - id: a7_return_series
+    requires: 自建月收益与老师交付序列对拍
+    enforced_by: [contract:a7_return_series]
+    on_fail: 停月度定价
+  - id: a8_flag_coverage
+    requires: flag 面板覆盖率与取值域
+    enforced_by: [contract:a8_flag_coverage]
+    on_fail: 停样本筛除
+
+sample_filters:
+  market_value_basis: total_market_value
+  st_primary: include_st
+  liquidity_threshold: none_declared
+  recent_ipo_months: 6
+  enforced_by: [script:pricing_sample_build]
+
+max_definition:
+  return_basis: raw_close
+  limit_hit_days: exclude
+  resume_day: exclude
+  market_or_industry_adjusted: false
+  enforced_by: [script:peermax_max_build]
+  audit_column: MAXraw_incl_all
+  note: 剔除涨跌停日与停牌复牌首日；含全部日的 MAX 另列并报
+
+windows:
+  requested: 2015-01..2023-12
+  effective: 2015-05..2023-12
+  segment_break: 2020-12
+  segment_break_role: descriptive
+
+inference:
+  p_direction: negative
+  nw_lag_sensitivity: [0, 3, 6, 12]
+  multiplicity: {family: m1_robustness, m: 19, method: BH}
+  placebo: {draws: 500, p_threshold: 0.05}
+  vif: {per_month_max: 10, on_exceed: mark_non_interpretable}
+  enforced_by: [script:pricing_fm_main, script:pricing_gate_report]
+
+iqr:
+  formula: pooled_treatment_only_v2
+  value: 0.02341287
+  drift_tolerance: 0.1
+  enforced_by: [script:pricing_sample_build]

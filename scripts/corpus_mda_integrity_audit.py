@@ -20,7 +20,6 @@
 import argparse
 import csv
 import collections
-import hashlib
 import heapq
 import json
 import os
@@ -230,12 +229,12 @@ def main():
     for i, (code6, year) in enumerate(files):
         p = os.path.join(TXT, code6, year + ".txt")
         b = Path(p).read_bytes()
-        h2[hashlib.md5(b).hexdigest()].append((code6, year))
+        h2[sizes.md5(b).hexdigest()].append((code6, year))
         t = b.decode("utf-8", "replace")
         content, method, ident = check_identity(t, code6, code6, name_map)
         rows.append({"code6": code6, "year": year, "content_code": content or "",
                      "method": method, "identity": ident, "doc_type": doc_type(t),
-                     "year_signal": year_signal(t, year), "md5": hashlib.md5(b).hexdigest()})
+                     "year_signal": year_signal(t, year), "md5": sizes.md5(b).hexdigest()})
         if (i + 1) % 5000 == 0:
             print(f"  身份校验 {i+1}/{len(files)}", flush=True)
 

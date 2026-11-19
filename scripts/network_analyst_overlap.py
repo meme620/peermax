@@ -7,7 +7,7 @@
 
 口径真源：
   - `reports/audits/s3_remaining_workplan_20261011.md` 第一梯队 6
-  - `docs/methodology/methodology_execution_plan.md` §8 B″11-7（**二修：v3**）
+  - 主仓库 methodology_execution_plan §8 B″11-7（**二修：v3**）
   - `reports/audits/s3_network_open_items_plan_20261006.md` §3-②(c)
   - S3A 9H：`reports/data_gates/G0/s3a_9h_absorb.json`（CF 方向参照）
 

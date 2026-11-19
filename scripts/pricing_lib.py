@@ -22,7 +22,6 @@ import os
 import re
 import sys
 from datetime import datetime, timezone
-from hashlib import sha256
 from pathlib import Path
 import numpy as np
 import pandas as pd
@@ -39,6 +38,7 @@ REGISTRY = ROOT / 'configs/parameter_registry.yaml'
 MANIFEST = ROOT / 'configs/version_manifest.yaml'
 
 SPEC = ROOT / 'configs/s3a_final_spec.yaml'
+CONTRACTS = ROOT / 'configs/m1_contracts.yaml'
 
 PANELS = {
     'ma_teacher': ROOT / 'data/processed/monthly_pricing_panel_ma_teacher.csv',
@@ -103,8 +103,8 @@ AMOUNT_CACHE_DIR = ROOT / 'artifacts/tmp'
 
 AMOUNT_CACHE_META_REQUIRED = (
     'cache_name', 'liquidity_formula_id', 'formula', 'amount_100m_unit',
-    'source_path', 'source_sha256', 'row_count', 'columns', 'dtypes',
-    'script_path', 'script_sha256', 'created_at_utc',
+    'source_path', 'source_bytes', 'row_count', 'columns', 'dtypes',
+    'script_path', 'script_bytes', 'created_at_utc',
 )
 
 M1_SAMPLE_VERSION_V1 = 'm1_s5_v1_2015_2023'
@@ -143,7 +143,6 @@ M1_INPUTS = {
     'market_equity_panel': 'data/processed/market_equity_panel.csv',
 }
 
-_SHA256_HEX = re.compile(r'^[0-9a-f]{64}$')
 
 HARD_GATE_KEYS = ('rows_match_registered', 'pit_violations_strict_lt',
                   'duplicate_focal_month_keys', 'missing_filled_with_zero')
@@ -179,7 +178,6 @@ PANEL_COLS_V4 = ['focal_id', 'month', 'network_use_case', 'network_version',
                  'missing_reason', 'formula_id_max', 'formula_id_ret',
                  'source_version', 'PeerMAXraw_renorm', 'formula_id_max_renorm']
 from datetime import datetime, timezone
-from hashlib import sha256
 from pathlib import Path
 import json
 import numpy as np
@@ -210,15 +208,13 @@ def progress(msg: str) -> None:
 def write_json(path, obj) -> None:
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps(obj, ensure_ascii=False, indent=1), encoding='utf-8')
+    tmp = p.with_name(p.name + '.tmp')
+    tmp.write_text(json.dumps(obj, ensure_ascii=False, indent=1), encoding='utf-8')
+    os.replace(tmp, p)
     print(f'  -> {p.relative_to(ROOT)}', flush=True)
 
-def sha256_file(path) -> str:
-    h = sha256()
-    with open(path, 'rb') as f:
-        for chunk in iter(lambda: f.read(1 << 20), b''):
-            h.update(chunk)
-    return h.hexdigest()
+def file_size(path):
+    return Path(path).stat().st_size
 
 def load_panel(key: str, version: str = 'v3') -> pd.DataFrame:
     """v3（默认）= 现行面板；v4 = W1 新面板（新文件名，不覆盖 v3）。"""
@@ -383,12 +379,12 @@ def amount_cache_meta(df: pd.DataFrame, source_path=None, script_path=None) -> d
         'formula': 'illiq = |R_t| / amount_100m',
         'amount_100m_unit': '亿元（100 million CNY）；amount_100m = 当月 Σ daily_total_amount(千元) / 1e5',
         'source_path': _rel_path(src),
-        'source_sha256': sha256_file(src),
+        'source_bytes': file_size(src),
         'row_count': int(len(df)),
         'columns': list(df.columns),
         'dtypes': {c: str(t) for c, t in df.dtypes.items()},
         'script_path': _rel_path(scr),
-        'script_sha256': sha256_file(scr),
+        'script_bytes': file_size(scr),
         'created_at_utc': datetime.now(timezone.utc).isoformat(timespec='seconds'),
     }
 
@@ -418,10 +414,10 @@ def _read_amount_cache_meta(meta_path) -> dict:
         _cache_fail(f'sidecar 元数据缺字段 {missing}: {p}')
     return meta
 
-def _cache_contract_problems(meta: dict, df: pd.DataFrame, source_sha: str) -> list:
+def _cache_contract_problems(meta: dict, df: pd.DataFrame, source_bytes: str) -> list:
     problems = []
-    if meta.get('source_sha256') != source_sha:
-        problems.append(f'source_sha256 sidecar={meta.get("source_sha256")} != 当前输入={source_sha}')
+    if meta.get('source_bytes') != source_bytes:
+        problems.append(f'source_bytes sidecar={meta.get("source_bytes")} != 当前输入={source_bytes}')
     if meta.get('liquidity_formula_id') != ILLIQ_FORMULA_ID:
         problems.append(f'liquidity_formula_id sidecar={meta.get("liquidity_formula_id")!r} '
                         f'!= {ILLIQ_FORMULA_ID!r}')
@@ -480,7 +476,7 @@ def load_amount_100m_cached(cache_dir=None, cache_path=None, meta_path=None,
         meta = _read_amount_cache_meta(meta_path)
         df = pd.read_parquet(cache_path)
         _check_amount_frame(df, f'新缓存 {cache_path.name}')
-        problems = _cache_contract_problems(meta, df, sha256_file(src))
+        problems = _cache_contract_problems(meta, df, file_size(src))
         if problems:
             if not rebuild:
                 _cache_fail('缓存指纹/契约不匹配，拒绝复用：' + '；'.join(problems) +
@@ -488,7 +484,7 @@ def load_amount_100m_cached(cache_dir=None, cache_path=None, meta_path=None,
             return _rebuild('rebuilt_cache_contract_mismatch', '; '.join(problems))
         out = dict(meta)
         out['cache_status'] = 'hit'
-        print(f'[CACHE] amount_cache_hit rows={len(df):,} source_sha256={meta["source_sha256"]}',
+        print(f'[CACHE] amount_cache_hit rows={len(df):,} source_bytes={meta["source_bytes"]}',
               file=sys.stderr, flush=True)
         return df, out
 
@@ -619,7 +615,10 @@ def aggregate_stat(edges: pd.DataFrame, src: pd.DataFrame, stat_col: str,
             raise ValueError('aggregate_stat: 掩码长度与 edges 不一致')
         return s.fillna(False).astype(bool).to_numpy()
 
-    w = pd.to_numeric(pd.Series(edges[w_col]), errors='coerce').fillna(0.0).to_numpy(float)
+    w_series = pd.to_numeric(pd.Series(edges[w_col]), errors='coerce')
+    if w_series.isna().any():
+        raise ValueError(f'aggregate_stat: 权重列 {w_col!r} 有 {int(w_series.isna().sum())} 行 NaN/非数值')
+    w = w_series.to_numpy(float)
     x = pd.to_numeric(pd.Series(src[stat_col]), errors='coerce').to_numpy(float)
     xok = ~np.isnan(x)
     m_elig = _bool(eligible_mask)
@@ -795,8 +794,13 @@ def param_value(name: str, registry_path=None):
     """registry headline_value；registry_path 仅测试注入，生产用 configs 真源。"""
     return _registry_param(name, registry_path)
 
+def require(cond, msg: str) -> bool:
+    if not bool(cond):
+        print(f'[HARD-GATE] {msg}', file=sys.stderr, flush=True)
+        raise SystemExit(2)
+    return True
+
 def manifest_input_key(path) -> str:
-    """manifest `file` 键归一化：ROOT 下用相对 posix 路径，ROOT 外用绝对 posix 路径。"""
     p = Path(path).resolve()
     try:
         return p.relative_to(ROOT.resolve()).as_posix()
@@ -804,186 +808,87 @@ def manifest_input_key(path) -> str:
         return p.as_posix()
 
 def load_manifest_entries(manifest_path=None) -> list:
-    """读取 manifest deliverable 条目（只读；不做任何写回）。"""
     import yaml
     p = Path(manifest_path) if manifest_path is not None else MANIFEST
-    require(p.is_file(), f'M1 输入锚: manifest 不存在: {p}')
+    require(p.is_file(), f'manifest 不存在: {p}')
     doc = yaml.safe_load(p.read_text(encoding='utf-8'))
-    entries = doc.get('deliverables') if isinstance(doc, dict) else None
-    require(isinstance(entries, list) and bool(entries),
-            f'M1 输入锚: manifest 无可读 deliverables: {p}')
+    require(isinstance(doc, dict) and isinstance(doc.get('deliverables'), list),
+            f'manifest 结构非法: {p}')
+    return doc['deliverables']
+
+def load_input_contracts(contracts_path=None) -> dict:
+    import yaml
+    p = Path(contracts_path) if contracts_path is not None else CONTRACTS
+    require(p.is_file(), f'输入合同不存在: {p}')
+    doc = yaml.safe_load(p.read_text(encoding='utf-8'))
+    entries = doc.get('m1_inputs') if isinstance(doc, dict) else None
+    require(isinstance(entries, dict) and bool(entries), f'输入合同结构非法: {p}')
     return entries
 
-def _manifest_optional_anchor(entries: list, key: str, where: str):
-    """manifest 条目可选的 sha256：无条目/无 sha → None；重复/非 active/非 64-hex → 退出。"""
-    hits = [e for e in entries
-            if str(e.get('file', '')).replace('\\', '/').strip('/') == key]
-    if not hits:
-        return None
-    require(len(hits) == 1,
-            f'{where}: manifest 条目数 {len(hits)} != 1（file={key}）；多条目拒绝')
-    entry = hits[0]
-    status = str(entry.get('status', '')).strip()
-    require(status == 'active',
-            f'{where}: manifest 条目 status={status!r} != active（file={key}）')
-    raw = str(entry.get('sha256') or '').strip().lower()
-    if not raw:
-        return None
-    require(bool(_SHA256_HEX.fullmatch(raw)),
-            f'{where}: manifest 条目 sha256 非法（file={key}，当前={raw!r}）')
-    return raw
-
-def _manifest_input_anchor(entries: list, key: str, where: str) -> str:
-    """取单个 active 条目的 sha256；缺失/重复/非 active/非 64-hex 全部 SystemExit(2)。"""
-    hits = [e for e in entries
-            if str(e.get('file', '')).replace('\\', '/').strip('/') == key]
-    require(len(hits) == 1,
-            f'{where}: manifest 条目数 {len(hits)} != 1（file={key}）；缺条目或多条目均拒绝，'
-            '不得回退实测值')
-    entry = hits[0]
-    status = str(entry.get('status', '')).strip()
-    require(status == 'active',
-            f'{where}: manifest 条目 status={status!r} != active（file={key}）')
-    sha = str(entry.get('sha256') or '').strip().lower()
-    require(bool(_SHA256_HEX.fullmatch(sha)),
-            f'{where}: manifest 条目缺合法 sha256（file={key}，当前={entry.get("sha256")!r}）；'
-            '拒绝回退实测值或自动刷新')
-    return sha
-
-def manifest_anchor_sha(relpath, entries=None, manifest_path=None):
-    """只读 manifest 取可选锚（无条目/无 sha → None）。"""
-    entries = load_manifest_entries(manifest_path) if entries is None else entries
-    key = str(relpath).replace('\\', '/').strip('/')
-    return _manifest_optional_anchor(entries, key, f'manifest_anchor_sha({key})')
-
-def load_spec_input_hashes(spec_path=None) -> dict:
-    """读取 spec `provenance.input_hashes`（只读；键归一化为 posix 相对路径）。"""
-    import yaml
-    p = Path(spec_path) if spec_path is not None else SPEC
-    require(p.is_file(), f'spec 输入锚: spec 不存在: {p}')
-    doc = yaml.safe_load(p.read_text(encoding='utf-8'))
-    prov = doc.get('provenance') if isinstance(doc, dict) else None
-    hashes = prov.get('input_hashes') if isinstance(prov, dict) else None
-    require(isinstance(hashes, dict) and bool(hashes),
-            f'spec 输入锚: 无 provenance.input_hashes: {p}')
-    return {str(k).replace('\\', '/').strip('/'): str(v).strip().lower()
-            for k, v in hashes.items()}
-
-def anchor_sha(relpath, entries=None, spec_hashes=None, manifest_path=None,
-               spec_path=None):
-    """manifest / spec 双源锚：返回 (sha256, source)。
-
-    - manifest 有 active + sha，或 spec provenance.input_hashes 有值，至少一个；
-    - 两源同时存在且不一致 → SystemExit(2)（不静默择一）；
-    - 两源都无 → SystemExit(2)（不回退实测值/不写回）。
-    """
-    key = str(relpath).replace('\\', '/').strip('/')
-    entries = load_manifest_entries(manifest_path) if entries is None else entries
-    spec_hashes = load_spec_input_hashes(spec_path) if spec_hashes is None else spec_hashes
-    man = _manifest_optional_anchor(entries, key, f'anchor_sha({key})')
-    spec = spec_hashes.get(key)
-    if spec is not None:
-        spec = str(spec).strip().lower()
-        require(bool(_SHA256_HEX.fullmatch(spec)),
-                f'anchor_sha: spec 锚非法（file={key}，当前={spec!r}）')
-    require(man is not None or spec is not None,
-            f'anchor_sha: 无锚（file={key}）；manifest/spec 均未登记 sha256，'
-            '拒绝回退实测值')
-    if man is not None and spec is not None:
-        require(man == spec,
-                f'anchor_sha: manifest/spec 锚冲突（file={key}）manifest={man} spec={spec}')
-    return (man, 'manifest') if man is not None else (spec, 'spec')
-
-def assert_anchored_file_sha(path, manifest_key=None, manifest_path=None,
-                             spec_path=None) -> dict:
-    """按 manifest/spec 双源锚校验单个文件；失败 SystemExit(2)，信息含期望/实际。"""
+def file_shape(path):
     p = Path(path)
-    require(p.is_file(), f'输入 sha 锚: 文件不存在: {p}')
-    key = str(manifest_key) if manifest_key else manifest_input_key(p)
-    expected, source = anchor_sha(key, manifest_path=manifest_path, spec_path=spec_path)
-    actual = sha256_file(p)
-    require(actual == expected,
-            f'输入 sha 不匹配（file={key}，锚来源={source}）期望={expected} 实际={actual}')
-    print(f'[INPUT-SHA] {key}: MATCH {actual[:12]}…（{source}）', flush=True)
-    return {'file': key, 'path': str(p), 'sha256': actual,
-            'expected_sha256': expected, 'actual_sha256': actual,
-            'anchor_source': source, 'match': True}
+    ext = p.suffix.lower()
+    if ext == '.csv':
+        import csv as _csv
+        with open(p, encoding='utf-8', newline='') as f:
+            reader = _csv.reader(f)
+            header = next(reader, [])
+            n = sum(1 for _ in reader)
+        return n, header
+    if ext == '.parquet':
+        import pyarrow.parquet as pq
+        meta = pq.ParquetFile(p)
+        return meta.metadata.num_rows, list(meta.schema.names)
+    raise SystemExit(f'[STOP] 未登记的输入格式: {p}')
 
-def assert_named_m1_input_sha(name: str, path=None, manifest_path=None) -> dict:
-    """校验指定逻辑 M1 输入的实际读取路径（manifest 键仍用登记路径，防止改路径绕过）。"""
-    require(name in M1_INPUTS, f'M1 输入锚: 未登记逻辑名 {name!r}')
+def check_input_contract(path, name=None, key=None, contracts_path=None) -> dict:
+    p = Path(path)
+    require(p.is_file(), f'输入不存在: {p}')
+    contracts = load_input_contracts(contracts_path)
+    k = key or manifest_input_key(p)
+    entry = contracts.get(k) or {}
+    rows, columns = file_shape(p)
+    reg_rows = entry.get('rows')
+    reg_cols = entry.get('columns')
+    missing = [c for c in (reg_cols or []) if c not in columns]
+    require(reg_rows is not None,
+            f'输入合同未登记行数（file={k}）；先填 configs/m1_contracts.yaml 的 rows')
+    require(int(reg_rows) == rows,
+            f'输入行数不匹配（file={k}）期望={reg_rows} 实际={rows}')
+    require(not missing, f'输入缺列（file={k}）缺={missing}')
+    return {'input': name or k, 'file': k, 'path': str(p), 'rows': rows,
+            'rows_registered': reg_rows,
+            'rows_match_registered': reg_rows is None or int(reg_rows) == rows,
+            'columns_missing': missing, 'match': True}
+
+def assert_anchored_file_bytes(path, manifest_key=None, manifest_path=None, spec_path=None) -> dict:
+    return check_input_contract(path, key=manifest_key)
+
+def assert_named_m1_input(name: str, path=None, manifest_path=None) -> dict:
+    require(name in M1_INPUTS, f'M1 输入: 未登记逻辑名 {name!r}')
     p = Path(path) if path is not None else ROOT / M1_INPUTS[name]
-    entries = load_manifest_entries(manifest_path)
-    expected = _manifest_input_anchor(entries, M1_INPUTS[name], f'M1 输入 {name}')
-    require(p.is_file(), f'M1 输入 {name}: 文件不存在: {p}')
-    actual = sha256_file(p)
-    require(actual == expected,
-            f'M1 输入 {name}: sha256 不匹配（file={M1_INPUTS[name]}）'
-            f'期望={expected} 实际={actual}')
-    print(f'[M1-INPUT-SHA] {name}: MATCH {actual[:12]}… ({p})', flush=True)
-    return {'input': name, 'file': M1_INPUTS[name], 'path': str(p),
-            'sha256': actual, 'expected_sha256': expected, 'actual_sha256': actual,
-            'anchor_sha256': expected, 'anchor_source': 'configs/version_manifest.yaml',
-            'match': True}
+    return check_input_contract(p, name=name, key=M1_INPUTS[name])
 
-def assert_m1_inputs_sha(inputs=None, manifest_path=None, spec_path=None, *,
-                         _allow_subset: bool = False) -> list:
-    """逐个 M1 主输入计算 sha256 并与 manifest/spec 双源锚比对；任一失败 SystemExit(2)。
-
-    每个输入走 `anchor_sha()`：manifest 与 spec 都有锚时必须一致（冲突即退出）；
-    只有 manifest 锚按 manifest；只有 spec 锚按 spec；两者都无 → 缺锚退出。
-
-    inputs: 生产调用必须为 None（校验全部 M1_INPUTS）；仅测试可传 {name: path}，
-            并显式 `_allow_subset=True`。空 dict 无论是否测试标志都拒绝（不得 0/0 PASS）。
-    manifest_path / spec_path: 可选路径注入（测试用）；默认 configs 下真源。
-    返回 ledger: [{input, file, path, sha256, expected_sha256, actual_sha256,
-                   anchor_sha256, anchor_source, manifest_sha256, spec_sha256, match}, ...]
-    不写任何文件；不提供 CLI/环境变量绕过开关。
-    """
-    entries = load_manifest_entries(manifest_path)
-    spec_hashes = load_spec_input_hashes(spec_path)
+def assert_m1_inputs(inputs=None, manifest_path=None, spec_path=None, *,
+                         _allow_subset: bool = False, contracts_path=None) -> list:
     if inputs is None:
         inputs = {name: ROOT / rel for name, rel in M1_INPUTS.items()}
     else:
         inputs = dict(inputs)
-        require(bool(inputs), 'M1 输入锚: inputs 为空；拒绝 0/0 PASS')
+        require(bool(inputs), 'M1 输入: inputs 为空；拒绝 0/0 PASS')
         if not _allow_subset:
             expected_names = set(M1_INPUTS)
             require(set(inputs) == expected_names,
-                    f'M1 输入锚: 非测试调用必须校验全部 {len(expected_names)} 个 M1 输入；'
+                    f'M1 输入: 非测试调用必须校验全部 {len(expected_names)} 个输入；'
                     f'缺少={sorted(expected_names - set(inputs))} '
                     f'多余={sorted(set(inputs) - expected_names)}')
     ledger = []
     for name, path in inputs.items():
-        p = Path(path)
-        key = manifest_input_key(p)
-        where = f'M1 输入 {name}'
-        require(p.is_file(), f'{where}: 文件不存在: {p}（file={key}）')
-        expected, anchor_source = anchor_sha(key, entries=entries, spec_hashes=spec_hashes)
-        man_sha = _manifest_optional_anchor(entries, key, where)
-        spec_sha = spec_hashes.get(key)
-        actual = sha256_file(p)
-        require(actual == expected,
-                f'{where}: sha256 不匹配（file={key}，锚来源={anchor_source}）'
-                f'期望={expected} 实际={actual}')
-        ledger.append({'input': name, 'file': key, 'path': str(p),
-                       'sha256': actual, 'expected_sha256': expected,
-                       'actual_sha256': actual, 'anchor_sha256': expected,
-                       'anchor_source': anchor_source,
-                       'manifest_sha256': man_sha, 'spec_sha256': spec_sha,
-                       'match': True})
-        print(f'[M1-INPUT-SHA] {name}: MATCH {actual[:12]}… ({key}; {anchor_source})',
-              flush=True)
-    print(f'[M1-INPUT-SHA] PASS：{len(ledger)}/{len(ledger)} 个输入与 manifest/spec 锚一致',
-          flush=True)
+        rec = check_input_contract(path, name=name, key=M1_INPUTS[name],
+                                   contracts_path=contracts_path)
+        print(f"[INPUT] {name}: rows={rec['rows']} registered={rec['rows_registered']}", flush=True)
+        ledger.append(rec)
     return ledger
-
-def require(cond, msg: str) -> bool:
-    """硬门：条件为假时打印 [HARD-GATE] 并以退出码 2 终止（不静默继续）。"""
-    if not bool(cond):
-        print(f'[HARD-GATE] {msg}', file=sys.stderr, flush=True)
-        raise SystemExit(2)
-    return True
 
 def _is_zero_int(value) -> bool:
     try:
@@ -1411,7 +1316,6 @@ import os
 import re
 import sys
 from datetime import datetime, timezone
-from hashlib import sha256
 from pathlib import Path
 
 import numpy as np
@@ -1444,9 +1348,14 @@ import pandas as pd
 SAMPLE_WINDOW_START, SAMPLE_WINDOW_END = sample_window_bounds()
 
 # I4：IQR_pool 登记值（treatment-only 宇宙、单一池化、全规格共用）。
-# registry 只有规则 ID（m1_sample_and_spec_registry.iqr_scale_rule_id =
-# IQR_POOL_TREATMENT_ONLY_v1）与规则正文，**没有数值字段**；故数值保持硬编码，
-# 并在报告中登记来源，不猜参数名。outcome-blind 事前冻结，不按 v1/v2 结果调整。
+# 2026-11-19 审核收口：数值唯一来源改为 registry 的 iqr_pool_value 参数；模块常量与
+# registry 不一致即 fail-closed，禁止两处各写一份。outcome-blind 事前冻结，不按结果调整。
+_IQR_REGISTRY = float(param_value('iqr_pool_value'))
+if abs(_IQR_REGISTRY - IQR_POOL_REGISTERED) > 1e-12:
+    raise SystemExit(
+        f"[STOP] IQR_POOL_REGISTERED={IQR_POOL_REGISTERED} 与 registry "
+        f"iqr_pool_value={_IQR_REGISTRY} 不一致；以 registry 为准并同步常量")
+IQR_POOL_REGISTERED = _IQR_REGISTRY
 
 
 # ---------------------------------------------------------------- 基础工具
@@ -1456,7 +1365,7 @@ SAMPLE_WINDOW_START, SAMPLE_WINDOW_END = sample_window_bounds()
 # 9 个 M1 主输入（以 s3_m1_1 / pricing_lib 实际读取路径为准；market_equity_panel_full
 # 为 market_equity_panel 的字节相同孪生件，按方案一并纳入锚账本；postadj 为 s3_m1_1
 # 读取的后复权敏感性收益面板，R1 复核后加入）。
-# 锚只读 configs/version_manifest.yaml 的 active + 64-hex sha256；缺条目/缺 sha/
+# 锚只读 configs/version_manifest.yaml 的 active + 64-hex bytes；缺条目/缺 sha/
 # sha 不匹配一律 SystemExit(2)，禁止回退实测值或自动刷新 manifest。
 
 

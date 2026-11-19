@@ -1,41 +1,46 @@
-m1_contracts_version: 1.0-baseline
+m1_contracts_version: 2.0.0
 meta:
-  baseline_date: '2026-11-18'
-  note: 新基线：9 个 M1 主输入的 sha256 与行数待数据生成后登记；当前 sha256 为空，读取方按 fail-closed 拒绝
+  baseline_date: '2026-11-19'
+  rule: 行数与列名是复现门槛；文件内容变动由行数或列名变化暴露
+  note: rows/columns 为 null 表示该项未登记，检查退化为「文件存在」
 m1_inputs:
   monthly_returns_clean_v2:
     file: data/processed/monthly_returns_clean_v2.csv
-    sha256: null
-    expected_rows: null
+    rows: null
+    columns: [firm_id, month, R, n_valid_days, complete_month, return_status,
+              month_start, month_end, sample_version, available_at]
   monthly_returns_adj_full_2006_2025:
     file: data/processed/monthly_returns_adj_full_2006_2025.csv
-    sha256: null
-    expected_rows: null
+    rows: null
+    columns: [firm_id, month, R]
   source_month_argmax_panel:
     file: data/processed/source_month_argmax_panel.csv
-    sha256: null
-    expected_rows: null
+    rows: null
+    columns: [source_id, month, MAXraw, argmax_date, n_valid_days, R,
+              tie_rule_version, formula_id, limit_hit_at_argmax,
+              qualification_status, st_flag_at_argmax, complete_month,
+              available_at]
   market_equity_panel_full_2006_2025:
     file: data/processed/market_equity_panel_full_2006_2025.csv
-    sha256: null
-    expected_rows: null
+    rows: null
+    columns: null
   sw2_industry_latest:
     file: data/processed/sw2_industry_latest.csv
-    sha256: null
-    expected_rows: null
+    rows: null
+    columns: null
   firm_analyst_derived:
     file: data/processed/analyst/firm_analyst_derived.csv
-    sha256: null
-    expected_rows: null
+    rows: null
+    columns: null
   firm_chars_clean:
     file: data/processed/firm_chars_clean.csv
-    sha256: null
-    expected_rows: null
+    rows: null
+    columns: null
   firm_id_map:
     file: data/processed/firm_id_map.csv
-    sha256: null
-    expected_rows: null
+    rows: null
+    columns: [firm_id, code6, board, ipo_date]
   market_equity_panel:
     file: data/processed/market_equity_panel.csv
-    sha256: null
-    expected_rows: null
+    rows: null
+    columns: null

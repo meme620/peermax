@@ -46,7 +46,7 @@
   rebuild     落地二级 K 选择（内存 patch `calibrate_K`，只重建 K 有变的年）
   compare     变体 × headline × p3asof 对比表（边数/Jaccard/密度/peer 中位与 p90/lift 两口径/楔子/K/
               isolated）+ 验收硬门 + 词表/目标效应分解；`3.2_comparison.csv` / `3.2_wedge.csv` /
-              `3.2_freeze_summary.csv` / `3.2_output_sha.json` / `3.2_counts.json`
+              `3.2_freeze_summary.csv` / `3.2_output_bytes.json` / `3.2_counts.json`
   postflight  再次核验锚与 headline 网络 sha（`3.2_anchor_post.json`）；CHANGED → 停机
 
 用法：
@@ -70,7 +70,7 @@ from datetime import datetime, timezone
 import numpy as np
 import pandas as pd
 import shadow_asof_industry as p31  # noqa: E402  （as-of 映射 / lift / 锚台账：3.1 交接件，只读复用）
-from pricing_lib import assert_m1_inputs_sha, require, sha256_file
+from pricing_lib import assert_m1_inputs, require, file_size
 from peermax_panel_build import (
     NETWORK_AVAILABLE_AT_RULE, load_versions, select_version,
 )
@@ -110,7 +110,7 @@ LEXICON_BY_YEAR_CSV = ART / '3.2_lexicon_by_year.csv'
 
 DF_REMOVED_CSV = ART / '3.2_df_removed_terms.csv'
 
-OUTPUT_SHA = ART / '3.2_output_sha.json'
+OUTPUT_SHA = ART / '3.2_output_bytes.json'
 
 ANCHOR_PRE = ART / '3.2_anchor_pre.json'
 
@@ -265,20 +265,20 @@ def log(msg: str) -> None:
     print(f'[{time.strftime("%H:%M:%S")}] {msg}', flush=True)
 
 def anchors_snapshot(tag: str) -> dict:
-    ledger = assert_m1_inputs_sha()
-    extra = {k: {'file': str(Path(v).relative_to(ROOT)).replace('\\', '/'), 'sha256': sha256_file(v)}
+    ledger = assert_m1_inputs()
+    extra = {k: {'file': str(Path(v).relative_to(ROOT)).replace('\\', '/'), 'bytes': file_size(v)}
              for k, v in EXTRA_INPUTS.items()}
     snap = {
         'tag': tag, 'run_at': datetime.now(timezone.utc).isoformat(),
-        'm1_inputs_9': {r['input']: r['sha256'] for r in ledger},
+        'm1_inputs_9': {r['input']: r['rows'] for r in ledger},
         'm1_inputs_ledger': ledger,
         'extra_inputs': extra,
-        'headline_network_sha': p31.sha_ledger_headline_net(),
+        'headline_network_bytes': p31.sha_ledger_headline_net(),
         'shadow_net_dirs_sha_ledger_note': (
             'headline 网络目录（data/processed/network_ma_teacher/）全文件 sha；'
             '3.2 新增的 4 个 shadow 目录不在本台账内（各自 build_report 记录 network_version 校验）'),
     }
-    snap['headline_network_n_files'] = len(snap['headline_network_sha'])
+    snap['headline_network_n_files'] = len(snap['headline_network_bytes'])
     return snap
 
 def load_k_targets_3_1() -> dict:
@@ -389,7 +389,7 @@ def build_yearly_lexicons(years, force: bool = False) -> dict:
             'hit_mass_share_rescued': round(hit_mass, 6),
             'headline_terms_dropped_by_max_rule': int((~lex_headline_keep).sum()),
             'file': str(out_f.relative_to(ROOT)).replace('\\', '/'),
-            'file_bytes': int(out_f.stat().st_size), 'file_sha256': sha256_file(out_f),
+            'file_bytes': int(out_f.stat().st_size), 'file_bytes': file_size(out_f),
             'file_existed_before_run': bool(existed),
             'n_terms_whose_headline_df_year_is_y': int(
                 ((~lex_headline_keep) & (lex['df_year'].astype(str) == str(y))).sum()),
@@ -689,7 +689,7 @@ def step_ladder(years, lexicon_mode: str, window: int = LADDER_WINDOW,
                 m = float(np.median(peers))
                 med[K] = m
                 rows.append({'text_year': y, 'lexicon_mode': lexicon_mode, 'K': int(K), 'median_peer': m,
-                             'mean_peer': round(float(peers.mean()), 2), 'size_max': int(sizes.max()),
+                             'mean_peer': round(float(peers.mean()), 2), 'size_max': int(file_size()),
                              'n_clusters': int(len(sizes)),
                              'is_freeze_K_of': ';'.join(sorted(f'{v}={freeze_K[v]}' for v in vs
                                                               if freeze_K.get(v) == K)),
@@ -1249,7 +1249,7 @@ def step_sha_ledger(years, variants) -> dict:
     files += sorted(SHADOW_DIR.glob('lexicon_p3ydf_*.csv'))
     files += [COMPARISON_CSV, WEDGE_CSV, FREEZE_SUMMARY_CSV, LEXICON_BY_YEAR_CSV, DF_REMOVED_CSV]
     files = [f for f in files if Path(f).is_file()]
-    cur = {Path(f).relative_to(ROOT).as_posix(): sha256_file(f) for f in files}
+    cur = {Path(f).relative_to(ROOT).as_posix(): file_size(f) for f in files}
     res = {'n_files': len(cur), 'sha': cur,
            'note': 'freeze 报告与 build_report 含 run_at/elapsed_sec，不参与逐字节比对'}
     if OUTPUT_SHA.is_file():

@@ -23,7 +23,6 @@ from statsutil import nw_t
 
 import json, sys
 from pathlib import Path
-import hashlib
 import pandas as pd
 import numpy as np
 import yaml
@@ -38,7 +37,7 @@ MEQ = Path(_SPEC['inputs']['market_equity'])
 OUT = Path('data/processed/analyst/cf_mom_replication.json')
 NET_VER = _SPEC['network']['primary_version']
 H12_MIN_AVAIL = int(_SPEC['horizon']['h12_min_available_months'])
-_SPEC_HASH = hashlib.sha256(SPEC.read_bytes()).hexdigest()
+_SPEC_HASH = file_size(SPEC.read_bytes()).hexdigest()
 _INPUT_HASHES = _SPEC['provenance']['input_hashes']
 
 

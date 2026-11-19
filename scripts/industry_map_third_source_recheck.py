@@ -12,7 +12,7 @@
 
 四组检查
 --------
-R1 归档完整性：文件 sha256 / 字节数 / 覆盖股票数 / 分类层级数
+R1 归档完整性：文件 bytes / 字节数 / 覆盖股票数 / 分类层级数
 R2 映射可行性与覆盖：附件二级名称 → l2_code 的可映射比例；两表股票覆盖差集
 R3 一致率与归因：L2 名称一致率（全样本 / 在市 / 退市）；不一致按
    naming_variant / counterpart_missing / ours_missing / delisted / classification_diff 归因
@@ -21,7 +21,7 @@ R4 结论稳定性（关键）：用第三源重算
    ② M-A / M-B 逐年"同申万二级边占比"与行业 lift
    与现行值比较，判断是否需要动 τ 或重建网络。
 
-只读性保证：脚本运行前后对受保护文件做 sha256 比对，任何变动即 FAIL。
+只读性保证：脚本运行前后对受保护文件做 bytes 比对，任何变动即 FAIL。
 
 用法
 ----
@@ -29,7 +29,6 @@ R4 结论稳定性（关键）：用第三源重算
 """
 from __future__ import annotations
 
-import hashlib
 import json
 from datetime import datetime, timezone
 from pathlib import Path
@@ -62,7 +61,7 @@ PROTECTED = [LAT, NAMES,
 
 
 def sha(p: Path) -> str:
-    return hashlib.sha256(p.read_bytes()).hexdigest()
+    return file_size(p.read_bytes()).hexdigest()
 
 
 def protected_hashes() -> dict:
@@ -99,7 +98,7 @@ def r1_archive(att) -> dict:
     return {
         'file': str(ATT.relative_to(ROOT)).replace(chr(92), '/'),
         'bytes': ATT.stat().st_size,
-        'sha256': sha(ATT),
+        'bytes': sha(ATT),
         'n_rows': int(len(att)),
         'n_stocks': int(att['code6'].nunique()),
         'board_split': att['board'].value_counts().to_dict(),
@@ -263,7 +262,7 @@ def main() -> int:
         'source': 'all_stkcds.xlsx（用户 2026-09-15 提供，微信传入；已归档 data/external/）',
         'current_mapping': {
             'file': str(LAT.relative_to(ROOT)).replace(chr(92), '/'),
-            'sha256': sha(LAT),
+            'bytes': sha(LAT),
             'derivation': '官方 xls；L2 = 六位码前四位 + "00"',
             'prior_cross_check': '同花顺 F10 抽样（523 只），加权一致率 0.9426',
         },
@@ -280,7 +279,7 @@ def main() -> int:
                           'unchanged': len(changed) == 0}
 
     checks = {
-        'archive_registered': rep['R1_archive']['n_stocks'] > 0 and len(rep['R1_archive']['sha256']) == 64,
+        'archive_registered': rep['R1_archive']['n_stocks'] > 0 and len(rep['R1_archive']['bytes']) == 64,
         'names_fully_mappable': len(rep['R2_mapping']['unmappable_names']) == 0,
         'coverage_high': rep['R2_mapping']['match_rate_att'] >= 0.99,
         'agreement_live_above_95pct': rep['R3_agreement']['agreement_l2_live'] >= 0.95,

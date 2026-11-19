@@ -4,11 +4,11 @@
 
 **只读复算 + 新建目录**：不重建主口径、不改任何 headline_value / 冻结参数；0.25 档（现状）的
 聚类与边表**落临时目录**（`artifacts/tmp/t1b/dfgrid/regr025/`），与 `data/processed/network_ma_teacher/`
-主口径产物做 **sha256 回归门**；10%/100% 两档落新目录 `data/processed/network_ma_teacher_df{10,100}/`。
+主口径产物做 **bytes 回归门**；10%/100% 两档落新目录 `data/processed/network_ma_teacher_df{10,100}/`。
 
 口径真源：
   - `reports/audits/s3_remaining_workplan_20261011.md` 第一梯队 5
-  - `docs/methodology/methodology_execution_plan.md` §8 B″11-8
+  - 主仓库 methodology_execution_plan §8 B″11-8
   - registry：`ma_lexicon_df_max`（0.25，headline 不动）、`ma_k_target_teacher`（44）
 
 操作（**低成本路径**）：`network_business_cluster_freeze.py` / `network_business_edges_build.py` 的 `--df-max` 按既有词表
@@ -16,7 +16,7 @@
 已复算确认 `df_ratio ≤ 0.25` ≡ `keep_df25` 在 1,355,237 行逐行一致）→ 同管线构网（K 目标 44）
 → 比 peer 分布 / same_sw2 / lift / 边 Jaccard / `mean_terms`。**不重跑词库 df 重算**（省 ~5,855 s）。
 
-验收：① **0.25 档与主口径产物 sha256 逐字节一致（回归门）**；② 三档结构指标表齐全；③ 结论句
+验收：① **0.25 档与主口径产物 bytes 逐字节一致（回归门）**；② 三档结构指标表齐全；③ 结论句
 （以实测定稿）。停机：0.25 档不可逐字节复现 → 停，先修参数化。**范围限定**：M-B 列 df 网格不覆盖。
 
 用法：
@@ -27,7 +27,6 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import subprocess
 import sys
@@ -54,12 +53,8 @@ TH_LIFT_REL_NOSIG = 0.02                       # 「无显著差异」的 |Δlif
 TH_PEER_MED_DELTA = 2.0                        # 「无显著差异」的 |Δ中位 peer| 上限
 
 
-def sha256(p: Path) -> str:
-    h = hashlib.sha256()
-    with open(p, 'rb') as fh:
-        for b in iter(lambda: fh.read(1 << 20), b''):
-            h.update(b)
-    return h.hexdigest()
+def file_size(p):
+    return p.stat().st_size
 
 
 def level_paths(df_max: float, tag: str) -> dict:
@@ -152,7 +147,7 @@ def main() -> None:
         print(f'[T1B-⑤] 档 {L["tag"]}%：terms_kept={L["lexicon"].get("terms_kept")} '
               f'K={list(L["K_by_year"].values())}', flush=True)
 
-    # 回归门：0.25 档 vs 主口径逐文件 sha256
+    # 回归门：0.25 档 vs 主口径逐文件 bytes
     regr = next((L for L in levels if L['tag'] == '25'), None)
     reg_rows, reg_pass = [], None
     if regr is not None:
@@ -160,15 +155,15 @@ def main() -> None:
             for kind in ('similarity', 'support'):
                 a = MAIN_NET / f'{y}_{kind}.csv'
                 b = regr['net'] / f'{y}_{kind}.csv'
-                sa = sha256(a) if a.exists() else None
-                sb = sha256(b) if b.exists() else None
+                sa = file_size(a) if a.exists() else None
+                sb = file_size(b) if b.exists() else None
                 reg_rows.append({'text_year': y, 'network_year': y + 1, 'file': f'{y}_{kind}.csv',
-                                 'main_sha256': sa, 'regr_sha256': sb,
+                                 'main_bytes': sa, 'regr_bytes': sb,
                                  'byte_identical': bool(sa and sb and sa == sb),
                                  'main_bytes': a.stat().st_size if a.exists() else None,
                                  'regr_bytes': b.stat().st_size if b.exists() else None})
         reg_pass = bool(reg_rows) and all(r['byte_identical'] for r in reg_rows)
-        print(f'[T1B-⑤] 回归门（0.25 档 vs 主口径 sha256 逐字节）：'
+        print(f'[T1B-⑤] 回归门（0.25 档 vs 主口径 bytes 逐字节）：'
               f'{"PASS" if reg_pass else "FAIL"}（{sum(1 for r in reg_rows if r["byte_identical"])}'
               f'/{len(reg_rows)} 文件一致）', flush=True)
 
@@ -274,8 +269,8 @@ def main() -> None:
                               'K_by_text_year': L['K_by_year'],
                               'regression_level': L['regression']}
                    for L in levels},
-        'regression_gate_sha256_vs_main': {
-            'rule': '0.25 档（现状）逐文件 sha256 与 data/processed/network_ma_teacher/ 主口径产物比对，'
+        'regression_gate_bytes_vs_main': {
+            'rule': '0.25 档（现状）逐文件 bytes 与 data/processed/network_ma_teacher/ 主口径产物比对，'
                     '必须逐字节一致',
             'rows': reg_rows, 'n_files': len(reg_rows),
             'n_byte_identical': sum(1 for r in reg_rows if r['byte_identical']),
@@ -286,7 +281,7 @@ def main() -> None:
         'edge_jaccard': jac,
         'structure_table': table,
         'conclusion': concl, 'conclusion_basis': concl_basis,
-        'acceptance': {'regression_gate_sha256_pass': reg_pass,
+        'acceptance': {'regression_gate_bytes_pass': reg_pass,
                        'three_levels_complete': bool(len(levels) >= 3),
                        'conclusion_from_measurement': bool(concl),
                        'headline_unchanged': 'ma_lexicon_df_max = 0.25（不动）'},
@@ -302,9 +297,9 @@ def main() -> None:
 
     md = ['# S3 第一梯队 ⑤ df 阈值网格 10%/25%/100%（B″11-8）', '',
           f"- run_at：{rep['run_at']}",
-          f"- 状态：**{rep['status']}**；回归门（0.25 档 vs 主口径 sha256）："
+          f"- 状态：**{rep['status']}**；回归门（0.25 档 vs 主口径 bytes）："
           f"**{'PASS' if reg_pass else reg_pass}**"
-          f"（{rep['regression_gate_sha256_vs_main']['n_byte_identical']}/{len(reg_rows)} 文件逐字节一致）",
+          f"（{rep['regression_gate_bytes_vs_main']['n_byte_identical']}/{len(reg_rows)} 文件逐字节一致）",
           f"- 词表：`{rep['inputs']['lexicon']}`（`df_ratio ≤ df_max` 即时过滤；不重跑 df 重算）",
           f"- 产物：`data/processed/network_ma_teacher_df10/`、`data/processed/network_ma_teacher_df100/`"
           f"（0.25 档 = 临时目录 `{TMP.as_posix()}/regr025/`）", '',
@@ -326,11 +321,11 @@ def main() -> None:
             md.append(f"| {tag}% | {y + 1} | {vr['jaccard'] if vr else '-'} | "
                       f"{vr['containment_a_in_b'] if vr else '-'} | {vr['containment_b_in_a'] if vr else '-'} | "
                       f"{vm['jaccard'] if vm else '-'} |")
-    md += ['', '## 回归门（0.25 档 vs 主口径，逐文件 sha256）', '',
-           '| 网络年 | 文件 | 主口径 sha256 | 回归档 sha256 | 逐字节一致 |', '|---|---|---|---|---|']
+    md += ['', '## 回归门（0.25 档 vs 主口径，逐文件 bytes）', '',
+           '| 网络年 | 文件 | 主口径 bytes | 回归档 bytes | 逐字节一致 |', '|---|---|---|---|---|']
     for r in reg_rows:
-        md.append(f"| {r['network_year']} | {r['file']} | `{(r['main_sha256'] or '')[:16]}…` | "
-                  f"`{(r['regr_sha256'] or '')[:16]}…` | {r['byte_identical']} |")
+        md.append(f"| {r['network_year']} | {r['file']} | `{(r['main_bytes'] or '')[:16]}…` | "
+                  f"`{(r['regr_bytes'] or '')[:16]}…` | {r['byte_identical']} |")
     md += ['', '## 结论', '', concl or '（未生成）', '',
            rep['scope_note'], '']
     outm = Path(args.out_md)

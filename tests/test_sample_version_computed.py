@@ -8,10 +8,9 @@
 - 当前 `monthly_returns_clean_v2.csv`：只读，856,771 行、已按 I-17 重写为 computed 标签
   （BL-01，2026-10-30；旧标签 mainline_2018_2025_fullperiod 退役）。
 - 孪生文件：`monthly_returns_clean.csv` 与 `monthly_returns_full_2006_2025.csv`
-  字节相同（md5/sha256），后者 alias_of 前者。
+  字节相同，后者 alias_of 前者。
 - 不写入 data/、不跑 build_monthly_returns_status 主流程、不跑 M1/PC。
 """
-import hashlib
 import inspect
 import re
 import sys
@@ -35,14 +34,6 @@ WINDOWS = [('2000-02', '2026-06'), ('2018-01', '2023-12')]
 
 def _months(start: str, end: str) -> list:
     return [str(p) for p in pd.period_range(start, end, freq='M')]
-
-
-def _digest(path: Path, algo: str) -> str:
-    h = hashlib.new(algo)
-    with path.open('rb') as f:
-        for chunk in iter(lambda: f.read(1 << 20), b''):
-            h.update(chunk)
-    return h.hexdigest()
 
 
 # ---------------------------------------------------------------------------
@@ -144,8 +135,7 @@ def test_current_v2_csv_computed_label_read_only():
 
 def test_twin_files_byte_identical_alias_of():
     assert MAIN_CSV.exists() and TWIN_CSV.exists()
-    assert _digest(MAIN_CSV, 'md5') == _digest(TWIN_CSV, 'md5')
-    assert _digest(MAIN_CSV, 'sha256') == _digest(TWIN_CSV, 'sha256')
+    assert MAIN_CSV.read_bytes() == TWIN_CSV.read_bytes()
     # 主文件被 S3A spec 锚定；full_2006_2025 是其别名，不改名/不删除
     assert MAIN_CSV.name == 'monthly_returns_clean.csv'
     assert TWIN_CSV.name == 'monthly_returns_full_2006_2025.csv'

@@ -73,8 +73,7 @@ from network_business_lexicon import build_automaton, load_lexicon  # noqa: E402
 
 REPD = ROOT / 'reports/data_gates/G0'
 TARGET = 56                                  # self（文本稳健性列）的历史目标，不改
-K_TARGET_FALLBACK = {'self': 56, 'teacher': 44, 'teacher_idf': 44, 'teacher_medadj': 44,
-                     'ma_fulltext': 44}
+SELF_TARGET = 56   # self 口径历史冻结值；teacher 系一律读 registry ma_k_target_teacher
 # 语料 → （默认年份、默认聚类目录、默认报告路径、默认目标来源标签）
 SPECS = {
     'self': {'years': list(range(2017, 2026)),
@@ -116,10 +115,11 @@ def rel(p):
 
 
 def registry_target(corpus, default):
-    """从 registry 读语料对应的 K 目标（机器可读冻结值）；缺失/异常时回退 default 并记录。
+    """从 registry 读语料对应的 K 目标；teacher 分支缺失即停机（2026-11-19 审核收口）。
 
-    `teacher` / `teacher_idf`（Phase B″10 IDF 变体）/ `ma_fulltext`（2026-10-19 全文语料对表列）
-    共用同一冻结 K 目标 `ma_k_target_teacher`（对表语料敏感性**不重标定 K**）。
+    `teacher` / `teacher_idf` / `teacher_medadj` / `ma_fulltext` 共用同一冻结 K 目标
+    `ma_k_target_teacher`（对表语料敏感性**不重标定 K**）。缺失/重复/非法 → SystemExit(2)，
+    不再静默回退默认值（旧版 fallback 会把 44 与 56 混用）。
     """
     param = 'ma_k_target_teacher' if corpus.startswith(('teacher', 'ma_fulltext')) else None
     if param is None:
@@ -127,12 +127,12 @@ def registry_target(corpus, default):
     try:
         import yaml
         d = yaml.safe_load(REGISTRY.read_text(encoding='utf-8'))
-        for p in d['parameters']:
-            if p.get('name') == param:
-                return int(p['headline_value']), f'registry:{param}'
-    except Exception as e:                                    # pragma: no cover
-        return default, f'fallback（registry 读取失败：{type(e).__name__}）'
-    return default, f'fallback（registry 无 {param}）'
+    except Exception as e:
+        raise SystemExit(f'[STOP] registry 读取失败（{type(e).__name__}: {e}）；K 目标禁止回退 {default}')
+    hits = [p for p in d.get('parameters', []) if p.get('name') == param]
+    if len(hits) != 1 or 'headline_value' not in hits[0]:
+        raise SystemExit(f'[STOP] registry 缺 {param}（命中 {len(hits)} 条）；K 目标禁止回退 {default}')
+    return int(hits[0]['headline_value']), f'registry:{param}'
 
 
 def cluster_stats(labels, l2_idx, n_l2, base):
@@ -148,7 +148,7 @@ def cluster_stats(labels, l2_idx, n_l2, base):
             'peer_p25': float(np.quantile(peers, .25)), 'peer_p90': float(np.quantile(peers, .9)),
             'isolated_share': round(float((peers == 0).mean()), 4),
             'n_clusters': int(len(ks)), 'size_median': float(np.median(sizes)),
-            'size_max': int(sizes.max()), 'size_p90': float(np.quantile(sizes, .9)),
+            'size_max': int(file_size()), 'size_p90': float(np.quantile(sizes, .9)),
             'same_sw2_edge_share': round(same / max(1, tot), 4),
             'sw2_lift': round((same / max(1, tot)) / max(1e-9, base), 2)}
 
@@ -212,7 +212,7 @@ def main():
     if args.target is not None:
         target, target_src = int(args.target), 'CLI --target'
     else:
-        target, target_src = registry_target(args.corpus, K_TARGET_FALLBACK[args.corpus])
+        target, target_src = registry_target(args.corpus, SELF_TARGET)
 
     terms, lmeta = (load_lexicon(lex_path) if args.df_max is None
                     else load_lexicon(lex_path, df_max=args.df_max))
@@ -232,27 +232,14 @@ def main():
                            'product_lexicon_v2_teacher_df_by_year.csv 的 doc_count_{y}，N_y = n_docs_{y}）'
                            if CORPORA[args.corpus].get('weighting') == 'idf' else None),
            'out_dir': rel(outd)}
-    # Phase 0.3（2026-10-27）：口径注记（append-only；不改任何数值/算法）
-    # N-3：池化目标 44 与逐年实现是两个统计量；teacher 分支留档逐年参照目标/行业目标/实现/K。
+    # Phase 0.3（2026-10-27）：口径注记。逐年 K / 实现中位 peer 属产物数据，只登记指针。
+    # 2026-11-19 审核收口：原 realized_median_peer_y / target_median_peer_y / K_y 等硬编码列表已移除，
+    # 代码不再携带读数；逐年值以档案产物为准。
     if args.corpus == 'teacher':
-        rep['per_year_calibration'] = {
-            'target_peer_pooled': 44,
-            'target_definition': '公司层面申万二级同行业中位 peer（组内 N−1），2014–2022 九个文本年池化；'
-                                 'K 校准把每年的团成员中位 peer 钉到 44',
-            'text_years': [2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022],
-            'network_years': [2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023],
-            'target_median_peer_y': [32, 36, 36, 39, 43, 51, 49, 71, 54],
-            'target_source': 's3_b1_tau_calibration_teacher.json → per_year_at_tau[].median_peer_at_tau'
-                             '（单一 τ=0.0888212137 的阈值网络逐年中位 peer）',
-            'sw2_median_peer_y': [26, 27, 30, 38, 37, 46, 52, 58, 62],
-            'sw2_median_peer_source': 's3_b1_tau_calibration_teacher.json → sw2_target.per_year[].median_peer'
-                                      '（逐年申万二级同行业中位 peer）',
-            'realized_median_peer_y': [44, 46, 45, 44, 43, 46, 42, 45, 44],
-            'K_y': [235, 238, 322, 291, 334, 407, 414, 434, 463],
-            'K_mode': ['exact', 'closest', 'closest', 'exact', 'closest', 'closest', 'closest', 'closest', 'exact'],
-            'note': 'target_median_peer_y 是 N-3 口径的逐年参照目标，不是 headline 44 的逐年分解；'
-                    '44 是池化统计量。2016 年 K +35.29%（238→322，n_firms +5.92%）的机制未分解，'
-                    '仅登记事实；未改目标、未重跑网络。',
+        rep['per_year_calibration_ref'] = {
+            'archive': 'reports/data_gates/G0/s3_b3_ma_param_freeze_teacher.json',
+            'fields': ['target_median_peer_y', 'sw2_median_peer_y', 'realized_median_peer_y', 'K_y', 'K_mode'],
+            'note': '逐年值以档案产物为准；代码只写指针，不复制读数',
         }
     # N-9：本报告 peer_median/sw2_lift 为同团成员法，与 grid/K_explore 的原文阈值法同名不同义。
     rep['metric_scope'] = {

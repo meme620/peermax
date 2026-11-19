@@ -35,7 +35,7 @@ st = read_pickle(d/'stock_st_flag_20260630.pkl')
 st_last = st.iloc[-1]  # 最后一日状态
 st_last.index = [c.split('.')[0] for c in st_last.index]
 fm = pd.read_csv('data/processed/firm_id_map.csv', dtype=str)
-fm['name_st'] = fm['name'].str.contains('ST|\*', regex=True)
+fm['name_st'] = fm['name'].str.contains(r'ST|\*', regex=True)
 common = fm[fm['code6'].isin(st_last.index)].copy()
 common['flag_st'] = common['code6'].map(st_last).fillna(False)
 agree = (common['name_st'] == common['flag_st']).mean()

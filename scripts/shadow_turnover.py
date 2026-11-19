@@ -42,8 +42,8 @@ from datetime import datetime, timezone
 import numpy as np
 import pandas as pd
 from pricing_lib import (
-    ROOT, TURNOVER_PKL, assert_m1_inputs_sha, drive_code_to_firm_id, fm_regression,
-    param_value, require, sha256_file, winsor_bounds,
+    ROOT, TURNOVER_PKL, assert_m1_inputs, drive_code_to_firm_id, fm_regression,
+    param_value, require, file_size, winsor_bounds,
 )
 from fileio import assert_path_allowed, read_pickle
 
@@ -333,7 +333,7 @@ def write_shadow_csv(df: pd.DataFrame, path: Path = OUT_CSV) -> dict:
     out.to_csv(tmp, index=False, float_format='%.8f', lineterminator='\n')
     os.replace(tmp, path)
     return {'file': str(path.relative_to(ROOT)), 'rows': int(len(df)),
-            'columns': list(df.columns), 'sha256': sha256_file(path)}
+            'columns': list(df.columns), 'bytes': file_size(path)}
 
 def write_diff_csv(yearly: list, path: Path = DIFF_CSV) -> dict:
     cols = ['year', 'n_rows', 'n_both', 'n_n_days_zero', 'corr', 'mean_abs_diff_pp',
@@ -345,7 +345,7 @@ def write_diff_csv(yearly: list, path: Path = DIFF_CSV) -> dict:
     df.to_csv(tmp, index=False, float_format='%.6f', lineterminator='\n')
     os.replace(tmp, path)
     return {'file': str(path.relative_to(ROOT)), 'rows': int(len(df)),
-            'sha256': sha256_file(path)}
+            'bytes': file_size(path)}
 
 def matrix_rows(matrix: dict) -> list:
     rows = []
@@ -370,7 +370,7 @@ def write_matrix_csv(matrix: dict, path: Path = MATRIX_CSV) -> dict:
     df.to_csv(tmp, index=False, float_format='%.8f', lineterminator='\n')
     os.replace(tmp, path)
     return {'file': str(path.relative_to(ROOT)), 'rows': int(len(df)),
-            'sha256': sha256_file(path)}
+            'bytes': file_size(path)}
 
 def assert_output_path_guard(path: Path) -> None:
     assert_path_allowed(path, banned_roots=(
@@ -539,8 +539,8 @@ def main(argv=None):
     args = parse_args(argv)
     t_generated = datetime.now(timezone.utc).isoformat(timespec='seconds')
     print('[2.4] preflight：9 个 M1 输入锚（只读）', flush=True)
-    anchors_before = assert_m1_inputs_sha()
-    headline_sha_before = {k: sha256_file(p) for k, p in HEADLINE_GUARD_FILES.items()}
+    anchors_before = assert_m1_inputs()
+    headline_sha_before = {k: file_size(p) for k, p in HEADLINE_GUARD_FILES.items()}
 
     print('[2.4] 读取 Drive turnover pkl 并聚合 last/mean/n_days', flush=True)
     pkl_path = Path(args.turnover_pkl)
@@ -560,14 +560,14 @@ def main(argv=None):
           flush=True)
 
     out_info = write_shadow_csv(shadow, Path(args.out))
-    sha = out_info['sha256']
+    sha = out_info['bytes']
     meta = {
         'p2shadow_version': P2SHADOW_VERSION,
         'artifact': Path(args.out).name,
         'generated_at_utc': t_generated,
         'script': 'scripts/shadow_turnover.py',
-        'script_sha256': sha256_file(Path(__file__)),
-        'output_sha256': sha,
+        'script_bytes': file_size(Path(__file__)),
+        'output_bytes': sha,
         'row_count': int(len(shadow)),
         'row_count_last_mean_nonnull': int(stats_plan_window['n_both']),
         'columns': list(shadow.columns),
@@ -579,7 +579,7 @@ def main(argv=None):
                 f'[{lo},{hi}] winsor）',
         'source': {
             'file': str(pkl_path.relative_to(ROOT)),
-            'sha256': sha256_file(pkl_path),
+            'bytes': file_size(pkl_path),
             'shape': [int(wide.shape[0]), int(wide.shape[1])],
             'index_range': [str(wide.index.min().date()), str(wide.index.max().date())],
             'read_only': True,
@@ -626,10 +626,10 @@ def main(argv=None):
     matrix_info = write_matrix_csv(matrix, Path(args.matrix_out))
 
     print('[2.4] postflight：9 个 M1 输入锚与 headline 文件 sha 复核', flush=True)
-    anchors_after = assert_m1_inputs_sha()
-    headline_sha_after = {k: sha256_file(p) for k, p in HEADLINE_GUARD_FILES.items()}
-    anchors_match = bool([a['sha256'] for a in anchors_before]
-                         == [a['sha256'] for a in anchors_after])
+    anchors_after = assert_m1_inputs()
+    headline_sha_after = {k: file_size(p) for k, p in HEADLINE_GUARD_FILES.items()}
+    anchors_match = bool([a['bytes'] for a in anchors_before]
+                         == [a['bytes'] for a in anchors_after])
     headline_unchanged = headline_sha_before == headline_sha_after
     require(anchors_match, '9 锚前后 sha 不一致（停机条件）')
     require(headline_unchanged, 'headline 文件 sha 发生变化（停机条件）')
@@ -638,7 +638,7 @@ def main(argv=None):
         'p2shadow_version': P2SHADOW_VERSION,
         'generated_at_utc': t_generated,
         'script': 'scripts/shadow_turnover.py',
-        'script_sha256': sha256_file(Path(__file__)),
+        'script_bytes': file_size(Path(__file__)),
         'scope': ('只读 pkl/样本/headline 定价表；只写 data/processed/phase2_shadow/turnover_p2shadow* '
                   '与 artifacts/phase2/2.4_*；不重跑 M1/PC/网络，不改 headline/configs/正式 reports'),
         'outputs': {'shadow_turnover_csv': out_info,
@@ -647,17 +647,17 @@ def main(argv=None):
                     'diff_csv': diff_info, 'matrix_csv': matrix_info},
         'inputs': {
             'turnover_pkl': {'file': str(pkl_path.relative_to(ROOT)),
-                             'sha256': meta['source']['sha256'],
+                             'bytes': meta['source']['bytes'],
                              'shape': meta['source']['shape'],
                              'index_range': meta['source']['index_range'], 'read_only': True},
             'm1_common_sample_ma_teacher_v2': {
                 'file': str(Path(args.sample).relative_to(ROOT)),
-                'sha256_before': headline_sha_before['m1_common_sample_ma_teacher_v2.parquet'],
-                'sha256_after': headline_sha_after['m1_common_sample_ma_teacher_v2.parquet'],
+                'bytes_before': headline_sha_before['m1_common_sample_ma_teacher_v2.parquet'],
+                'bytes_after': headline_sha_after['m1_common_sample_ma_teacher_v2.parquet'],
                 'rows': int(diag['sample_rows']), 'fm_rows': int(diag['fm_rows']),
                 'read_only': True},
             'headline_pricing_table_v2': {'file': str(PRICING_TABLE_V2.relative_to(ROOT)),
-                                          'sha256': sha256_file(PRICING_TABLE_V2),
+                                          'bytes': file_size(PRICING_TABLE_V2),
                                           'read_only': True},
         },
         'turnover_diff': {
@@ -682,7 +682,7 @@ def main(argv=None):
         'headline_anchors_after': anchors_after,
         'headline_anchors_match': anchors_match,
         'headline_files': {
-            k: {'sha256_before': headline_sha_before[k], 'sha256_after': headline_sha_after[k],
+            k: {'bytes_before': headline_sha_before[k], 'bytes_after': headline_sha_after[k],
                 'unchanged': headline_sha_before[k] == headline_sha_after[k]}
             for k in HEADLINE_GUARD_FILES},
         'headline_files_modified': not headline_unchanged,

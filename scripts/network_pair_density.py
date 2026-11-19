@@ -7,7 +7,7 @@
 
 口径真源：
   - `reports/audits/s3_remaining_workplan_20261011.md` 第一梯队 1–2
-  - `docs/methodology/methodology_execution_plan.md` §8 B″11-1（pair-density）与 B″11-11（density_readouts）
+  - 主仓库 methodology_execution_plan §8 B″11-1（pair-density）与 B″11-11（density_readouts）
   - `reports/audits/s3_network_open_items_plan_20261006.md` §3-③、§4 序 1/1b
   - `configs/parameter_registry.yaml` → `lift_pair_density_readout`
 

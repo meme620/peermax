@@ -1,0 +1,53 @@
+# 外部输入 spec：路径、消费者、是否必需。由 peerlab spec 校验消费者脚本与必需路径的存在性。
+version: 1
+
+inputs:
+  - path: ref/proposals/peer_Proposal_PeerMAX.pdf
+    kind: proposal
+    required: true
+  - path: ref/proposals/Proposal_PeerMAX_中文版.pdf
+    kind: proposal
+    required: true
+  - path: ref/teacher-materials/Methodology Description.pdf
+    kind: teacher-note
+    required: true
+  - path: ref/teacher-materials/A股产品市场竞争.pdf
+    kind: reference-paper
+    required: true
+  - path: ref/teacher-materials/Shared Analyst Coverage Unifying Momentum Spillover Effects.pdf
+    kind: reference-paper
+    required: true
+  - path: ref/team-papers/Long_2025_net_peer_momentum_China.pdf
+    kind: team-paper
+    required: true
+  - path: ref/team-papers/Jiang_Danling_et_al_2023_A股关联公司动量溢出_分析师共同覆盖.pdf
+    kind: team-paper
+    required: true
+  - path: data/raw/analyst/预测情况(1).7z
+    kind: analyst-forecast
+    consumer: analyst_forecast_ingest
+    required: true
+  - path: data/raw/teacher/mda_data_2023.csv
+    kind: teacher-corpus
+    consumer: corpus_teacher_ingest
+    required: true
+  - path: data/raw/drive
+    kind: teacher-drive
+    consumer: drive_batch1_crosscheck
+    required: false
+  - path: data/raw/cfnd
+    kind: network-news
+    required: false
+    note: 当前无代码读取，留档
+  - path: data/raw/wsvi
+    kind: network-search-index
+    required: false
+    note: 当前无代码读取，留档
+  - path: data/external/sw_industry_all_stkcds_20260915.xlsx
+    kind: sw2-industry-snapshot
+    consumer: industry_map_third_source_recheck
+    required: true
+  - path: data/processed
+    kind: derived
+    required: false
+    note: 当前为空；产物由阶段跑出

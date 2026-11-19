@@ -79,7 +79,7 @@ KNOWN_LIMITATIONS = [
                            'similarity_max_abs_diff_seed1_vs_seed2': 1.192e-07,
                            'similarity_mean_abs_diff': 2.538e-09,
                            'max_abs_diff_vs_production_artifact': [1.192e-07, 1.490e-07],
-                           'cluster_labels_sha256_equal_across_seeds_and_production': True,
+                           'cluster_labels_bytes_equal_across_seeds_and_production': True,
                            'K': 198, 'peer_median': 44.0, 'K_mode': 'exact',
                            'filter_stats_equal_across_runs': True,
                            'ew_chain_byte_reproducible': True,
@@ -88,8 +88,8 @@ KNOWN_LIMITATIONS = [
      'evidence': 'artifacts/repro/phase_bpp_snapshot/idf_seed_reproducibility_spotcheck_20261005.json',
      'scope_note': '仅文本年 2017 抽检双种子；其余 8 年未逐年全检；等权（主口径）链另有 self 2021 + teacher 2014 '
                    '全链逐字节回归 PASS',
-     'impact': '不影响任何已登记数值的等级（四项对照与九项验收在两套运行下均通过）；但 IDF 链**不保证 sha256 级'
-               '逐字节复现**，引用 IDF 产物做比对应用数值容差（≤1e-6）而非 sha256'},
+     'impact': '不影响任何已登记数值的等级（四项对照与九项验收在两套运行下均通过）；但 IDF 链**不保证 bytes 级'
+               '逐字节复现**，引用 IDF 产物做比对应用数值容差（≤1e-6）而非 bytes'},
     {'id': 'idf_only_no_tf',
      'severity': 'registered_non_blocking',
      'detail': '本变体为 **IDF-only（不含 TF）**；文献（刘亚辉、牟爽、尹玉刚 2021）第(3)列稳健性为 '
@@ -391,7 +391,7 @@ def main() -> None:
                    f'  - 实测（文本年 {m["text_year"]}，PYTHONHASHSEED={m["hash_seeds"]}）：边集（focal, source 对）'
                    f'**完全一致**（{m["n_edges"]:,} 条）；similarity max|Δ| = '
                    f'{m["similarity_max_abs_diff_seed1_vs_seed2"]:.2e}（均值 {m["similarity_mean_abs_diff"]:.2e}）；'
-                   f'对**已落盘产物** max|Δ| = {m["max_abs_diff_vs_production_artifact"]}；聚类标签 sha256 '
+                   f'对**已落盘产物** max|Δ| = {m["max_abs_diff_vs_production_artifact"]}；聚类标签 bytes '
                    f'**两侧与产物一致**（K = {m["K"]}、peer 中位 = {m["peer_median"]}、`filter_stats` 相等）；'
                    f'等权链逐字节可复现 = {m["ew_chain_byte_reproducible"]}；float32 eps = {m["float32_eps"]:.2e}'
                    f'（审查方在另一样本测得 {m["reviewer_measured_max_abs_diff_other_sample"]:.2e}，同量级）。',

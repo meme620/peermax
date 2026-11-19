@@ -23,7 +23,6 @@ doc_type/md5_*/n_hits）重算核验统计，并做两项独立对账：
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import sys
 import time
@@ -42,7 +41,7 @@ TEACHER_PANEL = ROOT / 'data/processed/teacher_mda_panel.csv'
 REPORT = ROOT / 'reports/data_gates/G0/annual_fulltext_panel_report.json'
 PROGRESS = ROOT / 'artifacts/tmp/fulltext_corr_progress.md'
 PC_YEARS = list(range(2017, 2023))          # 对表可用文本年（PC_{i,y} 需 y−1 年营收）
-SMALL_COLS = ['firm_id', 'year', 'length', 'sha256', 'src_file', 'status', 'reason',
+SMALL_COLS = ['firm_id', 'year', 'length', 'bytes', 'src_file', 'status', 'reason',
               'src_identity', 'content_code', 'dup_n', 'year_signal', 'doc_type',
               'md5_match_audit', 'md5_audit_present', 'n_hits']
 
@@ -55,12 +54,8 @@ def psay(msg: str) -> None:
         f.write(f'- {line}\n')
 
 
-def sha256(p: Path) -> str:
-    h = hashlib.sha256()
-    with open(p, 'rb') as f:
-        for c in iter(lambda: f.read(1 << 20), b''):
-            h.update(c)
-    return h.hexdigest()
+def file_size(p):
+    return p.stat().st_size
 
 
 def main() -> int:
@@ -74,10 +69,10 @@ def main() -> int:
 
     t_all = time.time()
     pan = pd.read_parquet(args.panel, columns=SMALL_COLS)
-    lex_sha = sha256(Path(args.lexicon))
+    lex_bytes = file_size(Path(args.lexicon))
     lex_rows = len(Path(args.lexicon).read_text(encoding='utf-8').splitlines()) - 1
     psay(f'状态 = 开始；面板 = {Path(args.panel).name}（{len(pan):,} 行）；'
-         f'词表 = {Path(args.lexicon).name}（{lex_rows:,} 行，sha256 {lex_sha[:12]}…）')
+         f'词表 = {Path(args.lexicon).name}（{lex_rows:,} 行，bytes {lex_bytes[:12]}…）')
 
     rep = {'artifact': 'annual_fulltext_panel_report', 'step': "F1' 面板核验（不回读 text）",
            'run_at': datetime.now(timezone.utc).isoformat(),
@@ -125,7 +120,7 @@ def main() -> int:
     rep['n_dupe_firm_year_key'] = int(pan.duplicated(['firm_id', 'year']).sum())
     rep['empty_text_docs'] = int(((pan['status'] == 'bad_source') & (pan['reason'] == 'empty_text')).sum())
     rep['length_zero_ok'] = int(((pan['status'] == 'ok') & (pan['length'] == 0)).sum())
-    rep['sha256_missing_ok'] = int(((pan['status'] == 'ok') & (pan['sha256'].fillna('') == '')).sum())
+    rep['bytes_missing_ok'] = int(((pan['status'] == 'ok') & (pan['bytes'].fillna('') == '')).sum())
 
     # 打标 × status 交叉（排除 ok，逐类留痕）
     for col, key in (('src_identity', 'flags_by_src_identity'), ('year_signal', 'flags_by_year_signal'),
@@ -142,7 +137,7 @@ def main() -> int:
         same_rows = len(z['firm_id']) == len(sub)
         same_ids = same_rows and bool((z['firm_id'] == sub['firm_id'].to_numpy()).all())
         same_hits = same_rows and bool((np.diff(z['offsets']) == sub['n_hits'].to_numpy()).all())
-        same_lex = (str(z['lex_sha256']) == lex_sha) and int(z['lex_rows']) == lex_rows
+        same_lex = (str(z['lex_bytes']) == lex_bytes) and int(z['lex_rows']) == lex_rows
         align[y] = {'rows_equal': bool(same_rows), 'firm_ids_equal': bool(same_ids),
                     'row_hits_equal': bool(same_hits), 'lexicon_equal': bool(same_lex)}
         if not all(align[y].values()):

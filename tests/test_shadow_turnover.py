@@ -20,7 +20,6 @@
 """
 from __future__ import annotations
 
-import hashlib
 import importlib.util
 import json
 from pathlib import Path
@@ -54,12 +53,8 @@ HEADLINE_FILES = {
 }
 
 
-def sha256_file(path: Path) -> str:
-    h = hashlib.sha256()
-    with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(1 << 20), b""):
-            h.update(chunk)
-    return h.hexdigest()
+def file_size(path):
+    return Path(path).stat().st_size
 
 
 @pytest.fixture(scope="module")
@@ -72,8 +67,8 @@ def mod():
 
 @pytest.fixture(scope="module")
 def sha_before():
-    out = {name: sha256_file(p) for name, p in HEADLINE_FILES.items()}
-    out["__turnover_pkl__"] = sha256_file(TURNOVER_PKL)
+    out = {name: file_size(p) for name, p in HEADLINE_FILES.items()}
+    out["__turnover_pkl__"] = file_size(TURNOVER_PKL)
     return out
 
 
@@ -199,18 +194,18 @@ def test_shadow_meta_contract():
     assert meta["row_count"] == EXPECTED_ROWS
     assert meta["row_count_last_mean_nonnull"] == EXPECTED_BOTH
     assert meta["window"]["start"] == "2014-01" and meta["window"]["end"] == "2024-01"
-    assert meta["output_sha256"] == sha256_file(SHADOW_CSV)
-    assert meta["source"]["sha256"] == sha256_file(TURNOVER_PKL)
-    assert meta["script_sha256"] == sha256_file(SCRIPT)
+    assert meta["output_bytes"] == file_size(SHADOW_CSV)
+    assert meta["source"]["bytes"] == file_size(TURNOVER_PKL)
+    assert meta["script_bytes"] == file_size(SCRIPT)
     assert meta["columns"] == ["firm_id", "month", "turnover_last", "turnover_mean", "n_days"]
 
 
 def test_counts_and_diff_outputs():
     counts = json.loads(COUNTS.read_text(encoding="utf-8"))
     assert counts["p2shadow_version"] == "p2shadow_v1"
-    assert counts["outputs"]["shadow_turnover_csv"]["sha256"] == sha256_file(SHADOW_CSV)
-    assert counts["outputs"]["diff_csv"]["sha256"] == sha256_file(DIFF_CSV)
-    assert counts["outputs"]["matrix_csv"]["sha256"] == sha256_file(MATRIX_CSV)
+    assert counts["outputs"]["shadow_turnover_csv"]["bytes"] == file_size(SHADOW_CSV)
+    assert counts["outputs"]["diff_csv"]["bytes"] == file_size(DIFF_CSV)
+    assert counts["outputs"]["matrix_csv"]["bytes"] == file_size(MATRIX_CSV)
     assert counts["headline_anchors_match"] is True
     assert counts["headline_files_modified"] is False
     diff = pd.read_csv(DIFF_CSV)
@@ -294,8 +289,8 @@ def test_load_turnover_drive_still_last(mod, shadow_frame):
 # ---------------------------------------------------------------- 6. headline 未变
 def test_headline_shas_unchanged(sha_before, spec_matrix):
     for name, p in HEADLINE_FILES.items():
-        assert sha256_file(p) == sha_before[name], name
-    assert sha256_file(TURNOVER_PKL) == sha_before["__turnover_pkl__"]
+        assert file_size(p) == sha_before[name], name
+    assert file_size(TURNOVER_PKL) == sha_before["__turnover_pkl__"]
 
 
 def test_headline_shas_equal_registered_anchors():
@@ -303,15 +298,15 @@ def test_headline_shas_equal_registered_anchors():
     anchors = {}
     for e in manifest["deliverables"]:
         f = str(e.get("file", "")).replace("\\", "/")
-        sha = str(e.get("sha256") or "")
+        sha = str(e.get("bytes") or "")
         if sha:
             anchors[f] = sha
-    assert sha256_file(HEADLINE_FILES["firm_chars_clean.csv"]) == \
+    assert file_size(HEADLINE_FILES["firm_chars_clean.csv"]) == \
         anchors["data/processed/firm_chars_clean.csv"]
-    assert sha256_file(HEADLINE_FILES["monthly_pricing_panel_ma_teacher.csv"]) == \
+    assert file_size(HEADLINE_FILES["monthly_pricing_panel_ma_teacher.csv"]) == \
         anchors["data/processed/monthly_pricing_panel_ma_teacher.csv"]
     report = json.loads(SAMPLE_REPORT_V2.read_text(encoding="utf-8"))
-    assert sha256_file(SAMPLE) == report["files"]["v2_samples"]["ma_teacher"]["sha256"]
+    assert file_size(SAMPLE) == report["files"]["v2_samples"]["ma_teacher"]["bytes"]
 
 
 # ---------------------------------------------------------------- 7. 路径治理

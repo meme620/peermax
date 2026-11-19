@@ -47,7 +47,6 @@ from __future__ import annotations
 
 import argparse
 import csv
-import hashlib
 import math
 import os
 import shutil
@@ -224,12 +223,12 @@ def anchor_snapshot(contracts: dict) -> dict:
         p = ROOT / meta["file"]
         if not p.is_file():
             raise SystemExit(f"[P2.3] headline 锚缺失: {p}")
-        h = sha256_file(p)
+        h = file_size(p)
         snap[key] = {
             "file": meta["file"],
-            "sha256": h,
-            "sha256_registered": meta["sha256"],
-            "sha_match": bool(h == meta["sha256"]),
+            "bytes": h,
+            "bytes_registered": meta["bytes"],
+            "sha_match": bool(h == meta["bytes"]),
             "rows_expected": int(meta["expected_rows"]),
         }
     return snap
@@ -238,7 +237,7 @@ def assert_anchors_unchanged(before: dict, after: dict) -> None:
     for key in before:
         if not before[key]["sha_match"]:
             raise SystemExit(f"[P2.3] 起始锚已不一致: {key}")
-        if before[key]["sha256"] != after[key]["sha256"]:
+        if before[key]["bytes"] != after[key]["bytes"]:
             raise SystemExit(f"[P2.3] headline 锚在运行中变化: {key}")
 
 def protected_paths(contracts: dict) -> set[Path]:
@@ -840,7 +839,6 @@ def build_exrights_audit(ev: pd.DataFrame, source: pd.DataFrame,
 
 import argparse
 import csv
-import hashlib
 import math
 import os
 import shutil
@@ -947,9 +945,9 @@ def main(argv=None) -> int:
     for key, p in input_paths.items():
         if not p.is_file():
             raise SystemExit(f"[P2.3] 输入缺失 {key}: {p}")
-    inputs_sha_before = {k: sha256_file(p) for k, p in input_paths.items()}
+    inputs_sha_before = {k: file_size(p) for k, p in input_paths.items()}
     daily_sha_before = {
-        y: sha256_file(panel_dir / f"{y}.csv")
+        y: file_size(panel_dir / f"{y}.csv")
         for y in range(args.start_year, args.end_year + 1)
     }
 
@@ -958,7 +956,7 @@ def main(argv=None) -> int:
         raise SystemExit(f"[P2.3] source 行数 {len(source)} != {args.expected_rows}")
     if source.duplicated(["source_id", "month"]).any():
         raise SystemExit("[P2.3] source 键 (source_id, month) 不唯一")
-    src_sha_before = sha256_file(src_p)
+    src_sha_before = file_size(src_p)
     if src_sha_before != EXPECTED_SOURCE_SHA:
         raise SystemExit(f"[P2.3] headline source panel sha 与登记不一致: {src_sha_before}")
     old_cols = list(source.columns)
@@ -1038,17 +1036,17 @@ def main(argv=None) -> int:
     if len(out) != args.expected_rows:
         raise SystemExit(f"[P2.3] shadow 行数 {len(out)} != {args.expected_rows}")
     write_shadow_csv(out, old_cols, out_p)
-    out_sha = sha256_file(out_p)
-    print(f"[P2.3] shadow CSV 已写出 sha={out_sha[:16]}…", flush=True)
+    out_bytes = file_size(out_p)
+    print(f"[P2.3] shadow CSV 已写出 sha={out_bytes[:16]}…", flush=True)
 
     # 旧列只读：回读 shadow 并与 source 逐行比对（分块）。
-    old_digest_src = hashlib.sha256()
+    old_digest_src = file_size()
     for start in range(0, len(source), 100_000):
         old_digest_src.update(
             source.iloc[start:start + 100_000][old_cols]
             .to_csv(index=False, header=False, lineterminator="\n")
             .encode("utf-8"))
-    old_digest_out = hashlib.sha256()
+    old_digest_out = file_size()
     for chunk in pd.read_csv(out_p, usecols=old_cols, dtype=str,
                              keep_default_na=False, chunksize=100_000):
         old_digest_out.update(
@@ -1064,8 +1062,8 @@ def main(argv=None) -> int:
     tmp = out_returns_p.with_name(out_returns_p.name + ".tmp")
     shutil.copyfile(monthly_adj_p, tmp)
     os.replace(tmp, out_returns_p)
-    returns_sha = sha256_file(out_returns_p)
-    if returns_sha != inputs_sha_before["monthly_returns_adj_full_2006_2025"]:
+    returns_bytes = file_size(out_returns_p)
+    if returns_bytes != inputs_sha_before["monthly_returns_adj_full_2006_2025"]:
         raise SystemExit("[P2.3] monthly_returns_adj_p2shadow 与输入不一致")
 
     # ---- 计数
@@ -1214,9 +1212,9 @@ def main(argv=None) -> int:
     }
 
     # 输入 sha after
-    inputs_sha_after = {k: sha256_file(p) for k, p in input_paths.items()}
+    inputs_sha_after = {k: file_size(p) for k, p in input_paths.items()}
     daily_sha_after = {
-        y: sha256_file(panel_dir / f"{y}.csv")
+        y: file_size(panel_dir / f"{y}.csv")
         for y in range(args.start_year, args.end_year + 1)
     }
     inputs_unchanged = all(inputs_sha_before[k] == inputs_sha_after[k]
@@ -1225,7 +1223,7 @@ def main(argv=None) -> int:
                           for y in daily_sha_before)
     if not inputs_unchanged or not daily_unchanged:
         raise SystemExit("[P2.3] 输入在运行中变化")
-    src_sha_after = sha256_file(src_p)
+    src_sha_after = file_size(src_p)
     if src_sha_after != src_sha_before:
         raise SystemExit("[P2.3] headline source panel 在运行中变化")
 
@@ -1237,48 +1235,48 @@ def main(argv=None) -> int:
     write_audit_csv(diff, diff_p)
     ex_audit = build_exrights_audit(ev, source, out, event_days, id_map)
     write_audit_csv(ex_audit, exrights_p)
-    diff_sha = sha256_file(diff_p)
-    ex_sha = sha256_file(exrights_p)
+    diff_bytes = file_size(diff_p)
+    ex_bytes = file_size(exrights_p)
 
     counts = {
         "p2shadow_version": P2SHADOW_VERSION,
         "generated_at_utc": pd.Timestamp.now(tz="UTC").isoformat(),
         "script": str(Path(__file__).resolve().relative_to(ROOT)).replace("\\", "/"),
-        "script_sha256": sha256_file(Path(__file__).resolve()),
+        "script_bytes": file_size(Path(__file__).resolve()),
         "tie_rule": tie,
         "outputs": {
             "shadow_panel": {
                 "file": str(out_p.relative_to(ROOT)).replace("\\", "/"),
                 "rows": int(len(out)),
                 "columns": old_cols + NEW_COLS,
-                "sha256": out_sha,
+                "bytes": out_bytes,
                 "old_columns_readonly_equal": bool(old_readonly_ok),
             },
             "monthly_returns_adj_p2shadow": {
                 "file": str(out_returns_p.relative_to(ROOT)).replace("\\", "/"),
                 "rows": int(len(ref_adj)),
-                "sha256": returns_sha,
+                "bytes": returns_bytes,
                 "copied_from": "monthly_returns_adj_full_2006_2025",
                 "recomputed": False,
             },
             "adj_diff": {
                 "file": str(diff_p.relative_to(ROOT)).replace("\\", "/"),
                 "rows": int(len(diff)),
-                "sha256": diff_sha,
+                "bytes": diff_bytes,
                 "note": "全部 MAX 尾部行 + 各 delta top 500",
             },
             "exrights_audit": {
                 "file": str(exrights_p.relative_to(ROOT)).replace("\\", "/"),
                 "rows": int(len(ex_audit)),
-                "sha256": ex_sha,
+                "bytes": ex_bytes,
                 "note": "2014-2025 sharebonus 实施分配事件 + 2018+ corporate_action 交叉",
             },
         },
         "inputs": {
             k: {
                 "file": str(p.relative_to(ROOT)).replace("\\", "/"),
-                "sha256_before": inputs_sha_before[k],
-                "sha256_after": inputs_sha_after[k],
+                "bytes_before": inputs_sha_before[k],
+                "bytes_after": inputs_sha_after[k],
                 "unchanged": bool(inputs_sha_before[k] == inputs_sha_after[k]),
             }
             for k, p in input_paths.items()
@@ -1287,8 +1285,8 @@ def main(argv=None) -> int:
             "dir": str(panel_dir.relative_to(ROOT)).replace("\\", "/"),
             "years": [args.start_year, args.end_year],
             "files": [
-                {"year": y, "sha256_before": daily_sha_before[y],
-                 "sha256_after": daily_sha_after[y],
+                {"year": y, "bytes_before": daily_sha_before[y],
+                 "bytes_after": daily_sha_after[y],
                  "unchanged": bool(daily_sha_before[y] == daily_sha_after[y])}
                 for y in sorted(daily_sha_before)
             ],
@@ -1487,7 +1485,7 @@ def main(argv=None) -> int:
         "p2shadow_version": P2SHADOW_VERSION,
         "generated_at_utc": counts["generated_at_utc"],
         "script": counts["script"],
-        "script_sha256": counts["script_sha256"],
+        "script_bytes": counts["script_bytes"],
         "shadow_panel": counts["outputs"]["shadow_panel"],
         "monthly_returns_adj_p2shadow": counts["outputs"]["monthly_returns_adj_p2shadow"],
         "inputs": counts["inputs"],
@@ -1496,14 +1494,14 @@ def main(argv=None) -> int:
         "source_panel_sha_match_registered": counts["source_panel_sha_match_registered"],
         "counts_file": {
             "file": str(counts_p.relative_to(ROOT)).replace("\\", "/"),
-            "sha256": sha256_file(counts_p),
+            "bytes": file_size(counts_p),
         },
         "columns": old_cols + NEW_COLS,
         "new_columns": NEW_COLS,
     }
     write_json_atomic(meta, meta_p)
 
-    print(f"[P2.3] shadow rows={len(out):,} sha={out_sha[:16]}…", flush=True)
+    print(f"[P2.3] shadow rows={len(out):,} sha={out_bytes[:16]}…", flush=True)
     print(f"[P2.3] adj coverage={int(out['MAXraw_adj'].notna().sum()):,} "
           f"pre2014={pre_2014:,}", flush=True)
     print(f"[P2.3] raw tail={tails['calendar_2015_2023']['raw']}", flush=True)

@@ -7,7 +7,7 @@
 
 口径真源：
   - `reports/audits/s3_remaining_workplan_20261011.md` 第一梯队 3
-  - `docs/methodology/methodology_execution_plan.md` §8 B″11-2
+  - 主仓库 methodology_execution_plan §8 B″11-2
   - `reports/audits/s3_network_open_items_plan_20261006.md` §3-②(a)（判据三件套 (a)）
   - registry：`rewiring_reps`（R = 1000，借用）、`random_seed`（20260727）
 

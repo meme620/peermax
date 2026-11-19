@@ -22,7 +22,7 @@ W1 bundle 口径（D-03=A / D-08=A+B / T-01）：
   data/processed/monthly_returns_clean_v2.csv（R / n_valid_days / complete_month / return_status）
   data/processed/network_{ma_teacher,mb_teacher,ma,mb}/{text_year}_similarity.csv（冻结边表）
 输出：
-  data/processed/monthly_pricing_panel_{corpus}_v4.csv
+  data/processed/monthly_pricing_panel_{use_case}{suffix}.csv（--out 可覆盖）
   reports/data_gates/G0/s4_step2_{corpus}_v4_report.json
 用法：
   python scripts/peermax_panel_build.py --use-case ma \
@@ -35,6 +35,7 @@ W1 bundle 口径（D-03=A / D-08=A+B / T-01）：
 import argparse
 import csv
 import json
+import os
 import re
 import sys
 from collections import defaultdict
@@ -46,7 +47,8 @@ import pandas as pd
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
-from pricing_lib import aggregate_stat, assert_m1_inputs_sha, assert_named_m1_input_sha, param_value, sha256_file
+from pricing_lib import (aggregate_stat, assert_m1_inputs, assert_named_m1_input,
+                         param_value, sample_window_bounds, file_size)
 
 ARGMAX = ROOT / 'data/processed/source_month_argmax_panel.csv'
 RETURNS = ROOT / 'data/processed/monthly_returns_clean_v2.csv'
@@ -62,9 +64,9 @@ KNOWN_NET_DIRS = set(NET_DIR_SUFFIX) | {'network_ma', 'network_mb'}
 OUTD = ROOT / 'data/processed'
 REPD = ROOT / 'reports/data_gates/G0'
 SAMPLE_DIR = ROOT / 'data/processed'
-SAMPLE_START, SAMPLE_END = '2018-01', '2025-12'
+# 默认窗口 = registry sample_start/sample_end（2026-11-19 审核收口；原硬编码 2018-01..2025-12 与 M1 不一致）
+SAMPLE_START, SAMPLE_END = sample_window_bounds()
 EXCLUDE_QUAL = 'limit_status_unknown'
-D03_STRICT = True   # D-03=A：complete_month=1 才计入 PeerReturn
 AVAILABLE_AT_RULE = '{text_year+1}-04-30; missing=STOP'
 _AVAILABLE_AT_RE = re.compile(r'\d{4}-\d{2}-\d{2}\Z')
 NETWORK_VERSIONS_KEY = 'network_versions'
@@ -286,11 +288,15 @@ def load_versions(net_dir, version_spec=None):
         label = doc['network_version']
         if not isinstance(label, str) or not label.strip():
             _stop_available_at(ty, rp, f'network_version 非非空字符串: {label!r}')
-        if 'text_year' in doc:
-            by = doc['text_year']
-            if isinstance(by, bool) or not isinstance(by, int) or by != ty:
-                _stop_available_at(
-                    ty, rp, f'build_report.text_year={by!r} 与目录年份 {ty} 不一致')
+        if 'text_year' not in doc:
+            _stop_available_at(ty, rp, 'build_report 缺 text_year')
+        by = doc['text_year']
+        if isinstance(by, bool) or not isinstance(by, int) or by != ty:
+            _stop_available_at(
+                ty, rp, f'build_report.text_year={by!r} 与目录年份 {ty} 不一致')
+        if not label.startswith(_prefix):
+            _stop_available_at(
+                ty, rp, f'network_version={label!r} 不以 manifest version_prefix={_prefix!r} 开头')
         vers[ty] = {'text_year': ty, 'available_at': av, 'label': label, 'path': p}
     return vers
 
@@ -380,12 +386,13 @@ def main(argv=None):
 
     # 读取 M1 输入之前先核验锚（source-month 与 clean_v2 均在 manifest 登记）。
     # 报告登记（07 §8.8）：input_anchors 记录本次实际核验的 9 个 M1 输入锚。
-    m1_ledger = assert_m1_inputs_sha()
-    anchor_argmax = assert_named_m1_input_sha('source_month_argmax_panel', ARGMAX)
-    anchor_returns = assert_named_m1_input_sha('monthly_returns_clean_v2', RETURNS)
+    m1_ledger = assert_m1_inputs()
+    anchor_argmax = assert_named_m1_input('source_month_argmax_panel', ARGMAX)
+    anchor_returns = assert_named_m1_input('monthly_returns_clean_v2', RETURNS)
     input_anchors = [
-        {'input': e['input'], 'file': e['file'], 'sha256': e['sha256'],
-         'anchor_sha256': e['anchor_sha256'], 'anchor_source': e['anchor_source']}
+        {'input': e['input'], 'file': e['file'], 'rows': e['rows'],
+         'rows_registered': e['rows_registered'],
+         'rows_match_registered': e['rows_match_registered']}
         for e in m1_ledger
     ]
 
@@ -620,10 +627,12 @@ def main(argv=None):
         n_ret_zero_total += int(zero_ret.sum())
 
     # support rows 的 status 计数和 must equal rows_support（互斥）
-    with open(out, 'w', encoding='utf-8', newline='') as f:
+    tmp_out = Path(str(out) + '.tmp')
+    with open(tmp_out, 'w', encoding='utf-8', newline='') as f:
         w = csv.DictWriter(f, fieldnames=COLS)
         w.writeheader()
         w.writerows(rows)
+    os.replace(tmp_out, out)
     mass_support = st['mass_support']
     # nv0_ret_weight_share：06 证据口径 = FM 行（v3 m1_in_fm_sample=1，只读诊断；W1 不产 v4 样本）
     fm_keys = None
@@ -685,10 +694,10 @@ def main(argv=None):
         'panel_version': panel_version,
         'run_at': datetime.now(timezone.utc).isoformat(),
         'script': rel(Path(__file__)),
-        'script_sha256': sha256_file(Path(__file__)),
+        'script_bytes': file_size(Path(__file__)),
         'input_anchors': input_anchors,
-        'input_anchor_argmax': anchor_argmax['sha256'],
-        'input_anchor_returns': anchor_returns['sha256'],
+        'input_anchor_argmax': anchor_argmax['rows'],
+        'input_anchor_returns': anchor_returns['rows'],
         'status': 'PASS' if all(status_checks.values()) else 'FAIL',
         'status_checks': status_checks,
         'status_rows_contract': status_rows_contract,
@@ -698,8 +707,8 @@ def main(argv=None):
         'network_versions_used': sorted({r['network_version'] for r in rows if r['network_version']}),
         'network_version_labels': sorted({r['network_version_label'] for r in rows
                                           if r['network_version_label']}),
-        'versions_without_report': 0,
-        'excluded_versions': [],
+        'versions_without_report': int(st.get('versions_without_report', 0)),
+        'excluded_versions': sorted(st.get('excluded_versions', [])),
         'available_at_rule': AVAILABLE_AT_RULE,
         'rows_total': len(rows), 'rows_support': int(st['rows_support']),
         'rows_no_network': int(st['rows_no_network']),

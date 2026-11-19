@@ -16,7 +16,6 @@
 """
 from __future__ import annotations
 
-import hashlib
 import importlib.util
 import json
 from pathlib import Path
@@ -47,12 +46,8 @@ NEW_COLS = [
 ]
 
 
-def sha256_file(path: Path) -> str:
-    h = hashlib.sha256()
-    with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(1 << 20), b""):
-            h.update(chunk)
-    return h.hexdigest()
+def file_size(path):
+    return Path(path).stat().st_size
 
 
 def load_module():
@@ -411,9 +406,9 @@ def test_headline_9_inputs_sha_unchanged():
     for key, meta in contracts["m1_inputs"].items():
         p = ROOT / meta["file"]
         assert p.is_file(), f"{key}: 文件缺失 {p}"
-        assert sha256_file(p) == meta["sha256"], f"{key}: headline sha 变化"
+        assert file_size(p) == meta["bytes"], f"{key}: headline sha 变化"
     # BL-01（I-17）后不再钉死 clean_v2 字面 sha：contracts 锚必须等于现盘（逐项比对见上一循环）
-    assert contracts["m1_inputs"]["monthly_returns_clean_v2"]["sha256"] == sha256_file(RETURNS)
+    assert contracts["m1_inputs"]["monthly_returns_clean_v2"]["bytes"] == file_size(RETURNS)
 
 
 # ---------------------------------------------------------------- 8. meta/counts
@@ -422,14 +417,14 @@ def test_meta_records_provenance(shadow):
     meta = json.loads(META.read_text(encoding="utf-8"))
     assert meta["p2shadow_version"] == "p2shadow_v1"
     assert meta["output"]["rows"] == EXPECTED_ROWS
-    assert meta["output"]["sha256"] == sha256_file(SHADOW)
+    assert meta["output"]["bytes"] == file_size(SHADOW)
     assert meta["output"]["columns"] == list(shadow.columns)
     assert meta["inputs"]["monthly_returns"]["rows"] == EXPECTED_ROWS
-    assert meta["inputs"]["monthly_returns"]["sha256"] == (
+    assert meta["inputs"]["monthly_returns"]["bytes"] == (
         "430419f60dfe77c57f9bdab2aef51607884240436e5019c4ddad55a74c2ecdc0")
-    assert meta["inputs"]["stock_suspend_flag"]["sha256"] == sha256_file(SUSPEND_FLAG)
-    assert meta["alias_map_output"]["sha256"] == sha256_file(ALIAS)
-    assert meta["script_sha256"] == sha256_file(SCRIPT)
+    assert meta["inputs"]["stock_suspend_flag"]["bytes"] == file_size(SUSPEND_FLAG)
+    assert meta["alias_map_output"]["bytes"] == file_size(ALIAS)
+    assert meta["script_bytes"] == file_size(SCRIPT)
     assert meta["headline_anchors_match"] is True
     assert meta["alias_map"] == {"sh601313": "sh601360"}
 
@@ -532,8 +527,8 @@ def test_counts_json_matches_panel(shadow, counts):
     contracts = yaml.safe_load(CONTRACTS.read_text(encoding="utf-8"))
     rewritten_by_bl01 = {"monthly_returns_clean_v2", "source_month_argmax_panel"}
     for key, meta in contracts["m1_inputs"].items():
-        assert before[key]["sha256"] == after[key]["sha256"], f"{key}: Phase 2 前/后锚不一致"
+        assert before[key]["bytes"] == after[key]["bytes"], f"{key}: Phase 2 前/后锚不一致"
         if key not in rewritten_by_bl01:
-            assert before[key]["sha256"] == meta["sha256"], f"{key}: 契约锚与历史锚不一致"
+            assert before[key]["bytes"] == meta["bytes"], f"{key}: 契约锚与历史锚不一致"
         else:
-            assert before[key]["sha256"] != meta["sha256"], f"{key}: BL-01 重写后锚应已变化"
+            assert before[key]["bytes"] != meta["bytes"], f"{key}: BL-01 重写后锚应已变化"

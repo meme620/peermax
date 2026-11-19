@@ -30,7 +30,12 @@ def test_readiness_reports_missing(tmp_path: Path):
     assert 'configs/parameter_registry.yaml' in check['missing']
     (tmp_path / 'configs').mkdir()
     (tmp_path / 'configs/parameter_registry.yaml').write_text('x: 1', encoding='utf-8')
+    # 2026-11-19：目录存在不再算就绪——必须落到具体产物（见 registry.EXPERIMENTS.requires）
     (tmp_path / 'data/processed').mkdir(parents=True)
+    check = runner.readiness(exp, tmp_path)
+    assert check['ready'] is False
+    assert 'data/processed/m1_common_sample_ma_teacher_v3.parquet' in check['missing']
+    (tmp_path / 'data/processed/m1_common_sample_ma_teacher_v3.parquet').write_bytes(b'')
     assert runner.readiness(exp, tmp_path)['ready'] is True
 
 

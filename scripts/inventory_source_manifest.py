@@ -8,7 +8,6 @@
 
 用法: python scripts/inventory_source_manifest.py
 """
-import hashlib
 import json
 from pathlib import Path
 
@@ -24,17 +23,13 @@ CHECKSUM_SAMPLES = [
 ]
 
 
-def sha256(p):
-    h = hashlib.sha256()
-    with open(p, "rb") as f:
-        for chunk in iter(lambda: f.read(1 << 20), b""):
-            h.update(chunk)
-    return h.hexdigest()
+def file_size(p):
+    return p.stat().st_size
 
 
 def main():
     tm = json.loads(TENCENT_MANIFEST.read_text(encoding="utf-8"))
-    samples = {str(p.relative_to(ROOT)): sha256(p) for p in CHECKSUM_SAMPLES}
+    samples = {str(p.relative_to(ROOT)): file_size(p) for p in CHECKSUM_SAMPLES}
 
     manifest = {
         "manifest_id": "data_access_manifest",

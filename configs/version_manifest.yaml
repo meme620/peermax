@@ -1,7 +1,7 @@
 manifest_version: 1.0.110
 meta:
   baseline_date: '2026-11-18'
-  note: 新基线重建：网络版本白名单与 M1 输入登记按代码与契约测试重建；sha256 待数据生成后登记
+  note: 新基线重建：网络版本白名单与 M1 输入登记；输入行数/列名合同在 configs/m1_contracts.yaml
 network_versions:
   network_ma:
     version_prefix: pm_ma_v1
@@ -63,36 +63,36 @@ deliverables:
   - file: data/processed/monthly_returns_clean_v2.csv
     status: pending
     role: m1_input
-    note: 待数据生成后登记 sha256 与行数
+    note: 行数与列名合同见 configs/m1_contracts.yaml
   - file: data/processed/monthly_returns_adj_full_2006_2025.csv
     status: pending
     role: m1_input
-    note: 待数据生成后登记 sha256 与行数
+    note: 行数与列名合同见 configs/m1_contracts.yaml
   - file: data/processed/source_month_argmax_panel.csv
     status: pending
     role: m1_input
-    note: 待数据生成后登记 sha256 与行数
+    note: 行数与列名合同见 configs/m1_contracts.yaml
   - file: data/processed/market_equity_panel_full_2006_2025.csv
     status: pending
     role: m1_input
-    note: 待数据生成后登记 sha256 与行数
+    note: 行数与列名合同见 configs/m1_contracts.yaml
   - file: data/processed/sw2_industry_latest.csv
     status: pending
     role: m1_input
-    note: 待数据生成后登记 sha256 与行数
+    note: 行数与列名合同见 configs/m1_contracts.yaml
   - file: data/processed/analyst/firm_analyst_derived.csv
     status: pending
     role: m1_input
-    note: 待数据生成后登记 sha256 与行数
+    note: 行数与列名合同见 configs/m1_contracts.yaml
   - file: data/processed/firm_chars_clean.csv
     status: pending
     role: m1_input
-    note: 待数据生成后登记 sha256 与行数
+    note: 行数与列名合同见 configs/m1_contracts.yaml
   - file: data/processed/firm_id_map.csv
     status: pending
     role: m1_input
-    note: 待数据生成后登记 sha256 与行数
+    note: 行数与列名合同见 configs/m1_contracts.yaml
   - file: data/processed/market_equity_panel.csv
     status: pending
     role: m1_input
-    note: 待数据生成后登记 sha256 与行数
+    note: 行数与列名合同见 configs/m1_contracts.yaml

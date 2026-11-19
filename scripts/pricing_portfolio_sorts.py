@@ -7,7 +7,7 @@
 产出：reports/data_gates/G0/s3_m1_portfolio_deciles.json、s3_m1_diagnostics.json
 用法：python scripts/pricing_portfolio_sorts.py [--sample-version {v1,v2}] [--out-suffix _v2]
 
-2026-10-11 F-2（v2 样本重跑批）：新增 `--sample-version`（默认 v2 headline；另一版本自动作敏感性并报）
+2026-10-11 F-2（v2 样本重跑批）：新增 `--sample-version`（2026-11-19 起默认 v3 headline；另一版本自动作敏感性并报）
 与 `--out-suffix`（如 `--out-suffix _v2` 产出 s3_m1_portfolio_deciles_v2.json / s3_m1_diagnostics_v2.json，
 不覆盖 v1 基线名）；组合与诊断块补**窗口标注**（FM 月范围）。
 """
@@ -86,7 +86,7 @@ def portfolio_table(df: pd.DataFrame, n_groups: int) -> dict:
 
 def parse_args(argv=None):
     ap = argparse.ArgumentParser(description='A8：M1 组合分位（五/十分位）与函数形式诊断')
-    ap.add_argument('--sample-version', choices=['v1', 'v2', 'v3', 'v4'], default='v2',
+    ap.add_argument('--sample-version', choices=['v1', 'v2', 'v3', 'v4'], default='v3',
                     help='headline 样本版本：v2（默认，m1_s5_v2_2015_2023）/ v1 / v3 / v4（W2 创建）；'
                          '另一版本自动作敏感性并报')
     ap.add_argument('--out-suffix', default='',

@@ -66,7 +66,7 @@ def sw2_target(years, corpus='self'):
             'text_year': int(y), 'network_year': int(y) + 1, 'firms': int(len(g)),
             'sw2_groups': int(sizes.size),
             'median_peer': float(peers.median()), 'mean_peer': round(float(peers.mean()), 2),
-            'group_size_median': float(sizes.median()),
+            'group_size_median': float(file_size()),
         })
         pooled.append(peers.values)
         pooled_group.append(sizes.values.astype(float))

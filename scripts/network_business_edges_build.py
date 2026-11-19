@@ -63,6 +63,7 @@ v8（2026-10-19，全文语料对表轮）：加语料条目 `ma_fulltext`（**�
 import argparse
 import csv
 import json
+import os
 import sys
 import time
 from datetime import datetime, timezone
@@ -220,7 +221,8 @@ def main():
         n_pairs_nonpos = 0       # 同团对中 sim_adj ≤ 0（按既有正相似规则剔除；聚类层未裁剪）
         sup_rows = []
         fp = outd / f'{y}_similarity.csv'
-        with open(fp, 'w', newline='', encoding='utf-8') as fh:
+        tmp_fp = fp.with_name(fp.name + '.tmp')
+        with open(tmp_fp, 'w', newline='', encoding='utf-8') as fh:
             w = csv.writer(fh)
             w.writerow(COLS)
             order = np.argsort(labels, kind='stable')
@@ -258,13 +260,16 @@ def main():
                                     avail, spec['src_version'], 'covered', '', 'support'])
                         n_edges += 1
                     sup_rows.append((firms[int(i)], int(len(src)), float(wsum[r]), 'support'))
+        os.replace(tmp_fp, fp)
         sp_ = outd / f'{y}_support.csv'
-        with open(sp_, 'w', newline='', encoding='utf-8') as fh:
+        tmp_sp = sp_.with_name(sp_.name + '.tmp')
+        with open(tmp_sp, 'w', newline='', encoding='utf-8') as fh:
             w = csv.writer(fh)
             w.writerow(['focal_id', 'n_edges', 'weight_sum', 'network_support_status',
                         'network_version', 'available_at'])
             for f_, ne, ws, st in sup_rows:
                 w.writerow([f_, ne, round(ws, 8) if ws else '', st, ver, avail])
+        os.replace(tmp_sp, sp_)
         n_sup = sum(1 for r in sup_rows if r[3] == 'support')
         n_ns = len(sup_rows) - n_sup
         meta = {'network_use_case': NET_USE_CASE, 'network_version': ver, 'text_year': y,

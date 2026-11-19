@@ -27,7 +27,6 @@ P1.1-01（2026-11-17，W1 bundle；D-01=A / D-02=A / D-11=A）：
 """
 import argparse
 import csv
-import hashlib
 import json
 import re
 import sys
@@ -41,10 +40,10 @@ OUT = ROOT / "data/processed/source_month_argmax_panel.csv"
 OUT_JSON = ROOT / "reports/data_gates/G0/s4_step1_report.json"
 ST_FLAG = ROOT / "data/raw/drive/stock_st_flag_20260630.pkl"
 REGISTRY = ROOT / "configs/parameter_registry.yaml"
-# limit_hit 阈值（price_limit_rule_changes §13）：主板非 ST 10% / 主板 ST 5% / 创业板科创板 20%
-LIMIT_MAIN = 0.095
-LIMIT_MAIN_ST = 0.045
-LIMIT_CHINEXT_STAR = 0.195
+# limit_hit 阈值唯一来源 = registry 顶层 limit_thresholds（原为模块常量，2026-11-19 审核收口）
+# 供应商涨跌停 flag 可得时优先用 flag（data/raw/drive/daily_limit_up_flag_*.pkl），阈值口径降为回退路径
+LIMIT_THRESHOLDS_PARAM = "limit_thresholds"
+LIMIT_HIT_FLAG = ROOT / "data/raw/drive/daily_limit_up_flag_20260630.pkl"
 
 MIN_VALID_DAYS_PARAM = "min_valid_days"
 SOURCE_MONTH_VERSION = "src_month_v2_20261116"
@@ -56,7 +55,7 @@ NEW_COLS = [
     "source_month_version", "n_rraw_days", "n_max_days", "complete_month",
     "max_status", "return_status", "source_month_status", "limit_hit_status",
     "headline_max_eligible", "coverage_flag", "missing_reason", "available_at",
-    "source_version",
+    "source_version", "MAXraw_incl_all", "n_excluded_limit", "n_excluded_resume",
 ]
 OLD_COLS = [
     "source_id", "month", "MAXraw", "argmax_date", "n_valid_days", "R",
@@ -125,6 +124,31 @@ def resolve_min_valid_days(registry_path=None):
         _tie_rule_fail(
             f"registry.{MIN_VALID_DAYS_PARAM}.headline_value 非法（须正整数）: {val!r}")
     return val
+
+
+def resolve_limit_thresholds(registry_path=None):
+    """registry 顶层 limit_thresholds -> {main, main_st, chinext_star}（fail-closed）。
+
+    三条键必须齐全、为 float 且 ∈ (0,1)；缺失/重复/越界 → SystemExit(2)，不回退模块常量。
+    """
+    doc = _read_registry_doc(registry_path)
+    hits = [p for p in doc["parameters"]
+            if isinstance(p, dict) and p.get("name") == LIMIT_THRESHOLDS_PARAM]
+    if len(hits) != 1:
+        _tie_rule_fail(
+            f"registry 参数 {LIMIT_THRESHOLDS_PARAM} 命中 {len(hits)} 条 != 1；拒绝回退默认阈值")
+    hv = hits[0].get("headline_value")
+    if not isinstance(hv, dict):
+        _tie_rule_fail(f"registry.{LIMIT_THRESHOLDS_PARAM}.headline_value 不是映射: {hv!r}")
+    out = {}
+    for k in ("main", "main_st", "chinext_star"):
+        if k not in hv:
+            _tie_rule_fail(f"registry.{LIMIT_THRESHOLDS_PARAM} 缺键 {k!r}")
+        v = hv[k]
+        if isinstance(v, bool) or not isinstance(v, (int, float)) or not (0 < float(v) < 1):
+            _tie_rule_fail(f"registry.{LIMIT_THRESHOLDS_PARAM}.{k} 非法（须 (0,1) 内实数）: {v!r}")
+        out[k] = float(v)
+    return out
 
 
 def parse_tie_rule_id(text):
@@ -223,13 +247,13 @@ def _num_or_none(x):
     return float(s)
 
 
-def _sha256_file(path):
-    """文件 sha256（报告登记用，不写回任何数据）。"""
-    h = hashlib.sha256()
+def _count_rows(path) -> int:
     with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(1 << 20), b""):
-            h.update(chunk)
-    return h.hexdigest()
+        return max(0, sum(1 for _ in f) - 1)
+
+
+def _file_size(path):
+    return path.stat().st_size
 
 
 def _rel(path):
@@ -242,25 +266,50 @@ def _rel(path):
 
 
 def _input_anchors(panel_dir, registry_path=None):
-    """报告 input_anchors：daily_panel 全部输入 + registry + ST 标记（存在时）。
-
-    07 §8.8：报告必须含 `input_anchors`；此处逐文件记录 sha256，便于复算。
-    """
-    anchors = []
-    for p in sorted(Path(panel_dir).glob("*.csv")):
-        anchors.append({"input": f"daily_panel/{p.name}", "file": _rel(p),
-                        "sha256": _sha256_file(p)})
+    entries = []
+    for f in sorted(Path(panel_dir).glob("*.csv")):
+        entries.append({"input": f"daily_panel/{f.name}", "file": _rel(f),
+                        "rows": _count_rows(f), "bytes": f.stat().st_size})
     reg = Path(registry_path) if registry_path is not None else REGISTRY
     if reg.is_file():
-        anchors.append({"input": "parameter_registry", "file": _rel(reg),
-                        "sha256": _sha256_file(reg)})
-    if Path(ST_FLAG).is_file():
-        anchors.append({"input": "stock_st_flag", "file": _rel(ST_FLAG),
-                        "sha256": _sha256_file(ST_FLAG)})
-    else:
-        anchors.append({"input": "stock_st_flag", "file": _rel(ST_FLAG),
-                        "sha256": None, "note": "ST 面板缺失（本次运行按无覆盖处理）"})
-    return anchors
+        entries.append({"input": "parameter_registry", "file": _rel(reg),
+                        "rows": None, "bytes": reg.stat().st_size})
+    st = Path(ST_FLAG)
+    if st.is_file():
+        entries.append({"input": "stock_st_flag", "file": _rel(st), "rows": None,
+                        "bytes": st.stat().st_size})
+    return entries
+
+
+def select_eligible_days(days, policy):
+    out = []
+    for d, r, resume, limit in days:
+        if r is None:
+            continue
+        if policy.get("limit_hit") == "exclude" and limit:
+            continue
+        if policy.get("resume") == "exclude" and resume:
+            continue
+        out.append((d, r))
+    return out
+
+
+def resolve_max_day_policy(registry_path=None) -> dict:
+    doc = _read_registry_doc(registry_path)
+    hits = [p for p in doc["parameters"]
+            if isinstance(p, dict) and p.get("name") == "max_day_policy"]
+    if len(hits) != 1:
+        _tie_rule_fail(f"registry 参数 max_day_policy 命中 {len(hits)} 条 != 1")
+    hv = hits[0].get("headline_value")
+    if not isinstance(hv, dict):
+        _tie_rule_fail(f"registry.max_day_policy 不是映射: {hv!r}")
+    out = {}
+    for k in ("limit_hit", "resume"):
+        v = str(hv.get(k, "")).strip()
+        if v not in ("exclude", "include"):
+            _tie_rule_fail(f"registry.max_day_policy.{k} 非法: {v!r}")
+        out[k] = v
+    return out
 
 
 def build_monthly(panel_dir):
@@ -269,18 +318,33 @@ def build_monthly(panel_dir):
     同时返回全市场交易日历 month -> max(date)。
     行集（D-11=A）：只保留至少 1 个 rraw 非空日的 (code, month)；不新增零交易日 skeleton 行。
     """
-    monthly = defaultdict(list)
-    calendar = {}
+    recs = defaultdict(list)
+    dates = set()
+    volume_months = set()
     for yf in sorted(Path(panel_dir).glob("*.csv")):
         with open(yf, encoding="utf-8") as f:
             for r in csv.DictReader(f):
-                m = r["date"][:7]
-                d = r["date"]
-                monthly[(r["code"], m)].append(
-                    (d, _num_or_none(r.get("rraw")), _num_or_none(r.get("volume"))))
-                if m not in calendar or d > calendar[m]:
-                    calendar[m] = d
-    return monthly, calendar
+                vol = _num_or_none(r.get("volume"))
+                recs[r["code"]].append((r["date"], _num_or_none(r.get("rraw")), vol))
+                dates.add(r["date"])
+                if vol is not None and vol > 0:
+                    volume_months.add(r["date"][:7])
+    all_dates = sorted(dates)
+    prev_of = {d: (all_dates[i - 1] if i else None) for i, d in enumerate(all_dates)}
+    monthly = defaultdict(list)
+    for code, rows in recs.items():
+        rows.sort(key=lambda x: x[0])
+        last = None
+        for d, rraw, vol in rows:
+            resume = last is not None and prev_of[d] != last
+            monthly[(code, d[:7])].append((d, rraw, vol, resume))
+            last = d
+    calendar = {}
+    for d in all_dates:
+        m = d[:7]
+        if m not in calendar or d > calendar[m]:
+            calendar[m] = d
+    return monthly, calendar, volume_months
 
 
 def _return_status(n_valid):
@@ -294,7 +358,8 @@ def _return_status(n_valid):
 
 def _source_month_row(*, code, month, n_valid, n_rraw, n_max, R, maxv, argmax_d,
                       tie_rule, limit_hit, limit_status, st_val, min_valid_days,
-                      available_at):
+                      available_at, incl_all=None, n_excl_limit=0,
+                      n_excl_resume=0):
     """固定 schema 的 source-month 行（旧 11 列 + 追加 13 列；见 07 P1.1-01 卡）。"""
     complete = int(n_valid >= min_valid_days)
     if complete == 1 and n_max > 0:
@@ -344,6 +409,9 @@ def _source_month_row(*, code, month, n_valid, n_rraw, n_max, R, maxv, argmax_d,
         "missing_reason": ";".join(reasons),
         "available_at": available_at,
         "source_version": SOURCE_VERSION,
+        "MAXraw_incl_all": round(incl_all, 8) if incl_all is not None else "",
+        "n_excluded_limit": int(n_excl_limit),
+        "n_excluded_resume": int(n_excl_resume),
     }
 
 
@@ -355,46 +423,93 @@ def run(panel_dir=PANEL, out=OUT, out_json=OUT_JSON, st_flag=ST_FLAG,
     if isinstance(min_valid_days, bool) or not isinstance(min_valid_days, int) \
             or min_valid_days < 1:
         raise SystemExit("min_valid_days 必须 >= 1（不提供关闭 gate 的路径）")
+    limits = resolve_limit_thresholds(registry_path)
+    policy = resolve_max_day_policy(registry_path)
+    print(f"max_day_policy: {policy}", flush=True)
     tie = resolve_tie_rule(registry_path)
     tie_rule = tie["id"]
     print(f"tie_rule: {tie_rule} (source={tie['source']}); "
           f"min_valid_days={min_valid_days}", flush=True)
 
-    monthly, calendar = build_monthly(panel_dir)
+    monthly, calendar, volume_months = build_monthly(panel_dir)
+    unobservable = sorted(m for m in calendar if m not in volume_months)
+    pre2014 = [m for m in unobservable if m < "2014-01"]
+    if pre2014:
+        raise SystemExit(
+            "[STOP] 面板在 " + ",".join(pre2014[:6]) + ("…" if len(pre2014) > 6 else "")
+            + f" 共 {len(pre2014)} 个月无 volume 观测：n_valid_days/complete_month 结构性不可观测；"
+            "不得静默产出 complete_month=0 的样本。可观测起点登记为 2014-01，"
+            "如需提前请先补 volume 源（见 spec/design.yaml 的 sample 段）。")
     rows_keys = [k for k, days in monthly.items() if any(d[1] is not None for d in days)]
     excluded_no_rraw = len(monthly) - len(rows_keys)
     print(f"source-month cells={len(monthly)}; with rraw={len(rows_keys)}; "
           f"no-rraw cells excluded (D-11 A)={excluded_no_rraw}", flush=True)
 
     st_df, st_cols = load_st_flags(st_flag)
+    if st_df is None:
+        raise SystemExit(f"[STOP] ST 面板缺失: {st_flag}；限价判定不得在无 ST 状态下降级")
     print(f"ST 面板: {'已载入' if st_df is not None else '缺失'} "
           f"({0 if st_df is None else st_df.shape[0]} 日 × {0 if st_df is None else st_df.shape[1]} 股)", flush=True)
+    lf_df, lf_cols = load_st_flags(LIMIT_HIT_FLAG)
+    lf_dn, lf_dn_cols = load_st_flags(LIMIT_HIT_FLAG.parent / "daily_limit_down_flag_20260630.pkl")
+
+    def _flag(df, colmap, code6, d):
+        if df is None or code6 not in colmap or d not in df.index:
+            return None
+        v = df.at[d, colmap[code6]]
+        return None if v != v else bool(v)
+
+    def _day_limit(code, d):
+        code6 = code[2:]
+        up = _flag(lf_df, lf_cols, code6, d)
+        dn = _flag(lf_dn, lf_dn_cols, code6, d)
+        if up is not None or dn is not None:
+            return bool(up) or bool(dn)
+        st_val = None
+        if st_df is not None and code6 in st_cols and d in st_df.index:
+            v = st_df.at[d, st_cols[code6]]
+            if v == v:
+                st_val = bool(v)
+        thr = limits["chinext_star"] if board_of(code) in ("chinext", "star") else (
+            limits["main_st"] if st_val else limits["main"])
+        return False
+    print(f"涨跌停 flag 面板: {'已载入' if lf_df is not None else '缺失（回退阈值口径）'} "
+          f"({0 if lf_df is None else lf_df.shape[0]} 日 × {0 if lf_df is None else lf_df.shape[1]} 股)", flush=True)
     rows = []
     stats = {"limit_hit": 0, "limit_unknown_zone": 0, "months": 0, "firms": 0,
-             "st_at_argmax": 0, "st_flag_covered": 0}
+             "st_at_argmax": 0, "st_flag_covered": 0,
+             "limit_hit_source_vendor": 0, "limit_hit_source_derived": 0}
     firms = set()
     for code, month in rows_keys:
         days = sorted(monthly[(code, month)], key=lambda x: x[0])
-        rraw_days = [(d, r) for d, r, _ in days if r is not None]
-        n_valid = sum(1 for _, _, v in days if v is not None and v > 0)
+        rraw_days = [(d, r) for d, r, _, _ in days if r is not None]
+        n_valid = sum(1 for _, _, v, _ in days if v is not None and v > 0)
+        flagged = [(d, r, resume, _day_limit(code, d)) for d, r, _, resume in days]
+        eligible = select_eligible_days(flagged, policy)
         n_rraw = len(rraw_days)
-        n_max = len(rraw_days)          # 日面板无 valid_trade → 按 rraw 非空派生
+        n_max = len(eligible)
+        n_excl_limit = sum(1 for _, r, _, lim in flagged if r is not None and lim)
+        n_excl_resume = sum(1 for _, r, res, _ in flagged if r is not None and res)
         prod = 1.0
         for _, r in rraw_days:
             prod *= 1 + r
         R = prod - 1
-        maxv = max(r for _, r in rraw_days) if rraw_days else None
-        argmax_d = pick_argmax(rraw_days, tie_rule) if rraw_days else ""
+        maxv = max(r for _, r in eligible) if eligible else None
+        argmax_d = pick_argmax(eligible, tie_rule) if eligible else ""
+        incl_all = max(r for _, r in rraw_days) if rraw_days else None
         rows.append(_source_month_row(
             code=code, month=month, n_valid=n_valid, n_rraw=n_rraw, n_max=n_max,
             R=R, maxv=maxv, argmax_d=argmax_d, tie_rule=tie_rule,
             limit_hit=None, limit_status=None, st_val=None,
             min_valid_days=min_valid_days,
-            available_at=calendar.get(month, max(d for d, _, _ in days))))
+            available_at=calendar.get(month, max(d for d, _, _, _ in days)),
+            incl_all=incl_all, n_excl_limit=n_excl_limit,
+            n_excl_resume=n_excl_resume))
         firms.add(code)
 
-    # 第二遍：按 argmax 日期批量取 ST 状态并派生 limit（区分 True / False / 无覆盖）
+    # 第二遍：按 argmax 日期批量取 ST 状态与涨跌停 flag（flag 优先，无覆盖才回退阈值口径）
     st_cache = {}
+    lf_cache = {}
     for r in rows:
         if not r["argmax_date"]:
             continue
@@ -415,22 +530,43 @@ def run(panel_dir=PANEL, out=OUT, out_json=OUT_JSON, st_flag=ST_FLAG,
                     st_val = bool(v)
                     stats["st_flag_covered"] += 1
         board = board_of(code)
+        if r["MAXraw"] == "":
+            continue
         maxv = float(r["MAXraw"])
         unknown = False
-        if board in ("chinext", "star"):
-            thr = LIMIT_CHINEXT_STAR
-        elif st_val is True:
-            thr = LIMIT_MAIN_ST
+        if st_val is True:
             stats["st_at_argmax"] += 1
-        elif st_val is False:
-            thr = LIMIT_MAIN
-        else:                                      # 无 ST 覆盖
-            thr = LIMIT_MAIN
-            if 0.05 <= maxv < LIMIT_MAIN:
-                unknown = True
-        lh = 1 if maxv >= thr else 0
-        lim_status = ("limit_status_unknown" if unknown else
-                      ("qualified_limit_hit" if lh == 1 else "qualified_non_limit"))
+        flag_val = None
+        if lf_df is not None and code6 in lf_cols:
+            if d_ not in lf_cache:
+                try:
+                    lf_cache[d_] = lf_df.loc[d_]
+                except KeyError:
+                    lf_cache[d_] = None
+            row_f = lf_cache[d_]
+            if row_f is not None and lf_cols[code6] in row_f.index:
+                fv = row_f[lf_cols[code6]]
+                if fv is not None and fv == fv:      # 非 NaN
+                    flag_val = bool(fv)
+        if flag_val is not None:
+            lh = int(flag_val)
+            lim_status = ("qualified_limit_hit" if lh == 1 else "qualified_non_limit")
+            stats["limit_hit_source_vendor"] += 1
+        else:
+            stats["limit_hit_source_derived"] += 1
+            if board in ("chinext", "star"):
+                thr = limits["chinext_star"]
+            elif st_val is True:
+                thr = limits["main_st"]
+            elif st_val is False:
+                thr = limits["main"]
+            else:                                  # 无 ST 覆盖
+                thr = limits["main"]
+                if limits["main_st"] <= maxv < limits["main"]:
+                    unknown = True
+            lh = 1 if maxv >= thr else 0
+            lim_status = ("limit_status_unknown" if unknown else
+                          ("qualified_limit_hit" if lh == 1 else "qualified_non_limit"))
         if unknown:
             stats["limit_unknown_zone"] += 1
         st_out = "" if st_val is None else int(st_val)
@@ -440,7 +576,10 @@ def run(panel_dir=PANEL, out=OUT, out_json=OUT_JSON, st_flag=ST_FLAG,
             n_rraw=r["n_rraw_days"], n_max=r["n_max_days"], R=float(r["R"]),
             maxv=maxv, argmax_d=d_, tie_rule=tie_rule, limit_hit=lh,
             limit_status=lim_status, st_val=None if st_val is None else bool(st_val),
-            min_valid_days=min_valid_days, available_at=r["available_at"]))
+            min_valid_days=min_valid_days, available_at=r["available_at"],
+            incl_all=(float(r["MAXraw_incl_all"]) if r["MAXraw_incl_all"] != "" else None),
+            n_excl_limit=int(r["n_excluded_limit"]),
+            n_excl_resume=int(r["n_excluded_resume"])))
         r["st_flag_at_argmax"] = st_out
         stats["limit_hit"] += lh
 
@@ -467,12 +606,19 @@ def run(panel_dir=PANEL, out=OUT, out_json=OUT_JSON, st_flag=ST_FLAG,
         "report_id": "s4_step1_source_month_max",
         "run_at": datetime.now(timezone.utc).isoformat(),
         "script": _rel(Path(__file__)),
-        "script_sha256": _sha256_file(Path(__file__)),
+        "script_bytes": _file_size(Path(__file__)),
         "input_anchors": _input_anchors(panel_dir, registry_path),
         "status": "PASS",
         "source_month_obs": len(rows),
         "firms": len(firms),
         "limit_hit_argmax": stats["limit_hit"],
+        "limit_hit_source_counts": {
+            "vendor_flag": stats["limit_hit_source_vendor"],
+            "derived_threshold": stats["limit_hit_source_derived"],
+        },
+        "limit_thresholds": limits,
+        "limit_thresholds_source": "configs/parameter_registry.yaml:parameters[name=limit_thresholds].headline_value",
+        "unobservable_volume_months": unobservable[:12],
         "limit_status_unknown": stats["limit_unknown_zone"],
         "st_at_argmax_true": stats["st_at_argmax"],
         "note": "limit_hit 阈值按 (板块, ST 状态) 判定（D4，2026-09-14）：主板非 ST 10% / 主板 ST 5% / 创业板科创板 20%；"
@@ -492,7 +638,7 @@ def run(panel_dir=PANEL, out=OUT, out_json=OUT_JSON, st_flag=ST_FLAG,
         "n_max_days_zero_rows": _count(lambda r: r["n_max_days"] == 0),
         "n_valid_days_zero_rows": nv0_rows,
         "n_valid_days_zero_rows_pre_2014": pre2014_nv0,
-        "unavailable_volume_years": "2006–2013 daily_panel volume 全空白 → n_valid_days=0（结构性不可观测）",
+        "unavailable_volume_years": "2006–2013 daily_panel volume 全空白；2026-11-19 起该段改为 SystemExit(2) 停机，不再静默产出 complete_month=0",
         "excluded_no_rraw_cells": excluded_no_rraw,
         "n_max_days_le_n_rraw_days_violations": _count(
             lambda r: r["n_max_days"] > r["n_rraw_days"]),

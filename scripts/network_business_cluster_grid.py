@@ -427,7 +427,7 @@ def eval_K(C, labels, l2, base_rate):
     sizes = []
     for k in np.unique(labels):
         idx = np.where(labels == k)[0]
-        sizes.append(len(idx))
+        file_size(len(idx))
         if len(idx) > 1:
             sub = C[np.ix_(idx, idx)].copy()
             np.fill_diagonal(sub, 2.0)
@@ -443,7 +443,7 @@ def eval_K(C, labels, l2, base_rate):
     sizes = np.array(sizes)
     return {
         'n_clusters': int(len(sizes)),
-        'size_median': float(np.median(sizes)), 'size_max': int(sizes.max()),
+        'size_median': float(np.median(sizes)), 'size_max': int(file_size()),
         'singleton_share': round(float((sizes == 1).mean()), 4),
         'peer_median': float(np.median(peers)), 'peer_mean': round(float(peers.mean()), 1),
         'peer_p90': float(np.quantile(peers, .9)),

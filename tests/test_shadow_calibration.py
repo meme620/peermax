@@ -259,10 +259,10 @@ def test_headline_lexicon_and_df_table_untouched():
     for k, name in (('product_lexicon_v2_teacher', 'product_lexicon_v2_teacher'),
                     ('product_lexicon_v2_teacher_df_by_year',
                      'product_lexicon_v2_teacher_df_by_year')):
-        assert pre['extra_inputs'][k]['sha256'] == post['extra_inputs'][k]['sha256']
+        assert pre['extra_inputs'][k]['bytes'] == post['extra_inputs'][k]['bytes']
     anc31 = json.loads((ART / '3.1_anchor_post.json').read_text(encoding='utf-8'))
-    assert (anc31['extra_inputs']['product_lexicon_v2_teacher']['sha256']
-            == post['extra_inputs']['product_lexicon_v2_teacher']['sha256'])
+    assert (anc31['extra_inputs']['product_lexicon_v2_teacher']['bytes']
+            == post['extra_inputs']['product_lexicon_v2_teacher']['bytes'])
 
 
 # ---------------------------------------------------------------- 3 逐年 target / ladder
@@ -637,7 +637,6 @@ def test_output_path_guard_blocks_headline_g0_configs_and_31(mod, tmp_path):
         HEADLINE_LEXICON,
         ROOT / 'data/processed/sw2_industry_map.csv',
         ROOT / 'tests/test_shadow_calibration.py',
-        ROOT / 'docs/methodology/methodology.md',
     ]
     for p in banned:
         with pytest.raises(SystemExit) as ei:

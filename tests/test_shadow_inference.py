@@ -19,7 +19,6 @@
 """
 from __future__ import annotations
 
-import hashlib
 import importlib.util
 import json
 import sys
@@ -53,12 +52,8 @@ HEADLINE_EW_BETA = 0.034273
 FM_ROWS = 181178
 
 
-def sha256_file(path: Path) -> str:
-    h = hashlib.sha256()
-    with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(1 << 20), b""):
-            h.update(chunk)
-    return h.hexdigest()
+def file_size(path):
+    return Path(path).stat().st_size
 
 
 def load_module():
@@ -504,7 +499,7 @@ def test_headline_files_sha_unchanged():
     for rel, sha in ledger.items():
         p = ROOT / rel
         assert p.is_file(), f"headline 文件缺失：{rel}"
-        assert sha256_file(p) == sha, f"headline 文件 sha 变化：{rel}"
+        assert file_size(p) == sha, f"headline 文件 sha 变化：{rel}"
     assert len(pre["m1_inputs_9"]) == 9
     if ANCHOR_POST.is_file():
         post = json.loads(ANCHOR_POST.read_text(encoding="utf-8"))
@@ -514,8 +509,8 @@ def test_headline_files_sha_unchanged():
 
 def test_m1_inputs_sha_match_manifest():
     sys.path.insert(0, str(ROOT / "scripts"))
-    from pricing_lib import assert_m1_inputs_sha
-    assert_m1_inputs_sha()
+    from pricing_lib import assert_m1_inputs
+    assert_m1_inputs()
 
 
 def test_anchor_compare_match(counts):

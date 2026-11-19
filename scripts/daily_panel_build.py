@@ -32,7 +32,9 @@ ROOT = Path(__file__).resolve().parents[1]
 TENCENT = ROOT / "data/raw/tencent"
 OUT_DIR = ROOT / "data/processed/daily_panel"
 REPORT_PATH = ROOT / "reports/data_gates/G0/s2_daily_panel_report.json"
-RATIO_JUMP = 0.01  # qfq/raw 比值跳变阈值（除权日检测）
+from pricing_lib import param_value
+
+RATIO_JUMP = float(param_value('ca_ratio_jump'))  # qfq/raw 比值跳变阈值（除权日检测）
 COLUMNS = ["code", "date", "close_raw", "close_qfq", "volume", "amount", "rraw", "ca_flag"]
 
 

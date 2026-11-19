@@ -50,7 +50,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 
 from pricing_lib import (  # noqa: E402
-    assert_m1_inputs_sha, fm_regression, param_value, require, sha256_file,
+    assert_m1_inputs, fm_regression, param_value, require, file_size,
     two_sided_p,
 )
 
@@ -143,24 +143,24 @@ def _clean(v):
 
 # ------------------------------------------------------------------ sha 台账
 def snapshot_anchors(tag: str) -> dict:
-    ledger = assert_m1_inputs_sha()
+    ledger = assert_m1_inputs()
     return {
         'tag': tag,
         'run_at': datetime.now(timezone.utc).isoformat(),
-        'm1_inputs': {r['input']: {'path': r['path'], 'sha256': r['sha256']}
+        'm1_inputs': {r['input']: {'path': r['path'], 'rows': r['rows']}
                       for r in ledger},
         'm1_ledger': ledger,
         'headline_sample': {
             'path': str(SAMPLE_PATH.relative_to(ROOT)).replace('\\', '/'),
-            'sha256': sha256_file(SAMPLE_PATH),
+            'bytes': file_size(SAMPLE_PATH),
         },
         'reference_3_6': {
             'path': str(REF_3_6.relative_to(ROOT)).replace('\\', '/'),
-            'sha256': sha256_file(REF_3_6),
+            'bytes': file_size(REF_3_6),
         },
         'script': {
             'path': str(Path(__file__).resolve().relative_to(ROOT)).replace('\\', '/'),
-            'sha256': sha256_file(Path(__file__).resolve()),
+            'bytes': file_size(Path(__file__).resolve()),
         },
     }
 
@@ -168,12 +168,12 @@ def snapshot_anchors(tag: str) -> dict:
 def compare_anchors(pre: dict, post: dict) -> dict:
     diffs = []
     for name in sorted(set(pre['m1_inputs']) | set(post['m1_inputs'])):
-        a = pre['m1_inputs'].get(name, {}).get('sha256')
-        b = post['m1_inputs'].get(name, {}).get('sha256')
+        a = pre['m1_inputs'].get(name, {}).get('bytes')
+        b = post['m1_inputs'].get(name, {}).get('bytes')
         if a != b:
             diffs.append(f'm1_inputs:{name}')
     for key in ('headline_sample', 'reference_3_6'):
-        if pre[key]['sha256'] != post[key]['sha256']:
+        if pre[key]['bytes'] != post[key]['bytes']:
             diffs.append(key)
     require(len(pre['m1_inputs']) == 9, f'9 输入台账长度={len(pre["m1_inputs"])} != 9')
     require(len(post['m1_inputs']) == 9, f'9 输入台账长度={len(post["m1_inputs"])} != 9')
@@ -183,11 +183,11 @@ def compare_anchors(pre: dict, post: dict) -> dict:
         'n_diff': len(diffs),
         'diff': diffs,
         'm1_inputs_match': pre['m1_inputs'] == post['m1_inputs'],
-        'headline_sample_match': pre['headline_sample']['sha256']
-        == post['headline_sample']['sha256'],
-        'reference_3_6_match': pre['reference_3_6']['sha256']
-        == post['reference_3_6']['sha256'],
-        'script_sha256': pre['script']['sha256'],
+        'headline_sample_match': pre['headline_sample']['bytes']
+        == post['headline_sample']['bytes'],
+        'reference_3_6_match': pre['reference_3_6']['bytes']
+        == post['reference_3_6']['bytes'],
+        'script_bytes': pre['script']['bytes'],
     }
 
 
@@ -406,7 +406,7 @@ def main() -> int:
 
     pre_anchor = snapshot_anchors('pre')
     print(f'[{time.strftime("%H:%M:%S")}] pre 锚：M1 输入 {len(pre_anchor["m1_inputs"])}/9，'
-          f'样本 sha={pre_anchor["headline_sample"]["sha256"][:16]}…', flush=True)
+          f'样本 sha={pre_anchor["headline_sample"]["bytes"][:16]}…', flush=True)
 
     fm = load_fm_sample()
     segs = build_segments(fm)
@@ -732,7 +732,7 @@ def main() -> int:
         },
         'headline_reference': {
             'source': str(REF_3_6.relative_to(ROOT)).replace('\\', '/'),
-            'sha256': pre_anchor['reference_3_6']['sha256'],
+            'bytes': pre_anchor['reference_3_6']['bytes'],
             'source_run_at': ref_run_at,
             'source_version_tag': ref_version_tag,
             'rows': [ref[k] for k in sorted(ref)],
@@ -770,7 +770,7 @@ def main() -> int:
     counts['outputs']['segment_csv'] = {
         'path': str(CSV_PATH.relative_to(ROOT)).replace('\\', '/'),
         'rows': int(len(out)), 'columns': int(len(out.columns)),
-        'sha256': sha256_file(CSV_PATH),
+        'bytes': file_size(CSV_PATH),
     }
     counts['outputs']['counts_json'] = {
         'path': str(JSON_PATH.relative_to(ROOT)).replace('\\', '/'),

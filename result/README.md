@@ -35,6 +35,6 @@ python -m peerlab report              # 重算 tables/ 与 summary.md
 
 ## 当前状态
 
-没有任何有效运行。`configs/` 六个 YAML 缺失，10 个实验在就绪检查阶段全部 blocked；`data/processed/` 为空，上游网络与面板也还没生成。`smoke/report.md` 记录了逐实验的缺口。
+没有任何有效运行。`configs/` 已按新基线重建；`data/processed/` 为空，上游网络与面板还没生成，10 个实验在就绪检查阶段全部受阻（0 就绪）。`smoke/report.md` 记录了逐实验的缺口。
 
-补齐 `configs/` 后按 `docs/result_pipeline.md` 的顺序推进：网络 → peermax 面板 → M1 样本 → M1 主表/组合/稳健性。
+推进顺序见 `spec/stages.yaml`：先网络与面板，再 M1 样本与定价表。

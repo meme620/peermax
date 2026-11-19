@@ -18,7 +18,7 @@ v3（2026-09-29，Phase B″5 判据修订·口径统一）：`median_peer` 由�
 与 `network_business_cluster_freeze.cluster_stats` 的 `peers = sizes[inv] − 1`（覆盖全部入网公司，singleton
 记 0）**逐值一致**，也与老师方法说明原文一致：
 「We calculate the median number of peers **for all firms** … the median number of text-based
-peers **across the pooled sample** equals N_SW2」（`docs/literature/Methodology Description.pdf` §2）。
+peers **across the pooled sample** equals N_SW2」（`ref/teacher-materials/Methodology Description.pdf` §2）。
 实现：以当年 `{y}_support.csv` 的 focal 集合为分母（= 入网全部公司 = build_report.n_nodes），
 peer 数 = 该 focal 的边数（无支持/零对手 = 0）。新增字段：`median_peer`（统一口径）、
 `median_peer_edges_only`（旧口径，描述性）、`isolated_share`、`peers_universe`；
@@ -144,7 +144,7 @@ def main():
            'median_peer_definition': ('当年网络全部公司（含零对手）：分母 = {y}_support.csv 的 focal 集合'
                                       '（= 入网公司 = build_report.n_nodes），peer 数 = 该 focal 边数，'
                                       '无支持 = 0；与 network_business_cluster_freeze.cluster_stats 的 peers = sizes[inv]-1 '
-                                      '逐值可比；依据 = docs/literature/Methodology Description.pdf §2'
+                                      '逐值可比；依据 = ref/teacher-materials/Methodology Description.pdf §2'
                                       '「median number of peers for all firms / across the pooled sample」'),
            'median_peer_edges_only_definition': '旧口径（描述性字段，不参与 pass）：edges.groupby(focal_id).size().median()',
            'dir': args.dir, 'clusters': args.clusters,

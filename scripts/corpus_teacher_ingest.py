@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """S3 Phase B′0：老师 MD&A 语料接入（M-B 新主输入，2026-09-22 决策）。
 
-输入：data/raw/teacher/mda_data_2023.csv（老师提供；sha256 364b1dc5…；字段 f_id/f_stock_id/f_year/f_chapter_content）
+输入：data/raw/teacher/mda_data_2023.csv（老师提供；bytes 364b1dc5…；字段 f_id/f_stock_id/f_year/f_chapter_content）
 输出：data/processed/teacher_mda_panel.csv + reports/data_gates/G0/s3_bp0_corpus_ingest.json
 
 处理门（对应 execution_plan §3 S3「语料来源与版本」块）：

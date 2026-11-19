@@ -155,12 +155,12 @@ def anchor_snapshot(contracts: dict) -> dict:
         p = ROOT / meta["file"]
         if not p.is_file():
             raise SystemExit(f"[P2.1] headline 锚缺失: {p}")
-        h = sha256_file(p)
+        h = file_size(p)
         snap[key] = {
             "file": meta["file"],
-            "sha256": h,
-            "sha256_registered": meta["sha256"],
-            "sha_match": bool(h == meta["sha256"]),
+            "bytes": h,
+            "bytes_registered": meta["bytes"],
+            "sha_match": bool(h == meta["bytes"]),
             "rows_expected": int(meta["expected_rows"]),
         }
     return snap
@@ -169,7 +169,7 @@ def assert_anchors_unchanged(before: dict, after: dict) -> None:
     for key in before:
         if not before[key]["sha_match"]:
             raise SystemExit(f"[P2.1] 起始锚已不一致: {key}")
-        if before[key]["sha256"] != after[key]["sha256"]:
+        if before[key]["bytes"] != after[key]["bytes"]:
             raise SystemExit(f"[P2.1] headline 锚在运行中变化: {key}")
 
 def protected_paths(contracts: dict) -> set[Path]:
@@ -856,14 +856,14 @@ def main(argv=None) -> int:
         raise SystemExit("[P2.1] shadow 键 (firm_id, month) 不唯一")
 
     write_csv_atomic(panel, out_p)
-    out_sha = sha256_file(out_p)
+    out_bytes = file_size(out_p)
 
     scope_counts = _scope_counts(panel)
     window_counts = _window_counts(panel)
     classification = _classification_audit(full, ALIAS_MAP)
     alias_payload = _alias_payload(ret, ALIAS_MAP, daily_rows, firm_map_p, full)
     write_json_atomic(alias_payload, alias_p)
-    alias_sha = sha256_file(alias_p)
+    alias_bytes = file_size(alias_p)
     fm_counts = _fm_counts(panel, fm_p, src_p)
     fm_event = _fm_event_month_counts(panel, fm_p)
     source_bridge = _source_bridge(panel, src_p)
@@ -875,11 +875,11 @@ def main(argv=None) -> int:
         "p2shadow_version": P2SHADOW_VERSION,
         "generated_at_utc": pd.Timestamp.utcnow().isoformat(),
         "script": str(Path(__file__).resolve().relative_to(ROOT)).replace("\\", "/"),
-        "script_sha256": sha256_file(Path(__file__).resolve()),
+        "script_bytes": file_size(Path(__file__).resolve()),
         "inputs": {
             "monthly_returns": {
                 "file": str(returns_p.relative_to(ROOT)).replace("\\", "/"),
-                "sha256": anchors_before["monthly_returns_clean_v2"]["sha256"],
+                "bytes": anchors_before["monthly_returns_clean_v2"]["bytes"],
                 "rows": int(len(ret)),
                 "read_only": True,
             },
@@ -889,32 +889,32 @@ def main(argv=None) -> int:
                 "files": [
                     {
                         "file": str(p.relative_to(ROOT)).replace("\\", "/"),
-                        "sha256": sha256_file(p),
+                        "bytes": file_size(p),
                     }
                     for p in sorted(Path(args.panel_dir).glob("*.csv"))
                 ],
             },
             "stock_suspend_flag": {
                 "file": str(susp_p.relative_to(ROOT)).replace("\\", "/"),
-                "sha256": sha256_file(susp_p),
+                "bytes": file_size(susp_p),
                 "read_only": True,
             },
             "firm_id_map": {
                 "file": str(firm_map_p.relative_to(ROOT)).replace("\\", "/"),
-                "sha256": sha256_file(firm_map_p),
+                "bytes": file_size(firm_map_p),
                 "read_only": True,
             },
             "alias_map": dict(ALIAS_MAP),
         },
         "output": {
             "file": str(out_p.relative_to(ROOT)).replace("\\", "/"),
-            "sha256": out_sha,
+            "bytes": out_bytes,
             "rows": int(len(panel)),
             "columns": list(panel.columns),
         },
         "alias_map_output": {
             "file": str(alias_p.relative_to(ROOT)).replace("\\", "/"),
-            "sha256": alias_sha,
+            "bytes": alias_bytes,
         },
         "alias_map": dict(ALIAS_MAP),
         "definitions": {
@@ -942,7 +942,7 @@ def main(argv=None) -> int:
         "headline_anchors_before": anchors_before,
         "headline_anchors_after": anchors_after,
         "headline_anchors_match": all(
-            anchors_before[k]["sha256"] == anchors_after[k]["sha256"]
+            anchors_before[k]["bytes"] == anchors_after[k]["bytes"]
             for k in anchors_before),
     }
     write_json_atomic(meta, meta_p)
@@ -985,7 +985,7 @@ def main(argv=None) -> int:
         "p2shadow_version": P2SHADOW_VERSION,
         "generated_at_utc": meta["generated_at_utc"],
         "script": meta["script"],
-        "script_sha256": meta["script_sha256"],
+        "script_bytes": meta["script_bytes"],
         "shadow_file": meta["output"],
         "alias_map_file": meta["alias_map_output"],
         "scope": {
@@ -1016,7 +1016,7 @@ def main(argv=None) -> int:
     }
     write_json_atomic(counts, counts_p)
 
-    print(f"[P2.1] shadow -> {out_p.relative_to(ROOT)}  rows={len(panel):,}  sha={out_sha[:12]}…")
+    print(f"[P2.1] shadow -> {out_p.relative_to(ROOT)}  rows={len(panel):,}  sha={out_bytes[:12]}…")
     print(f"[P2.1] 2014–2025: ok={scope_counts['n_trade_days_ge_15'] + scope_counts['n_trade_days_1_14']:,} "
           f"no_trade={scope_counts['n_trade_days_zero']:,} "
           f"daily_panel_missing={scope_counts['rows_daily_panel_missing']:,}")

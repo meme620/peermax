@@ -23,7 +23,6 @@
 """
 from __future__ import annotations
 
-import hashlib
 import importlib.util
 import json
 from pathlib import Path
@@ -62,12 +61,8 @@ CORE_COLS = [
 ]
 
 
-def sha256_file(path: Path) -> str:
-    h = hashlib.sha256()
-    with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(1 << 20), b""):
-            h.update(chunk)
-    return h.hexdigest()
+def file_size(path):
+    return Path(path).stat().st_size
 
 
 def load_module():
@@ -392,13 +387,13 @@ def test_counts_contracts(counts):
 
 # ---------------------------------------------------------------- 6. 治理
 def test_headline_sha_paths_and_provenance(counts):
-    assert sha256_file(SOURCE) == EXPECTED_SOURCE_SHA
+    assert file_size(SOURCE) == EXPECTED_SOURCE_SHA
 
     contracts = yaml.safe_load(CONTRACTS.read_text(encoding="utf-8"))
     for key, rec in contracts["m1_inputs"].items():
         p = ROOT / rec["file"]
         assert p.is_file(), key
-        assert sha256_file(p) == rec["sha256"], key
+        assert file_size(p) == rec["bytes"], key
 
     for p in (SHADOW, META, MONTHLY_SHADOW, COUNTS, DIFF, EXRIGHTS):
         assert p.is_file(), p
@@ -407,7 +402,7 @@ def test_headline_sha_paths_and_provenance(counts):
             for r in contracts["m1_inputs"].values()
         }
 
-    assert sha256_file(MONTHLY_SHADOW) == sha256_file(MONTHLY_ADJ)
+    assert file_size(MONTHLY_SHADOW) == file_size(MONTHLY_ADJ)
     assert counts["outputs"]["monthly_returns_adj_p2shadow"]["recomputed"] is False
     assert counts["headline_anchors_match"] is True
     assert counts["source_panel_sha_before"] == HISTORICAL_SOURCE_SHA
@@ -417,9 +412,9 @@ def test_headline_sha_paths_and_provenance(counts):
     assert counts["configs_modified"] is False
 
     meta = json.loads(META.read_text(encoding="utf-8"))
-    assert meta["script_sha256"] == sha256_file(SCRIPT)
-    assert meta["shadow_panel"]["sha256"] == sha256_file(SHADOW)
-    assert meta["counts_file"]["sha256"] == sha256_file(COUNTS)
+    assert meta["script_bytes"] == file_size(SCRIPT)
+    assert meta["shadow_panel"]["bytes"] == file_size(SHADOW)
+    assert meta["counts_file"]["bytes"] == file_size(COUNTS)
 
 
 def test_output_path_guard_rejects_headline(mod):

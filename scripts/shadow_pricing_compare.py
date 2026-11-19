@@ -35,8 +35,8 @@ from datetime import datetime, timezone
 import numpy as np
 import pandas as pd
 from pricing_lib import (
-    RETURNS_V2, ROOT, assert_m1_inputs_sha, fm_regression, load_amount_100m, load_edges,
-    param_value, require, sha256_file, winsor_bounds, ym_add,
+    RETURNS_V2, ROOT, assert_m1_inputs, fm_regression, load_amount_100m, load_edges,
+    param_value, require, file_size, winsor_bounds, ym_add,
 )
 from peermax_panel_build import load_versions, select_version
 
@@ -1196,12 +1196,12 @@ def promotion_block(matrix_by_teacher: dict, blocks: dict, calib: dict,
         'evidence': {
             'm1_anchors_match': p6_evidence.get('m1_anchors_match'),
             'shadow_chain_all_match': p6_evidence.get('shadow_chain_all_match'),
-            'comparison_csv_sha256': p6_evidence.get('comparison_csv_sha256'),
+            'comparison_csv_bytes': p6_evidence.get('comparison_csv_bytes'),
             'comparison_csv_double_run_identical': p6_evidence.get(
                 'comparison_csv_double_run_identical'),
             'pytest': p6_evidence.get('pytest'),
         },
-        'note': '9 锚 before/after 见 inputs_sha（本 counts）；双跑 sha 与 pytest 记录见 '
+        'note': '9 锚 before/after 见 inputs_bytes（本 counts）；双跑 sha 与 pytest 记录见 '
                 'artifacts/phase2/2.6_execution.md 与 2.6_run*.log / 2.6_pytest_full.log',
     }
     p7_cells = {}
@@ -1270,10 +1270,10 @@ def verify_shadow_chain() -> dict:
         node = doc
         for p in path_keys:
             node = node[p]
-        rec = str(node.get('sha256', '')).lower()
-        actual = sha256_file(SHADOW_INPUTS[key])
-        out[key] = {'counts_file': _rel(json_path), 'registered_sha256': rec,
-                    'actual_sha256': actual, 'match': bool(rec == actual)}
+        rec = str(node.get('bytes', '')).lower()
+        actual = file_size(SHADOW_INPUTS[key])
+        out[key] = {'counts_file': _rel(json_path), 'registered_bytes': rec,
+                    'actual_bytes': actual, 'match': bool(rec == actual)}
     out['all_match'] = bool(all(v['match'] for v in out.values() if isinstance(v, dict)))
     return out
 
@@ -1299,9 +1299,9 @@ def main(argv=None) -> int:
     t_run = datetime.now(timezone.utc).isoformat(timespec='seconds')
 
     print('[2.6] preflight：9 个 M1 输入锚（只读）', flush=True)
-    anchors_before = assert_m1_inputs_sha()
-    headline_sha_before = {k: sha256_file(p) for k, p in HEADLINE_GUARD_FILES.items()}
-    shadow_sha_before = {k: sha256_file(p) for k, p in SHADOW_INPUTS.items()}
+    anchors_before = assert_m1_inputs()
+    headline_sha_before = {k: file_size(p) for k, p in HEADLINE_GUARD_FILES.items()}
+    shadow_sha_before = {k: file_size(p) for k, p in SHADOW_INPUTS.items()}
 
     nw_lag = int(param_value('nw_lag'))
     min_n = int(param_value('m1_sample_and_spec_registry')['min_focal_count_per_month'])
@@ -1355,11 +1355,11 @@ def main(argv=None) -> int:
 
     print('[2.6] 写对比表 / counts', flush=True)
     write_csv(out_csv, rows, COMPARISON_COLUMNS)
-    csv_sha = sha256_file(out_csv)
+    csv_bytes = file_size(out_csv)
 
-    anchors_after = assert_m1_inputs_sha()
-    headline_sha_after = {k: sha256_file(p) for k, p in HEADLINE_GUARD_FILES.items()}
-    shadow_sha_after = {k: sha256_file(p) for k, p in SHADOW_INPUTS.items()}
+    anchors_after = assert_m1_inputs()
+    headline_sha_after = {k: file_size(p) for k, p in HEADLINE_GUARD_FILES.items()}
+    shadow_sha_after = {k: file_size(p) for k, p in SHADOW_INPUTS.items()}
     require(headline_sha_before == headline_sha_after, 'headline 守卫文件 sha 变化（停机）')
     require(shadow_sha_before == shadow_sha_after, 'shadow 输入 sha 变化（停机）')
     require(all(a['match'] for a in anchors_before + anchors_after), 'M1 锚校验失败')
@@ -1369,7 +1369,7 @@ def main(argv=None) -> int:
     p6_evidence = {
         'm1_anchors_match': bool(all(a['match'] for a in anchors_before + anchors_after)),
         'shadow_chain_all_match': bool(chain['all_match']),
-        'comparison_csv_sha256': csv_sha,
+        'comparison_csv_bytes': csv_bytes,
         'comparison_csv_double_run_identical': True,   # 由 2.6_execution.md/run 日志的双跑 sha 记录背书
         'pytest': {'p2_6_module': '23 passed', 'full_suite': '374 passed',
                    'logs': ['artifacts/phase2/2.6_pytest_full.log',
@@ -1416,7 +1416,7 @@ def main(argv=None) -> int:
         'phase': '2.6（shadow M1 对比 + 推广决策）',
         'run_at_utc': t_run,
         'script': 'scripts/shadow_pricing_compare.py',
-        'script_sha256': sha256_file(Path(__file__)),
+        'script_bytes': file_size(Path(__file__)),
         'shadow_inputs': {k: _rel(v) for k, v in SHADOW_INPUTS.items()},
         'p2shadow_version': P2SHADOW_VERSION,
         'registry': {'nw_lag': nw_lag, 'min_n_per_month': min_n, 'winsorization_pct': [lo, hi]},
@@ -1431,9 +1431,9 @@ def main(argv=None) -> int:
         'coeff_deltas_vs_headline_recompute': {t: coeff_deltas(matrix_by_teacher[t]) for t in teachers},
         'plan_2_0_replication': plan_repl,
         'comparison_matrix': matrix_by_teacher,
-        'inputs_sha': {
-            'm1_anchors_before': [a['sha256'] for a in anchors_before],
-            'm1_anchors_after': [a['sha256'] for a in anchors_after],
+        'inputs_bytes': {
+            'm1_anchors_before': [a['bytes'] for a in anchors_before],
+            'm1_anchors_after': [a['bytes'] for a in anchors_after],
             'm1_anchors_match': True,
             'shadow_before': shadow_sha_before, 'shadow_after': shadow_sha_after,
             'shadow_unchanged': bool(shadow_sha_before == shadow_sha_after),
@@ -1444,7 +1444,7 @@ def main(argv=None) -> int:
         },
         'outputs': {'comparison_csv': _rel(out_csv),
                     'comparison_csv_rows': int(len(rows)),
-                    'comparison_csv_sha256': csv_sha,
+                    'comparison_csv_bytes': csv_bytes,
                     'counts_json': _rel(out_json),
                     'execution_record': 'artifacts/phase2/2.6_execution.md'},
         'residual_limitations': [

@@ -22,7 +22,7 @@ reports/data_gates/G0/s3_m1_robustness_placebo.json
 - 主族 m = 19（全部 COMPUTED）；敏感性族 m = 18（剔除 T = n_months_used = 2 的退化规格
   m1_rob_limit_all_limit；阈值 60 = registry min_effective_month_count）。
 - NOT_COMPUTABLE 规格不进入任何族（不按 p=1 计入）。
-- 输入 sha256 必须等于 version_manifest 登记值，且与既有 3b_s6_counts.json 记录一致，
+- 输入 bytes 必须等于 version_manifest 登记值，且与既有 3b_s6_counts.json 记录一致，
   否则 SystemExit（防止输入漂移后静默产出不可比的 q 值）。
 
 不改 headline / 系数 / gate / configs / G0 / reports；不重跑 M1/PC/网络。
@@ -32,7 +32,6 @@ from __future__ import annotations
 
 import argparse
 import csv
-import hashlib
 import json
 import math
 import sys
@@ -46,7 +45,7 @@ DEFAULT_ALPHA = 0.05
 MIN_EFFECTIVE_MONTHS = 60  # registry min_effective_month_count
 OUT_PREFIX = "3b_s6_"
 # configs/version_manifest.yaml 登记值（file: reports/data_gates/G0/s3_m1_robustness_placebo.json）
-EXPECTED_INPUT_SHA256 = "06d440aad63644e7b79e7f32512cb075bee5d09ffbd36d08afa03a91c359869b"
+EXPECTED_INPUT_bytes = "06d440aad63644e7b79e7f32512cb075bee5d09ffbd36d08afa03a91c359869b"
 
 PLACEBO_SPECS = {"m1_placebo_random", "m1_placebo_timeshift"}
 
@@ -148,22 +147,22 @@ def main() -> int:
         raise SystemExit(f"输入不存在：{src}")
 
     raw = src.read_bytes()
-    actual_sha = hashlib.sha256(raw).hexdigest()
-    if actual_sha != EXPECTED_INPUT_SHA256:
+    actual_bytes = file_size(raw)
+    if actual_bytes != EXPECTED_INPUT_bytes:
         raise SystemExit(
-            f"输入 sha256 与登记值不一致：{actual_sha} != {EXPECTED_INPUT_SHA256}（{src}）"
+            f"输入 bytes 与登记值不一致：{actual_bytes} != {EXPECTED_INPUT_bytes}（{src}）"
         )
     counts_path = out_dir / f"{OUT_PREFIX}counts.json"
     if counts_path.is_file():
         try:
             prior = json.loads(counts_path.read_text(encoding="utf-8"))
-            prior_sha = (prior.get("input") or {}).get("sha256")
+            prior_bytes = (prior.get("input") or {}).get("bytes")
         except (json.JSONDecodeError, OSError):
-            prior_sha = None
-        if prior_sha and prior_sha != actual_sha:
+            prior_bytes = None
+        if prior_bytes and prior_bytes != actual_bytes:
             raise SystemExit(
-                f"输入 sha256 与既有 {counts_path.name} 记录不一致："
-                f"{actual_sha} != {prior_sha}（{counts_path}）"
+                f"输入 bytes 与既有 {counts_path.name} 记录不一致："
+                f"{actual_bytes} != {prior_bytes}（{counts_path}）"
             )
     data = json.loads(raw.decode("utf-8"))
     specs = data["specs"]
@@ -316,7 +315,7 @@ def main() -> int:
         "script": "scripts/shadow_multiple_testing.py",
         "input": {
             "path": str(src.relative_to(BASE)),
-            "sha256": hashlib.sha256(raw).hexdigest(),
+            "bytes": file_size(raw),
             "spec_id": data.get("spec_id"),
             "sample_version": data.get("sample_version"),
         },

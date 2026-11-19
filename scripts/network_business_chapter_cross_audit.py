@@ -12,7 +12,7 @@ v2（2026-09-29，判据修订，依据用户裁定）：
     与 `network_business_cluster_freeze.cluster_stats` 的 `peers = sizes[inv] − 1` 逐值一致，也与老师方法说明
     原文一致：「We calculate the median number of peers **for all firms** … the median number of
     text-based peers **across the pooled sample** equals N_SW2」
-    （`docs/literature/Methodology Description.pdf` §2）。
+    （`ref/teacher-materials/Methodology Description.pdf` §2）。
   - ⓒ 边 Jaccard **降级为描述性**（不再计入 pass/fail）。理由：两章语料层的产品词集本身只重合
     10–22%（`s3_teacher_corpus_chapter_scan.json → lexicon_comparison`，Jaccard 0.119–0.132），
     边不重合是预期；且 0.20 这条线是从阈值法（M-B）跨域借来的（换语料 0.600 / 换方法 0.047–0.129），
@@ -80,7 +80,7 @@ MIN_LIFT = 1.0                                         # ⓑ
 PEER_MEDIAN_DEF = ('median_peer = 当年网络全部公司（含零对手）：分母 = {y}_support.csv 的 focal 集合'
                    '（= 入网公司 = build_report.n_nodes），peer 数 = 该 focal 边数，无支持 = 0；'
                    '与 network_business_cluster_freeze.cluster_stats 的 peers = sizes[inv]-1 逐值可比；'
-                   '依据 = docs/literature/Methodology Description.pdf §2'
+                   '依据 = ref/teacher-materials/Methodology Description.pdf §2'
                    '（median number of peers for all firms / across the pooled sample）')
 LIFT_DEF = ('lift = 同申万二级边占比 / 同样本边际基线：base = Σ_k n_k(n_k−1) / (N(N−1))，'
             'n_k = 当年网络节点（support 表全部 focal，含零对手）中申万二级 = k 的计数（仅计有映射者），'

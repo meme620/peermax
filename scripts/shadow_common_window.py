@@ -22,7 +22,7 @@
 验证：
   - 原窗口读数与 `reports/data_gates/G0/s3_m1_pricing_table_v2.json` 的主表逐值对账
     （beta / NW t / N / T），不一致即退出，不写任何产物。
-  - 9 个 M1 主输入 + 4 个样本 parquet 的 sha256 在计算前后各记一次，必须不变。
+  - 9 个 M1 主输入 + 4 个样本 parquet 的 bytes 在计算前后各记一次，必须不变。
 
 用法：
   python scripts/shadow_common_window.py
@@ -41,8 +41,8 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 
 from pricing_lib import (  # noqa: E402
-    SAMPLE_WINDOW_END, SAMPLE_WINDOW_START, assert_m1_contract, assert_m1_inputs_sha,
-    fm_regression, param_value, require, sample_path, sha256_file,
+    SAMPLE_WINDOW_END, SAMPLE_WINDOW_START, assert_m1_contract, assert_m1_inputs,
+    fm_regression, param_value, require, sample_path, file_size,
 )
 
 ART = ROOT / 'artifacts/phase3b'
@@ -183,17 +183,17 @@ def main():
     ART.mkdir(parents=True, exist_ok=True)
 
     # ---------------- 计算前 sha 账本（9 个 M1 主输入 + 4 个样本 + 只读参照）
-    pre_m1 = assert_m1_inputs_sha()
+    pre_m1 = assert_m1_inputs()
     sample_paths = {k: sample_path(k, 'v2') for k in COLUMNS}
-    pre_samples = {k: {'path': _rel(p), 'sha256': sha256_file(p)}
+    pre_samples = {k: {'path': _rel(p), 'bytes': file_size(p)}
                    for k, p in sample_paths.items()}
     pre_refs = {
         'g0_reference': {'path': _rel(G0_REFERENCE),
-                         'sha256': sha256_file(G0_REFERENCE)},
+                         'bytes': file_size(G0_REFERENCE)},
         'parameter_registry': {'path': _rel(REGISTRY),
-                               'sha256': sha256_file(REGISTRY)},
+                               'bytes': file_size(REGISTRY)},
         'sample_report': {'path': _rel(SAMPLE_REPORT),
-                          'sha256': sha256_file(SAMPLE_REPORT)},
+                          'bytes': file_size(SAMPLE_REPORT)},
     }
 
     sample_report = json.loads(SAMPLE_REPORT.read_text(encoding='utf-8'))
@@ -293,16 +293,16 @@ def main():
     table = pd.DataFrame(rows)
 
     # ---------------- 计算后 sha：必须与计算前一致
-    post_m1 = assert_m1_inputs_sha()
-    post_samples = {k: {'path': _rel(p), 'sha256': sha256_file(p)}
+    post_m1 = assert_m1_inputs()
+    post_samples = {k: {'path': _rel(p), 'bytes': file_size(p)}
                     for k, p in sample_paths.items()}
     post_refs = {
         'g0_reference': {'path': _rel(G0_REFERENCE),
-                         'sha256': sha256_file(G0_REFERENCE)},
+                         'bytes': file_size(G0_REFERENCE)},
         'parameter_registry': {'path': _rel(REGISTRY),
-                               'sha256': sha256_file(REGISTRY)},
+                               'bytes': file_size(REGISTRY)},
         'sample_report': {'path': _rel(SAMPLE_REPORT),
-                          'sha256': sha256_file(SAMPLE_REPORT)},
+                          'bytes': file_size(SAMPLE_REPORT)},
     }
     sha_ledger = {
         'before': {'m1_inputs_9': pre_m1, 'samples': pre_samples, 'references': pre_refs},
@@ -316,10 +316,10 @@ def main():
         post = ({f'm1:{x["input"]}': x for x in post_m1}.get(name)
                 or post_samples.get(name.split(':', 1)[1])
                 or post_refs.get(name.split(':', 1)[1]))
-        ok = pre['sha256'] == post['sha256']
-        sha_ledger['checks'].append({'item': name, 'pre': pre['sha256'],
-                                     'post': post['sha256'], 'unchanged': bool(ok)})
-        require(ok, f'{name}: 计算前后 sha 不一致（{pre["sha256"]} -> {post["sha256"]}）')
+        ok = pre['bytes'] == post['bytes']
+        sha_ledger['checks'].append({'item': name, 'pre': pre['bytes'],
+                                     'post': post['bytes'], 'unchanged': bool(ok)})
+        require(ok, f'{name}: 计算前后 sha 不一致（{pre["bytes"]} -> {post["bytes"]}）')
     print(f'[3b_n6] 前后 sha 不变：9 M1 输入 + 4 样本 + 3 只读参照', flush=True)
 
     # ---------------- 共同窗口结论素材
@@ -354,7 +354,7 @@ def main():
 
     # ---------------- 写 CSV
     table.to_csv(OUT_CSV, index=False, encoding='utf-8')
-    csv_sha = sha256_file(OUT_CSV)
+    csv_bytes = file_size(OUT_CSV)
 
     counts = {
         'report_id': '3b_n6_common_window',
@@ -362,7 +362,7 @@ def main():
         'audit_item': 'N-6',
         'task': '四列并报统一到 2018-05..2023-12 共同窗口重跑 S1（原窗口同报）',
         'generated_at_utc': datetime.now(timezone.utc).isoformat(timespec='seconds'),
-        'script': {'path': _rel(SCRIPT), 'sha256': sha256_file(SCRIPT)},
+        'script': {'path': _rel(SCRIPT), 'bytes': file_size(SCRIPT)},
         'spec': {
             'id': 'S1', 'label': '登记全控制（8 controls）',
             'formula': 'R_{i,t+1} = alpha_t + beta*PeerMAXraw + theta*OwnMAXraw + '
@@ -381,7 +381,7 @@ def main():
         'readings': readings, 'summary': summary,
         'g0_reconciliation': recon,
         'input_sha_ledger': sha_ledger,
-        'outputs': {'csv': _rel(OUT_CSV), 'csv_sha256': csv_sha},
+        'outputs': {'csv': _rel(OUT_CSV), 'csv_bytes': csv_bytes},
         'scope_note': (
             '共同窗口只消除 FM 窗口差异。K 目标（ma_teacher/mb_teacher 44；ma 56）、'
             '语料（teacher_mda_panel vs business_texts）与由二者决定的 N 差异仍在；'
@@ -389,7 +389,7 @@ def main():
     }
     OUT_JSON.write_text(json.dumps(_json_ready(counts), ensure_ascii=False, indent=1),
                         encoding='utf-8')
-    json_sha = sha256_file(OUT_JSON)
+    json_bytes = file_size(OUT_JSON)
 
     # ---------------- 写执行报告 MD
     def cell(key, weight, var, stat):
@@ -398,7 +398,7 @@ def main():
     L = []
     L.append('# Phase 3B / N-6（B2）：四列共同窗口 S1 重跑\n')
     L.append(f'- 生成时间（UTC）：{counts["generated_at_utc"]}')
-    L.append(f'- 脚本：`{counts["script"]["path"]}`（sha256 `{counts["script"]["sha256"]}`）')
+    L.append(f'- 脚本：`{counts["script"]["path"]}`（bytes `{counts["script"]["bytes"]}`）')
     L.append('- 样本版本：`m1_s5_v2_2015_2023`（四列 v2 parquet，只读）')
     L.append('- 规格：S1 = PeerMAXraw + OwnMAXraw + PeerReturn + 8 controls'
              '（size / bm / mom / rev / turnover / illiq / AnalystCoverage / NetworkDegree）')
@@ -534,26 +534,26 @@ def main():
     L.append('python scripts/shadow_common_window.py')
     L.append('```')
     L.append('\n产物：')
-    L.append(f'- `{_rel(OUT_CSV)}`（sha256 `{csv_sha}`）')
-    L.append(f'- `{_rel(OUT_JSON)}`（sha256 `{json_sha}`）')
+    L.append(f'- `{_rel(OUT_CSV)}`（bytes `{csv_bytes}`）')
+    L.append(f'- `{_rel(OUT_JSON)}`（bytes `{json_bytes}`）')
     L.append(f'- `{_rel(OUT_MD)}`（本文件）')
 
-    L.append('\n## 8. 输入 sha256（计算前 / 计算后）\n')
+    L.append('\n## 8. 输入 bytes（计算前 / 计算后）\n')
     L.append('### 9 个 M1 主输入\n')
-    L.append('| 输入 | 文件 | sha256（前=后） |')
+    L.append('| 输入 | 文件 | bytes（前=后） |')
     L.append('|---|---|---|')
     for x in pre_m1:
-        L.append(f'| {x["input"]} | `{x["file"]}` | `{x["sha256"]}` |')
+        L.append(f'| {x["input"]} | `{x["file"]}` | `{x["bytes"]}` |')
     L.append('\n### 4 个 v2 样本（只读）\n')
-    L.append('| 列 | 文件 | sha256（前=后） |')
+    L.append('| 列 | 文件 | bytes（前=后） |')
     L.append('|---|---|---|')
     for key in COLUMNS:
-        L.append(f'| `{key}` | `{pre_samples[key]["path"]}` | `{pre_samples[key]["sha256"]}` |')
+        L.append(f'| `{key}` | `{pre_samples[key]["path"]}` | `{pre_samples[key]["bytes"]}` |')
     L.append('\n### 只读参照\n')
-    L.append('| 文件 | sha256（前=后） |')
+    L.append('| 文件 | bytes（前=后） |')
     L.append('|---|---|')
     for k, v in pre_refs.items():
-        L.append(f'| `{v["path"]}` | `{v["sha256"]}` |')
+        L.append(f'| `{v["path"]}` | `{v["bytes"]}` |')
     L.append(f'\n> 计算前后逐项比对：{len(sha_ledger["checks"])} 项全部不变；'
              f'9 个 M1 输入均与 `configs/version_manifest.yaml` 锚一致。')
     OUT_MD.write_text('\n'.join(L) + '\n', encoding='utf-8')

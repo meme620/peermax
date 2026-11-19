@@ -33,7 +33,6 @@ import re
 import sys
 from collections import Counter
 from datetime import datetime, timezone
-from hashlib import sha256
 from pathlib import Path
 
 import numpy as np
@@ -394,7 +393,7 @@ def read_label_file(path: Path, n_expect: int) -> tuple:
         raise SystemExit(f'[STOP] 标签文件完整性校验失败（M1）：{path} -> {checks}')
     report = {
         'file': str(Path(path).as_posix()),
-        'sha256': sha256(Path(path).read_bytes()).hexdigest(),
+        'bytes': file_size(Path(path).read_bytes()).hexdigest(),
         'distribution': {k: int(v) for k, v in lab.value_counts().items()},
         'reason_max_len': checks['reason_max_len'],
         'checks': checks,
@@ -451,7 +450,7 @@ def merge_labels(sample_csv: Path, label_files: list) -> dict:
     return {'label_files': reports, 'n_rows': n, 'n_columns_after_merge': int(len(df.columns)),
             'n_agree_distribution': {str(k): int(nag[k]) for k in (3, 2, 1)},
             'final_label_distribution': {k: int(v) for k, v in mode_share.items()},
-            'merged_csv_sha256': sha256(sample_csv.read_bytes()).hexdigest(),
+            'merged_csv_bytes': file_size(sample_csv.read_bytes()).hexdigest(),
             '_reasons': notes}
 
 
@@ -733,7 +732,7 @@ def compute(annotated: Path, out_dir: Path, out_prefix: str, label_files=None) -
                         'pre-validated；外部锚仍未满足）。'),
         'computed_at': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
         'annotated_file': str(annotated.as_posix()),
-        'annotated_file_sha256': sha256(Path(annotated).read_bytes()).hexdigest(),
+        'annotated_file_bytes': file_size(Path(annotated).read_bytes()).hexdigest(),
         'n_rows_total': int(len(df)), 'n_rows_scored': int(len(scored)),
         'n_disagreement': int((df['disagreement'] == '1').sum()),
         'agreement_rate': round(float((df['disagreement'] == '0').mean()), 6),

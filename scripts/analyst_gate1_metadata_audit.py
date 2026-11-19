@@ -10,7 +10,6 @@
 import json
 import sys
 from datetime import datetime, timezone
-from hashlib import sha256
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -87,7 +86,7 @@ def main():
     require_fields = spec.get('provenance', {}).get('output_metadata_required', REQ)
     report = {
         'spec_id': spec['spec_id'],
-        'spec_hash': sha256(spec_bytes).hexdigest(),
+        'spec_hash': file_size(spec_bytes),
         'run_at': datetime.now(timezone.utc).isoformat(),
         'command': ' '.join(sys.argv),
         'status': None,

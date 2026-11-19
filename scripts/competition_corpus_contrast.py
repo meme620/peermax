@@ -289,7 +289,7 @@ def main() -> int:
            'historical_label_note': HIST_NOTE,
            'comparability': {
                'comparable_to_paper': False,
-               'registered_deviation': 'docs/methodology/methodology_execution_plan.md:2290',
+               'registered_deviation': 'methodology_execution_plan:2290',
                'project_rule': 'same_cluster_members（同团全部成员）',
                'paper_rule': '任何与其相似度超过团内最小相似度的公司（字面含团外）',
                'consequence': 'PC 不是原文变量的严格复现；判定 = 不可比/未复现（对手集合口径不同）；'

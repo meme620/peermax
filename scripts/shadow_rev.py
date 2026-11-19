@@ -45,8 +45,8 @@ from datetime import datetime, timezone
 import numpy as np
 import pandas as pd
 from pricing_lib import (
-    RETURNS_V2, ROOT, assert_m1_inputs_sha, fm_regression, param_value, require,
-    sha256_file, winsor_bounds, winsorize_by_month,
+    RETURNS_V2, ROOT, assert_m1_inputs, fm_regression, param_value, require,
+    file_size, winsor_bounds, winsorize_by_month,
 )
 from fileio import assert_path_allowed
 
@@ -670,7 +670,7 @@ def write_matrix_csv(matrix: dict, path: Path = MATRIX_CSV) -> dict:
     df.to_csv(tmp, index=False, float_format='%.8f', lineterminator='\n')
     os.replace(tmp, path)
     return {'file': str(path.relative_to(ROOT)), 'rows': int(len(df)),
-            'columns': list(df.columns), 'sha256': sha256_file(path)}
+            'columns': list(df.columns), 'bytes': file_size(path)}
 
 def parse_args(argv=None):
     ap = argparse.ArgumentParser(description='Phase 2.5 shadow：rev 同月/滞后/移除 × turnover 控制矩阵')
@@ -723,8 +723,8 @@ def main(argv=None) -> int:
     args = parse_args(argv)
     t_generated = datetime.now(timezone.utc).isoformat(timespec='seconds')
     print('[2.5] preflight：9 个 M1 输入锚（只读）', flush=True)
-    anchors_before = assert_m1_inputs_sha()
-    headline_sha_before = {k: sha256_file(p) for k, p in HEADLINE_GUARD_FILES.items()}
+    anchors_before = assert_m1_inputs()
+    headline_sha_before = {k: file_size(p) for k, p in HEADLINE_GUARD_FILES.items()}
     extra_inputs = {
         'monthly_returns_clean.csv': RETURNS_V1,
         'shadow_turnover_2_4_csv': Path(args.turnover_shadow),
@@ -733,7 +733,7 @@ def main(argv=None) -> int:
         'matrix_2_4_csv': MATRIX_24,
         'counts_2_4_json': COUNTS_24,
     }
-    extra_sha_before = {k: (sha256_file(p) if p.is_file() else None)
+    extra_sha_before = {k: (file_size(p) if p.is_file() else None)
                         for k, p in extra_inputs.items()}
 
     print('[2.5] 构造控制矩阵（样本只读 + v2 收益 lag + 2.4 turnover shadow）', flush=True)
@@ -823,12 +823,12 @@ def main(argv=None) -> int:
     out_info = write_matrix_csv(matrix, Path(args.matrix_out))
 
     print('[2.5] postflight：9 个 M1 输入锚与 headline 文件 sha 复核', flush=True)
-    anchors_after = assert_m1_inputs_sha()
-    headline_sha_after = {k: sha256_file(p) for k, p in HEADLINE_GUARD_FILES.items()}
-    extra_sha_after = {k: (sha256_file(p) if p.is_file() else None)
+    anchors_after = assert_m1_inputs()
+    headline_sha_after = {k: file_size(p) for k, p in HEADLINE_GUARD_FILES.items()}
+    extra_sha_after = {k: (file_size(p) if p.is_file() else None)
                        for k, p in extra_inputs.items()}
-    anchors_match = bool([a['sha256'] for a in anchors_before]
-                         == [a['sha256'] for a in anchors_after])
+    anchors_match = bool([a['bytes'] for a in anchors_before]
+                         == [a['bytes'] for a in anchors_after])
     headline_unchanged = headline_sha_before == headline_sha_after
     extra_unchanged = extra_sha_before == extra_sha_after
     require(anchors_match, '9 锚前后 sha 不一致（停机条件）')
@@ -839,7 +839,7 @@ def main(argv=None) -> int:
         'p2shadow_version': P2SHADOW_VERSION,
         'generated_at_utc': t_generated,
         'script': 'scripts/shadow_rev.py',
-        'script_sha256': sha256_file(Path(__file__)),
+        'script_bytes': file_size(Path(__file__)),
         'scope': ('只读样本/月收益/2.4 shadow turnover/headline 定价表；只写 artifacts/phase2/2.5_counts.json '
                   '与 2.5_control_matrix.csv；不重跑 M1/PC/网络，不写 data/、G0、configs、正式 reports'),
         'outputs': {
@@ -849,29 +849,29 @@ def main(argv=None) -> int:
         'inputs': {
             'm1_common_sample_ma_teacher_v2': {
                 'file': str(SAMPLE_PARQUET.relative_to(ROOT)),
-                'sha256_before': headline_sha_before['m1_common_sample_ma_teacher_v2.parquet'],
-                'sha256_after': headline_sha_after['m1_common_sample_ma_teacher_v2.parquet'],
+                'bytes_before': headline_sha_before['m1_common_sample_ma_teacher_v2.parquet'],
+                'bytes_after': headline_sha_after['m1_common_sample_ma_teacher_v2.parquet'],
                 'rows': int(diag['sample_rows']), 'fm_rows': int(diag['fm_rows']),
                 'fm_months': int(diag['fm_months']), 'read_only': True},
             'monthly_returns_clean_v2': {
                 'file': str(RETURNS_V2.relative_to(ROOT)),
-                'sha256_before': headline_sha_before['monthly_returns_clean_v2.csv'],
-                'sha256_after': headline_sha_after['monthly_returns_clean_v2.csv'],
+                'bytes_before': headline_sha_before['monthly_returns_clean_v2.csv'],
+                'bytes_after': headline_sha_after['monthly_returns_clean_v2.csv'],
                 'read_only': True},
             'monthly_returns_clean': {'file': str(RETURNS_V1.relative_to(ROOT)),
-                                      'sha256': extra_sha_before['monthly_returns_clean.csv'],
+                                      'bytes': extra_sha_before['monthly_returns_clean.csv'],
                                       'read_only': True},
             'firm_chars_clean': {'file': str(CHARS.relative_to(ROOT)),
-                                 'sha256_before': headline_sha_before['firm_chars_clean.csv'],
-                                 'sha256_after': headline_sha_after['firm_chars_clean.csv'],
+                                 'bytes_before': headline_sha_before['firm_chars_clean.csv'],
+                                 'bytes_after': headline_sha_after['firm_chars_clean.csv'],
                                  'read_only': True},
             'shadow_turnover_2_4_csv': {
                 'file': str(Path(args.turnover_shadow).relative_to(ROOT)),
-                'sha256': extra_sha_before['shadow_turnover_2_4_csv'],
+                'bytes': extra_sha_before['shadow_turnover_2_4_csv'],
                 'read_only': True},
             'headline_pricing_table_v2': {
                 'file': str(PRICING_TABLE_V2.relative_to(ROOT)),
-                'sha256': extra_sha_before['headline_pricing_table_v2'], 'read_only': True},
+                'bytes': extra_sha_before['headline_pricing_table_v2'], 'read_only': True},
             'registry_params': {'winsorization_pct': list(diag['winsorization_pct']),
                                 'nw_lag': matrix['nw_lag'], 'min_n': matrix['min_n']},
         },
@@ -907,11 +907,11 @@ def main(argv=None) -> int:
         'headline_anchors_after': anchors_after,
         'headline_anchors_match': anchors_match,
         'headline_files': {
-            k: {'sha256_before': headline_sha_before[k], 'sha256_after': headline_sha_after[k],
+            k: {'bytes_before': headline_sha_before[k], 'bytes_after': headline_sha_after[k],
                 'unchanged': headline_sha_before[k] == headline_sha_after[k]}
             for k in HEADLINE_GUARD_FILES},
         'extra_input_files': {
-            k: {'sha256_before': extra_sha_before[k], 'sha256_after': extra_sha_after[k],
+            k: {'bytes_before': extra_sha_before[k], 'bytes_after': extra_sha_after[k],
                 'unchanged': extra_sha_before[k] == extra_sha_after[k]}
             for k in extra_inputs},
         'headline_files_modified': not headline_unchanged,
@@ -941,7 +941,7 @@ def main(argv=None) -> int:
     }
     write_json(Path(args.counts_out), counts)
     print(f'[2.5] DONE：13 规格矩阵落盘 {out_info["rows"]} 行 '
-          f'sha={out_info["sha256"][:12]}…；锚点 all_match={anchors["all_items_match"]}；'
+          f'sha={out_info["bytes"][:12]}…；锚点 all_match={anchors["all_items_match"]}；'
           f'plan 前视复现 all_match={fwd_diag["all_items_match"]}', flush=True)
     return 0
 

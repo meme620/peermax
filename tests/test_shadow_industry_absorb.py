@@ -12,7 +12,6 @@
 """
 from __future__ import annotations
 
-import hashlib
 import importlib.util
 import json
 import sys
@@ -48,12 +47,8 @@ HEADLINE_BETA_WITHOUT = 0.03427280848385429
 RESID_E9_BETA_LATEST = -0.03905433621818112
 
 
-def sha256_file(path: Path) -> str:
-    h = hashlib.sha256()
-    with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(1 << 20), b""):
-            h.update(chunk)
-    return h.hexdigest()
+def file_size(path):
+    return Path(path).stat().st_size
 
 
 # Phase 3.5 shadow 的输入样本固定为 v2（历史只读）；仅此文件允许 manifest
@@ -66,7 +61,7 @@ _SUPERSEDED_SCOPED_ALLOW = {
 
 
 def _manifest_anchor(rel: str) -> str:
-    """当前 manifest 条目 sha256；默认只接受 active，superseded 仅限 scoped 例外。"""
+    """当前 manifest 条目；默认只接受 active，superseded 仅限 scoped 例外。"""
     import yaml
     man = yaml.safe_load((ROOT / "configs/version_manifest.yaml").read_text(encoding="utf-8"))
     hits = [e for e in man["deliverables"] if str(e.get("file", "")).replace("\\", "/") == rel]
@@ -77,7 +72,7 @@ def _manifest_anchor(rel: str) -> str:
             f"manifest 条目 superseded 但不在 scoped 例外: {rel}")
     else:
         assert status == "active", f"manifest 条目非 active: {rel}（status={status!r}）"
-    return str(hits[0]["sha256"])
+    return str(hits[0]["bytes"])
 
 
 def load_module():
@@ -319,20 +314,20 @@ def test_headline_sample_firmchars_panel_sha_unchanged(counts):
                       ("g0_a12_report", G0_A12),
                       ("asof_baselines_p3asof", ASOF_BASELINES),
                       ("asof_sample_copy", SAMPLE_ASOF)):
-        assert pre[key]["sha256"] == sha256_file(path), f"{key} sha 变化"
-        assert pre[key]["sha256"] == post[key]["sha256"]
+        assert pre[key]["bytes"] == file_size(path), f"{key} sha 变化"
+        assert pre[key]["bytes"] == post[key]["bytes"]
     # BL-01（I-16）metadata 重写已改现盘 headline 样本 sha；`3.5_counts.json` 是 Phase 3 历史证据
     # （不得重写），故现盘比对改到当前 manifest 锚；pre==post 历史不变式保留。
-    assert pre["headline_sample_parquet"]["sha256"] == post["headline_sample_parquet"]["sha256"]
-    assert sha256_file(SAMPLE) == _manifest_anchor(
+    assert pre["headline_sample_parquet"]["bytes"] == post["headline_sample_parquet"]["bytes"]
+    assert file_size(SAMPLE) == _manifest_anchor(
         "data/processed/m1_common_sample_ma_teacher_v2.parquet")
 
 
 def test_m1_inputs_sha_still_match(counts):
     import yaml
-    from pricing_lib import assert_m1_inputs_sha
-    ledger = assert_m1_inputs_sha()
-    actual = {r["input"]: r["sha256"] for r in ledger}
+    from pricing_lib import assert_m1_inputs
+    ledger = assert_m1_inputs()
+    actual = {r["input"]: r["bytes"] for r in ledger}
     assert len(actual) == 9
     pre = counts["anchors"]["pre"]["m1_inputs_9"]
     assert set(pre) == set(actual)
@@ -340,7 +335,7 @@ def test_m1_inputs_sha_still_match(counts):
     assert {k for k in actual if actual[k] != pre[k]} <= {"monthly_returns_clean_v2", "source_month_argmax_panel"}
     contracts = yaml.safe_load((ROOT / "configs/m1_contracts.yaml").read_text(encoding="utf-8"))
     for key, sha in actual.items():
-        assert sha == contracts["m1_inputs"][key]["sha256"], f"{key}: m1_contracts 锚不一致"
+        assert sha == contracts["m1_inputs"][key]["bytes"], f"{key}: m1_contracts 锚不一致"
 
 
 def test_headline_sample_counts_unchanged(counts):

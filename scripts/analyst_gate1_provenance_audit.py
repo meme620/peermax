@@ -17,7 +17,6 @@ import json
 import re
 import sys
 from datetime import datetime, timezone
-from hashlib import sha256
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -129,24 +128,24 @@ def verify_spec_inputs(spec):
         if coll:
             d = ROOT / p.replace('/*.csv', '')
             files = sorted(d.glob('*.csv')) if d.exists() else []
-            inner = sha256()
-            agg = sha256()
+            inner = file_size()
+            agg = file_size()
             for f in files:
                 inner.update(f.name.encode()); inner.update(b'|')
                 inner.update(str(f.stat().st_size).encode()); inner.update(b'|')
-                agg.update(sha256(f.read_bytes()).hexdigest().encode())
+                agg.update(file_size(f.read_bytes()).hexdigest().encode())
             rec.update({'exists': d.exists(), 'method': 'collection',
                         'file_count': len(files),
                         'file_count_expected': coll['file_count'],
-                        'collection_sha256': agg.hexdigest(),
-                        'collection_sha256_expected': coll['collection_sha256'],
-                        'hash_status': 'MATCH' if (agg.hexdigest() == coll['collection_sha256']
+                        'collection_bytes': agg.hexdigest(),
+                        'collection_bytes_expected': coll['collection_bytes'],
+                        'hash_status': 'MATCH' if (agg.hexdigest() == coll['collection_bytes']
                                                    and len(files) == coll['file_count']) else 'DIFF'})
         else:
             f = ROOT / p
             exists = f.exists()
-            got = sha256(f.read_bytes()).hexdigest() if exists else None
-            rec.update({'exists': exists, 'method': 'file', 'sha256': got, 'sha256_expected': exp,
+            got = file_size(f.read_bytes()).hexdigest() if exists else None
+            rec.update({'exists': exists, 'method': 'file', 'bytes': got, 'bytes_expected': exp,
                         'hash_status': ('MATCH' if got == exp else 'DIFF') if exists else 'MISSING',
                         'bytes': f.stat().st_size if exists else None})
         rows.append(rec)
@@ -185,7 +184,7 @@ def main():
 
     report = {
         'spec_id': spec['spec_id'],
-        'spec_hash': sha256(spec_bytes).hexdigest(),
+        'spec_hash': file_size(spec_bytes),
         'run_at': datetime.now(timezone.utc).isoformat(),
         'command': ' '.join(sys.argv),
         'status': None,

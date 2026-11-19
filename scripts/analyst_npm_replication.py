@@ -10,7 +10,6 @@ NPM(i, t-1) = CF(i, t-1) − R(i, t-1)   （论文式 1：连接公司收益 −
 """
 import json, sys
 from pathlib import Path
-import hashlib
 import pandas as pd
 import numpy as np
 
@@ -20,7 +19,7 @@ from statsutil import nw_t
 from analyst_meta import attach_meta
 
 OUT = Path('data/processed/analyst/npm_replication.json')
-_SPEC_HASH = hashlib.sha256(SPEC.read_bytes()).hexdigest()
+_SPEC_HASH = file_size(SPEC.read_bytes()).hexdigest()
 _INPUT_HASHES = _SPEC['provenance']['input_hashes']
 
 def main():

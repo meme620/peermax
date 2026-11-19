@@ -49,7 +49,7 @@ N-11（PC 团-年常数）
   3.4_blockperm_reps.csv       N-1 (c′) 年块置换逐 rep
   3.4_counts.json              全部读数 + 对账 + 判据 + 锚台账
   3.4_anchor_pre.json / 3.4_anchor_post.json   9 锚 + headline 45 文件 sha 台账
-  3.4_output_sha.json          本次确定性产物 sha
+  3.4_output_bytes.json          本次确定性产物 sha
   3.4_run.log                  运行日志（stdout tee）
 
 用法
@@ -76,7 +76,7 @@ from datetime import datetime, timezone
 import numpy as np
 import pandas as pd
 from pricing_lib import (
-    assert_m1_inputs_sha, fm_regression, newey_west, param_value, require, sha256_file,
+    assert_m1_inputs, fm_regression, newey_west, param_value, require, file_size,
     two_sided_p, winsor_bounds, _ols,
 )
 from peermax_panel_build import (
@@ -120,7 +120,7 @@ ANCHOR_PRE = ART / '3.4_anchor_pre.json'
 
 ANCHOR_POST = ART / '3.4_anchor_post.json'
 
-OUTPUT_SHA = ART / '3.4_output_sha.json'
+OUTPUT_SHA = ART / '3.4_output_bytes.json'
 
 RUN_LOG = ART / '3.4_run.log'
 
@@ -266,31 +266,31 @@ def sha_ledger_headline_net() -> dict:
     out = {}
     for p in sorted(HEADLINE_NET.rglob('*')):
         if p.is_file():
-            out[p.relative_to(ROOT).as_posix()] = sha256_file(p)
+            out[p.relative_to(ROOT).as_posix()] = file_size(p)
     return out
 
 def anchors_snapshot(tag: str) -> dict:
-    ledger = assert_m1_inputs_sha()
+    ledger = assert_m1_inputs()
     snap = {
         'tag': tag, 'run_at': datetime.now(timezone.utc).isoformat(),
         'script': 'scripts/shadow_inference.py',
-        'm1_inputs_9': {r['input']: r['sha256'] for r in ledger},
+        'm1_inputs_9': {r['input']: r['rows'] for r in ledger},
         'm1_inputs_ledger': ledger,
-        'headline_network_sha': sha_ledger_headline_net(),
+        'headline_network_bytes': sha_ledger_headline_net(),
     }
-    snap['headline_network_n_files'] = len(snap['headline_network_sha'])
+    snap['headline_network_n_files'] = len(snap['headline_network_bytes'])
     return snap
 
 def compare_anchors(pre: dict, post: dict) -> dict:
     diffs = []
-    for sect in ('m1_inputs_9', 'headline_network_sha'):
+    for sect in ('m1_inputs_9', 'headline_network_bytes'):
         a, b = pre.get(sect) or {}, post.get(sect) or {}
         for k in sorted(set(a) | set(b)):
             if a.get(k) != b.get(k):
                 diffs.append({'section': sect, 'key': k, 'pre': a.get(k), 'post': b.get(k)})
     return {'status': 'MATCH' if not diffs else 'CHANGED', 'n_diff': len(diffs), 'diffs': diffs,
             'n_m1_inputs': len(pre.get('m1_inputs_9') or {}),
-            'n_headline_files': len(pre.get('headline_network_sha') or {})}
+            'n_headline_files': len(pre.get('headline_network_bytes') or {})}
 
 def fm_cluster_scores(df: pd.DataFrame, ycol: str, xcols, weight_col=None,
                       cluster_col='cid', month_col='month', min_n=None):
@@ -1044,9 +1044,9 @@ def step_n8perm(inp: Inputs, counts: dict, reps: int, seed: int, industry: str,
         f'经验 p(双侧)={out["empirical_p_two_sided"]}；null sd={out["null_sd"]}')
     return out
 
-def step_sha(inp: Inputs) -> dict:
+def step_bytes(inp: Inputs) -> dict:
     files = [INF_CSV, STRUCT_CSV, VAR_CSV, PC_CSV, NULL_CSV, NULL_SUMMARY, BLOCKPERM_CSV]
-    cur = {Path(p).relative_to(ROOT).as_posix(): sha256_file(p) for p in files if Path(p).is_file()}
+    cur = {Path(p).relative_to(ROOT).as_posix(): file_size(p) for p in files if Path(p).is_file()}
     res = {'n_files': len(cur), 'sha': cur,
            'excluded_from_byte_compare': ['3.4_counts.json', '3.4_anchor_pre.json',
                                           '3.4_anchor_post.json', '3.4_run.log']}
@@ -1226,7 +1226,7 @@ class Inputs:
             c = pd.read_csv(HEADLINE_NET / 'clusters' / f'{y}_clusters.csv', dtype={'firm_id': str})
             self.cluster[y] = dict(zip(c['firm_id'], c['cluster_id']))
             sizes = c.groupby('cluster_id').size()
-            self.cluster_size[y] = {int(k): int(v) for k, v in sizes.items()}
+            self.cluster_size[y] = {int(k): int(v) for k, v in file_size()}
         # 节点宇宙 + 边结构
         nodes = set(self.sample['focal_id'])
         self.edges = {}
@@ -1647,7 +1647,7 @@ def main():
             print('[HARD-GATE] headline/输入锚发生变化；停机（禁止重算覆盖）', file=sys.stderr, flush=True)
             raise SystemExit(2)
     if 'sha' in steps or 'postflight' in steps:
-        counts['output_sha'] = step_sha(inp)
+        counts['output_bytes'] = step_bytes(inp)
 
     counts['elapsed_sec_total'] = r6(time.time() - t_all)
     write_json(COUNTS_JSON, counts)

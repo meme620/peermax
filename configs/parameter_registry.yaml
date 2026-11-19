@@ -1,7 +1,8 @@
-registry_version: 1.5.32-peermax-baseline
+registry_version: 1.5.33-peermax-baseline
 meta:
-  baseline_date: '2026-11-18'
+  baseline_date: '2026-11-19'
   source: 按代码与契约测试重建；非主仓库原文件
+  audit_fix: '2026-11-19 审核修复：M1-3/M1-4/M1-5 阈值改回 spec/design.yaml m1_gates 登记的键值；补 ma_k_target_teacher；新增阈值与口径参数，替换脚本内硬编码'
 parameters:
   - name: sample_start
     headline_value: '2015-01-01'
@@ -22,20 +23,20 @@ parameters:
     note: complete_month = volume>0 交易日 >= 15；build_monthly_returns_status 注释
   - name: alpha_m1
     headline_value: 0.05
-    note: 单侧显著性门 M1-2 的 alpha；基线取值（原主仓库值不可得）
+    note: 单侧显著性门 M1-2 的 alpha；spec/design.yaml m1_gates 的 registry_key
   - name: K_Econ_M1
-    headline_value: 0.05
-    note: M1-3 经济量级门 |beta*IQR| 阈值；基线取值
+    headline_value: 0.003
+    note: M1-3 经济量级门 |beta*IQR| 阈值；spec/design.yaml m1_gates 的 registry_key（月收益单位）
   - name: K_Spread_M1
-    headline_value: 0.05
-    note: M1-4 组合 spread 阈值（月收益单位）；基线取值
+    headline_value: 0.003
+    note: M1-4 组合 spread 阈值；spec/design.yaml m1_gates 的 registry_key（月收益单位）
   - name: K_Consist_M1
-    headline_value: 0.05
+    headline_value: 0.5
     sensitivity_grid:
-      - 0.025
-      - 0.05
-      - 0.1
-    note: M1-5 EW/VW 一致性阈值；基线取值，敏感网格供 gate 报告
+      - 0.25
+      - 0.5
+      - 0.75
+    note: 'M1-5 EW/VW 一致性阈值，beta 单位；spec/design.yaml m1_gates 的 registry_key 登记值（×IQR≈1.17%/月）'
   - name: portfolio_breakpoints
     headline_value:
       - 0.2
@@ -72,7 +73,10 @@ parameters:
     note: M-A 聚类 linkage；code_design_audit 读取
   - name: sw2_median_peer_target
     headline_value: 56
-    note: M-A 逐年 K 的目标同伴数（目标密度 56）；docs/pipeline.md
+    note: M-A 自建语料（self 列）的逐年 K 目标同伴数；主口径 teacher 用 ma_k_target_teacher，勿混用
+  - name: ma_k_target_teacher
+    headline_value: 44
+    note: M-A 主口径（老师 MD&A 语料）逐年 K 目标同伴数；network_business_cluster_freeze 读取
   - name: m1_sample_and_spec_registry
     headline_value:
       sample_version: m1_s5_v3_20261115
@@ -87,7 +91,7 @@ parameters:
     headline_value:
       microcap_exclusion: monthly_market_equity_q10
       ipo_exclusion: listed_less_than_6_months
-      st_exclusion: st_flag_focal
+      st_stratify: st_flag_focal
       limit_hit_source: daily_limit_hit_flag
       no_network_support: network_support_status!=support
     note: 样本筛除口径；字段名由 pricing_sample_build 读取，值为基线口径
@@ -110,3 +114,32 @@ parameters:
   - name: s3a_weight_rule
     headline_value: equal_weight_over_common_analysts
     note: S3A 共同分析师边的权重规则（一致性检查按子串匹配）
+  - name: limit_thresholds
+    headline_value:
+      main: 0.095
+      main_st: 0.045
+      chinext_star: 0.195
+    note: 涨跌停派生阈值（|rraw| >= 阈值判 limit_hit）；peermax_max_build 读取；供应商 flag 可得时优先用 flag
+  - name: ca_ratio_jump
+    headline_value: 0.01
+    note: qfq/raw 比值相邻日跳变阈值，用于 ca_flag 候选除权日（ca_flag 已弃用，仅审计）
+  - name: ca_flag_status
+    headline_value: deprecated
+    note: ca_flag 由 SHAREBONUS 除权日表替代；仍写入面板仅作审计，消费方不得据此过滤
+  - name: iqr_pool_value
+    headline_value: 0.02341287
+    note: M1 经济量级的 treatment-only 池化 IQR 登记值；pricing_lib.IQR_POOL_REGISTERED 导入即核对该值
+  - name: pc_coverage_years
+    headline_value: 6
+    note: PC 竞争强度可得年数（文本年 2017-2022）；营收年表仅 FY2016-2024，文本年 2014-2016 缺且不填 0
+  - name: p_direction
+    headline_value: negative
+    note: M1-2 单侧检验方向；pricing_lib.fm_regression 与 gate 共用
+  - name: max_day_policy
+    headline_value:
+      limit_hit: exclude
+      resume: exclude
+    note: MAX/argmax 的日样本口径；涨跌停日与停牌复牌首日剔除，另报含全部日的 MAXraw_incl_all
+  - name: iqr_drift_tolerance
+    headline_value: 0.1
+    note: 样本实算 IQR 与登记值的相对漂移上限；超过即停机复核

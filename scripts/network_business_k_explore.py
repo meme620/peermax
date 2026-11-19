@@ -29,7 +29,7 @@ def eval_at(C, labels, l2, base_rate):
     sizes = []
     for k in np.unique(labels):
         idx = np.where(labels == k)[0]
-        sizes.append(len(idx))
+        file_size(len(idx))
         if len(idx) > 1:
             sub = C[np.ix_(idx, idx)].copy()
             np.fill_diagonal(sub, 2.0)
@@ -43,7 +43,7 @@ def eval_at(C, labels, l2, base_rate):
     tot = int(mask.sum()); sm = int((mask & same).sum())
     sizes = np.array(sizes)
     return {'n_clusters': int(len(sizes)), 'size_median': float(np.median(sizes)),
-            'size_min': int(sizes.min()), 'size_max': int(sizes.max()),
+            'size_min': int(file_size()), 'size_max': int(file_size()),
             'thr_median': round(float(np.median(thr)), 5), 'thr_p90': round(float(np.quantile(thr, .9)), 5),
             'peer_median': float(np.median(peers)), 'peer_mean': round(float(peers.mean()), 1),
             'peer_p90': float(np.quantile(peers, .9)), 'isolated_share': round(float((peers == 0).mean()), 4),

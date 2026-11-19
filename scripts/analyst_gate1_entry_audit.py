@@ -12,7 +12,6 @@ import re
 import subprocess
 import sys
 from datetime import datetime, timezone
-from hashlib import sha256
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -100,7 +99,7 @@ NINE_X_SCRIPTS = (
 
 
 def check_9x_paths(spec_paths, spec_names):
-    """9A–9M 入口审计：名单与 docs/pipeline.md §3.3 的 9A–9M 表一致。"""
+    """9A–9M 入口审计：名单与 spec/stages.yaml 的 S3A 阶段一致。"""
     out = []
     for name in NINE_X_SCRIPTS:
         f = ROOT / 'scripts' / name
@@ -146,7 +145,7 @@ def main():
     spec, spec_paths, spec_names = spec_inputs()
     report = {
         'spec_id': spec['spec_id'],
-        'spec_hash': sha256(spec_bytes).hexdigest(),
+        'spec_hash': file_size(spec_bytes),
         'run_at': datetime.now(timezone.utc).isoformat(),
         'command': ' '.join(sys.argv),
         'status': 'COMPUTED',

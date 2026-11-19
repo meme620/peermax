@@ -26,7 +26,7 @@ from datetime import datetime, timezone
 import numpy as np
 import pandas as pd
 from pricing_lib import (
-    assert_m1_inputs_sha, fm_regression, param_value, require, sha256_file,
+    assert_m1_inputs, fm_regression, param_value, require, file_size,
     winsor_bounds, winsorize_by_month,
 )
 from peermax_panel_build import (
@@ -48,7 +48,7 @@ COMPARISON_CSV = ART / '3.6_network_comparison.csv'
 
 COUNTS_JSON = ART / '3.6_counts.json'
 
-OUTPUT_SHA = ART / '3.6_output_sha.json'
+OUTPUT_SHA = ART / '3.6_output_bytes.json'
 
 ANCHOR_PRE = ART / '3.6_anchor_pre.json'
 
@@ -191,7 +191,7 @@ def write_parquet(path, df: pd.DataFrame) -> None:
     os.replace(tmp, p)
 
 def _sha_map(paths) -> dict:
-    return {str(Path(p).relative_to(ROOT)).replace('\\', '/'): sha256_file(p)
+    return {str(Path(p).relative_to(ROOT)).replace('\\', '/'): file_size(p)
             for p in paths}
 
 def _net_files(net_dir: Path) -> list:
@@ -204,14 +204,14 @@ def _net_files(net_dir: Path) -> list:
 
 def snapshot_anchors(tag: str) -> dict:
     log(f'锚快照 {tag}：9 个 M1 输入 + headline 样本/网络 + shadow 网络 sha')
-    ledger = assert_m1_inputs_sha()
+    ledger = assert_m1_inputs()
     return {
         'tag': tag,
         'run_at': datetime.now(timezone.utc).isoformat(),
-        'm1_inputs': {r['input']: r['sha256'] for r in ledger},
+        'm1_inputs': {r['input']: r['rows'] for r in ledger},
         'm1_ledger': ledger,
         'headline_sample': {'path': str(SAMPLE_PATH.relative_to(ROOT)).replace('\\', '/'),
-                            'sha256': sha256_file(SAMPLE_PATH)},
+                            'bytes': file_size(SAMPLE_PATH)},
         'headline_net': _sha_map(_net_files(HEADLINE_NET)),
         'shadow_net': {v['id']: _sha_map(_net_files(v['dir']))
                        for v in VARIANTS if v['id'] != 'headline'},
@@ -236,9 +236,9 @@ def compare_anchors(pre: dict, post: dict) -> dict:
                     diffs.append(f'{key}:{f}')
             blocks[key] = {'n': len(a), 'match': a == b}
     s_pre, s_post = pre['headline_sample'], post['headline_sample']
-    if s_pre.get('sha256') != s_post.get('sha256'):
+    if s_pre.get('bytes') != s_post.get('bytes'):
         diffs.append('headline_sample')
-    blocks['headline_sample'] = {'n': 1, 'match': s_pre.get('sha256') == s_post.get('sha256')}
+    blocks['headline_sample'] = {'n': 1, 'match': s_pre.get('bytes') == s_post.get('bytes')}
     return {'status': 'MATCH' if not diffs else 'DIFFERENT',
             'n_diff': len(diffs), 'diff': diffs, 'blocks': blocks}
 
@@ -984,7 +984,7 @@ def main() -> int:
             prev = {}
     files = [COMPARISON_CSV] + [SHADOW_DATA / f'p3_6_shadow_treat_{vid}.parquet'
                                 for vid in SHADOW_IDS]
-    cur = {str(p.relative_to(ROOT)).replace('\\', '/'): sha256_file(p) for p in files}
+    cur = {str(p.relative_to(ROOT)).replace('\\', '/'): file_size(p) for p in files}
     diff = sorted(k for k in set(prev) | set(cur) if prev.get(k) != cur.get(k))
     rerun = {'status': ('NO_PREVIOUS' if not prev else
                         'IDENTICAL' if not diff else 'DIFFERENT'),
@@ -992,7 +992,7 @@ def main() -> int:
     write_json(OUTPUT_SHA, {'phase': '3.6', 'run_at': datetime.now(timezone.utc).isoformat(),
                             'files': cur, 'rerun_check': rerun})
     counts['rerun_check'] = rerun
-    counts['output_sha'] = cur
+    counts['output_bytes'] = cur
     if rerun['status'] == 'IDENTICAL':
         counts['q_status']['Q6'] = {
             'status': 'PASS',

@@ -1,7 +1,6 @@
 # PeerMAX 计算链依赖
 # 解释器：Python 3.13（见 .python-version）
-# 解析与验证：2026-11-18，uv 0.12.3；验证方式见 docs/environment.md
-# pandas 锁 2.x 的理由见 docs/environment.md
+# 解析与验证：2026-11-18，uv 0.12.3
 
 # ---- 直接依赖（14）----
 # 核心

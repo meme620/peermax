@@ -37,8 +37,8 @@ governance:
     sample_start: '2015-01-01'
     sample_end: '2023-12-31'
     s3a_weight_rule: equal_weight_over_common_analysts
-  manifest_sha256: 9a6d6d73f29df59091a23ea5fafe6bf92e688f4d0428c756a767b4c40d96a664
-  registry_sha256: 4deaeb994d83f09321cfaa5835baea97111882df6d091239bd413a572c13efd6
+  manifest_version: 1.0.110
+  registry_version: 1.5.33-peermax-baseline
 provenance:
   input_hashes: {}
   input_collections: {}

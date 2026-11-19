@@ -1,7 +1,8 @@
 claim_registry_version: 1.0-baseline
 claims:
   - claim_id: M1_headline
-    status: active
+    status: blocked
+    blocked_reason: 'S5_status=FAIL：M1-1 符号 / M1-2 单侧显著性 / M1-3 经济量级 / M1-4 组合 spread / M1-5 EW-VW 一致性 五项全未过；按 spec/design.yaml 的 m1_gates 停止 standalone MAX-pricing claim，只保留描述性关联'
     treatment: PeerMAXraw
     outcome: R_next
     unit: firm-month

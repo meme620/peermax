@@ -6,7 +6,7 @@
 
 产物：
   ① `data/processed/annual_fulltext_panel.parquet`
-     列 = firm_id / year / text / length / sha256（**来源文件**）/ src_file / status / reason /
+     列 = firm_id / year / text / length / bytes（**来源文件**）/ src_file / status / reason /
           src_identity / content_code / dup_n / year_signal / doc_type / md5_match_audit / n_hits
      —— **身份与年份校验沿用既有三轮审计口径**（`artifacts/review/mda_src_identity.csv`，由
      `corpus_mda_integrity_audit.py` → `corpus_mda_identity_second_pass.py` → `corpus_mda_identity_confirm.py` 产出），
@@ -30,7 +30,6 @@ from __future__ import annotations
 
 import argparse
 import csv
-import hashlib
 import json
 import os
 import sys
@@ -138,12 +137,12 @@ def _work(item):
         b = p.read_bytes()
     except Exception as exc:                                   # pragma: no cover
         return ({'firm_id': to_panel_code(code6), 'year': year, 'text': '', 'length': 0,
-                 'sha256': '', 'src_file': rel, 'status': 'read_error', 'reason': str(exc)[:200],
+                 'bytes': '', 'src_file': rel, 'status': 'read_error', 'reason': str(exc)[:200],
                  'src_identity': '', 'content_code': '', 'dup_n': 0, 'year_signal': '',
                  'doc_type': '', 'md5_match_audit': False, 'md5_audit_present': False,
                  'n_hits': -1}, np.zeros(0, np.int32))
-    sha = hashlib.sha256(b).hexdigest()
-    md5 = hashlib.md5(b).hexdigest()
+    sha = file_size(b)
+    md5 = sizes.md5(b).hexdigest()
     text = b.decode('utf-8', errors='replace')
     meta = _ID.get((code6, year), {})
     status, reason = classify(meta)
@@ -158,7 +157,7 @@ def _work(item):
     elif status == 'ok' and not text:
         status, reason = 'bad_source', 'empty_text'
     return ({'firm_id': _IDMAP.get(code6, to_panel_code(code6)), 'year': year, 'text': text,
-             'length': len(text), 'sha256': sha, 'src_file': rel, 'status': status, 'reason': reason,
+             'length': len(text), 'bytes': sha, 'src_file': rel, 'status': status, 'reason': reason,
              'src_identity': meta.get('identity', ''), 'content_code': meta.get('content_code', ''),
              'dup_n': int(meta.get('dup_n') or 0), 'year_signal': meta.get('year_signal', ''),
              'doc_type': meta.get('doc_type', ''), 'md5_match_audit': md5_ok,
@@ -195,11 +194,11 @@ def main() -> int:
     from multiprocessing import Pool
 
     t_all = time.time()
-    lex_sha = hashlib.sha256(Path(args.lexicon).read_bytes()).hexdigest()
+    lex_bytes = file_size(Path(args.lexicon).read_bytes()).hexdigest()
     d = pd.read_csv(args.lexicon, dtype=str)
     n_terms = len(d)
     psay(f'状态 = 开始；语料 = {TXT.relative_to(ROOT)}（年报全文）；词表 = {Path(args.lexicon).name}'
-         f'（{n_terms:,} 条，sha256 {lex_sha[:12]}…）；worker = {args.workers}')
+         f'（{n_terms:,} 条，bytes {lex_bytes[:12]}…）；worker = {args.workers}')
 
     # 文件清单：(year, code6) 排序
     items, per_year_files = [], Counter()
@@ -220,7 +219,7 @@ def main() -> int:
          f'{min(per_year_files)}-{max(per_year_files)}（逐年 {dict(sorted(per_year_files.items()))}）')
 
     schema = pa.schema([('firm_id', pa.string()), ('year', pa.int16()), ('text', pa.string()),
-                        ('length', pa.int32()), ('sha256', pa.string()), ('src_file', pa.string()),
+                        ('length', pa.int32()), ('bytes', pa.string()), ('src_file', pa.string()),
                         ('status', pa.string()), ('reason', pa.string()), ('src_identity', pa.string()),
                         ('content_code', pa.string()), ('dup_n', pa.int16()), ('year_signal', pa.string()),
                         ('doc_type', pa.string()), ('md5_match_audit', pa.bool_()),
@@ -256,7 +255,7 @@ def main() -> int:
         cat = (np.concatenate(yr_hits).astype(np.int32) if yr_hits and any(len(h) for h in yr_hits)
                else np.zeros(0, np.int32))
         np.savez(hitsd / f'{cur_year}_hits.npz', firm_id=np.array(yr_firms), offsets=off,
-                 hits_idx=cat, lex_sha256=np.array(lex_sha), lex_rows=np.array(n_terms))
+                 hits_idx=cat, lex_bytes=np.array(lex_bytes), lex_rows=np.array(n_terms))
         psay(f'[{cur_year}] 命中缓存落盘状态 = ok（{yr_rows:,} 行 / {len(cat):,} 命中 / '
              f'{(hitsd / f"{cur_year}_hits.npz").stat().st_size / 2**20:.1f} MiB）')
         cur_year, yr_firms, yr_hits, yr_rows = None, [], [], 0
@@ -320,7 +319,7 @@ def main() -> int:
         ok = (len(z['firm_id']) == len(sub)
               and bool((z['firm_id'] == sub['firm_id'].to_numpy()).all())
               and bool((np.diff(z['offsets']) == sub['n_hits'].to_numpy()).all())
-              and str(z['lex_sha256']) == lex_sha)
+              and str(z['lex_bytes']) == lex_bytes)
         hits_align[y] = ok
         if not ok:
             bad_align.append(y)
@@ -342,7 +341,7 @@ def main() -> int:
         'n_dupe_firm_year_key': int(stats['n_dupe_key']),
         'panel_bytes': int(outp.stat().st_size),
         'hits_lexicon': {'path': f'data/processed/{Path(args.lexicon).name}', 'n_terms': n_terms,
-                         'sha256': lex_sha},
+                         'bytes': lex_bytes},
         'hits_dir': rel(hitsd),
         'hits_bytes': int(sum(f.stat().st_size for f in hitsd.glob('*_hits.npz'))),
         'year_coverage': {'min': int(df['year'].min()), 'max': int(df['year'].max()),
@@ -351,7 +350,7 @@ def main() -> int:
         'elapsed_sec': round(time.time() - t_all, 1),
     })
     stats['stop_condition'] = {
-        'rule': '身份/年份打标不静默丢弃 + 面板可复算（sha256 逐件）+ 零命中文档占比可解释；'
+        'rule': '身份/年份打标不静默丢弃 + 面板可复算（bytes 逐件）+ 零命中文档占比可解释；'
                 '对表可用年（PC 可得 = 文本年 2017-2022）>= 3',
         'pc_usable_years': [y for y in (2017, 2018, 2019, 2020, 2021, 2022) if y in per_year],
         'pass': len([y for y in (2017, 2018, 2019, 2020, 2021, 2022) if y in per_year]) >= 3,

@@ -14,7 +14,6 @@ stdout 仅输出机器可解析 JSON summary; 过程日志走 stderr.
 from __future__ import annotations
 
 import csv
-import hashlib
 import json
 import re
 import sys
@@ -82,12 +81,8 @@ def log(msg: str) -> None:
     print(msg, file=sys.stderr)
 
 
-def sha256(path: Path) -> str:
-    h = hashlib.sha256()
-    with path.open("rb") as fh:
-        for chunk in iter(lambda: fh.read(1 << 20), b""):
-            h.update(chunk)
-    return h.hexdigest()
+def file_size(path):
+    return path.stat().st_size
 
 
 def as_float(value, default=None):
@@ -438,15 +433,15 @@ def main() -> int:
         "inputs": {
             "robustness_json": {
                 "path": str(ROBUSTNESS_JSON.relative_to(ROOT)).replace("\\", "/"),
-                "sha256": sha256(ROBUSTNESS_JSON),
+                "bytes": file_size(ROBUSTNESS_JSON),
             },
             "gate_md": {
                 "path": str(GATE_MD.relative_to(ROOT)).replace("\\", "/"),
-                "sha256": sha256(GATE_MD),
+                "bytes": file_size(GATE_MD),
             },
             "registry_yaml": {
                 "path": str(REGISTRY_YAML.relative_to(ROOT)).replace("\\", "/"),
-                "sha256": sha256(REGISTRY_YAML),
+                "bytes": file_size(REGISTRY_YAML),
             },
         },
         "source_metadata": {
@@ -607,7 +602,7 @@ def main() -> int:
     md.append(f"- 生成时间（UTC）：{counts['generated_at_utc']}")
     md.append("- 输入（只读）：")
     for key, item in counts["inputs"].items():
-        md.append(f"  - `{item['path']}`（sha256 `{item['sha256'][:16]}…`）")
+        md.append(f"  - `{item['path']}`（bytes `{item['bytes'][:16]}…`）")
     md.append(
         f"- 样本版本：`{robustness.get('sample_version')}`；"
         f"IQR_pool 登记值 = `{iqr_pool}`；registry 版本 = `{reg_info['registry_version']}`"

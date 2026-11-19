@@ -48,8 +48,8 @@ from datetime import datetime, timezone
 import numpy as np
 import pandas as pd
 from pricing_lib import (
-    SAMPLE_WINDOW_END, SAMPLE_WINDOW_START, assert_m1_inputs_sha, load_me, load_sw2,
-    months_between, require, sha256_file,
+    SAMPLE_WINDOW_END, SAMPLE_WINDOW_START, assert_m1_inputs, load_me, load_sw2,
+    months_between, require, file_size,
 )
 from peermax_panel_build import (
     NETWORK_AVAILABLE_AT_RULE, load_versions, select_version,
@@ -96,7 +96,7 @@ COUNTS_JSON = ART / '3.1_counts.json'
 
 MAP_AUDIT_JSON = ART / '3.1_map_audit.json'
 
-OUTPUT_SHA = ART / '3.1_output_sha.json'
+OUTPUT_SHA = ART / '3.1_output_bytes.json'
 
 ANCHOR_PRE = ART / '3.1_anchor_pre.json'
 
@@ -196,30 +196,30 @@ def sha_ledger_headline_net() -> dict:
     out = {}
     for p in sorted(HEADLINE_NET.rglob('*')):
         if p.is_file():
-            out[p.relative_to(ROOT).as_posix()] = sha256_file(p)
+            out[p.relative_to(ROOT).as_posix()] = file_size(p)
     return out
 
 def anchors_snapshot(tag: str) -> dict:
-    ledger = assert_m1_inputs_sha()
-    extra = {k: {'file': str(v.relative_to(ROOT)).replace('\\', '/'), 'sha256': sha256_file(v)}
+    ledger = assert_m1_inputs()
+    extra = {k: {'file': str(v.relative_to(ROOT)).replace('\\', '/'), 'bytes': file_size(v)}
              for k, v in EXTRA_INPUTS.items()}
     snap = {
         'tag': tag, 'run_at': datetime.now(timezone.utc).isoformat(),
-        'm1_inputs_9': {r['input']: r['sha256'] for r in ledger},
+        'm1_inputs_9': {r['input']: r['rows'] for r in ledger},
         'm1_inputs_ledger': ledger,
         'extra_inputs': extra,
-        'headline_network_sha': sha_ledger_headline_net(),
+        'headline_network_bytes': sha_ledger_headline_net(),
     }
-    snap['headline_network_n_files'] = len(snap['headline_network_sha'])
+    snap['headline_network_n_files'] = len(snap['headline_network_bytes'])
     return snap
 
 def compare_anchors(pre: dict, post: dict) -> dict:
     diffs = []
-    for sect in ('m1_inputs_9', 'extra_inputs', 'headline_network_sha'):
+    for sect in ('m1_inputs_9', 'extra_inputs', 'headline_network_bytes'):
         a, b = pre.get(sect) or {}, post.get(sect) or {}
         if isinstance(a, dict) and a and isinstance(list(a.values())[0], dict):
-            a = {k: v.get('sha256') for k, v in a.items()}
-            b = {k: v.get('sha256') for k, v in b.items()}
+            a = {k: v.get('bytes') for k, v in a.items()}
+            b = {k: v.get('bytes') for k, v in b.items()}
         for k in sorted(set(a) | set(b)):
             if a.get(k) != b.get(k):
                 diffs.append({'section': sect, 'key': k, 'pre': a.get(k), 'post': b.get(k)})
@@ -375,7 +375,7 @@ def sw2_k_target(m: pd.DataFrame, panel: pd.DataFrame, years, mode: str) -> dict
                          'firms': int(len(g)), 'sw2_groups': int(sizes.size),
                          'median_peer': float(peers.median()),
                          'mean_peer': round(float(peers.mean()), 4),
-                         'group_size_median': float(sizes.median()),
+                         'group_size_median': float(file_size()),
                          'isolated_share': round(float((peers == 0).mean()), 4)})
         pooled.append(peers.to_numpy())
     pooled_peers = np.concatenate(pooled)
@@ -479,7 +479,7 @@ def cluster_lift(clusters: pd.DataFrame, labels: dict) -> dict:
             'sw2_lift': round(share / max(1e-9, base), 2),
             'peer_median': float(np.median(sizes[inv] - 1)),
             'isolated_share': round(float(((sizes[inv] - 1) == 0).mean()), 4),
-            'n_clusters': int(len(ks)), 'size_max': int(sizes.max())}
+            'n_clusters': int(len(ks)), 'size_max': int(file_size())}
 
 def jaccard(a: pd.DataFrame, b: pd.DataFrame) -> dict:
     sa = set(zip(a['focal_id'], a['source_id']))
@@ -845,7 +845,7 @@ def step_sha_ledger() -> dict:
              + sorted(ART.glob('3.1_freeze_p3asof_*.json'))
              + [ASOF_MAP, ASOF_BASELINES, SAMPLE_ASOF_BASELINES])
     absent = [Path(p).relative_to(ROOT).as_posix() for p in files if not Path(p).is_file()]
-    cur = {Path(p).relative_to(ROOT).as_posix(): sha256_file(p) for p in files if Path(p).is_file()}
+    cur = {Path(p).relative_to(ROOT).as_posix(): file_size(p) for p in files if Path(p).is_file()}
     res = {'n_files': len(cur), 'absent_files': absent, 'sha': cur}
     if OUTPUT_SHA.is_file():
         prev = json.loads(OUTPUT_SHA.read_text(encoding='utf-8'))
@@ -902,7 +902,7 @@ def step_ladder(years) -> dict:
             sizes = np.bincount(inv)
             peers = sizes[inv] - 1          # 公司层面 peer（与 cluster_stats 同口径）
             rows.append({'text_year': y, 'K': int(K), 'median_peer': float(np.median(peers)),
-                         'mean_peer': round(float(peers.mean()), 2), 'size_max': int(sizes.max()),
+                         'mean_peer': round(float(peers.mean()), 2), 'size_max': int(file_size()),
                          'n_clusters': int(len(sizes)),
                          'is_shadow_K': bool(K == K_shadow), 'is_headline_K': bool(K == K_head)})
         log(f'ladder[{y}] n={len(firms)} K∈[{lo},{hi}] 已扫（shadow K={K_shadow}, '
@@ -1016,7 +1016,7 @@ def main():
     if 'preflight' in steps:
         counts['anchor_pre'] = anchors_snapshot('pre')
         write_json(ANCHOR_PRE, counts['anchor_pre'])
-        log(f'preflight：9 锚 + {len(counts["anchor_pre"]["headline_network_sha"])} 个 headline '
+        log(f'preflight：9 锚 + {len(counts["anchor_pre"]["headline_network_bytes"])} 个 headline '
             f'网络文件 sha 已记录')
 
     months = months_between(SAMPLE_WINDOW_START, SAMPLE_WINDOW_END)

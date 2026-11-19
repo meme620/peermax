@@ -1,4 +1,3 @@
-import hashlib
 import json
 import math
 
@@ -7,7 +6,7 @@ import pytest
 
 from dates import next_month
 from fmt import fmt_float, fmt_int
-from fileio import (atomic_write_text, json_default, sha256_file,
+from fileio import (atomic_write_text, json_default, file_size,
                     write_csv_rows, write_json_atomic)
 from statsutil import nw_ols, nw_t
 
@@ -33,10 +32,10 @@ def test_atomic_write_text_replaces_without_leftover(tmp_path):
     assert sorted(p.name for p in tmp_path.iterdir()) == ['x.txt']
 
 
-def test_sha256_file_matches_hashlib(tmp_path):
+def test_file_size_matches_stat(tmp_path):
     target = tmp_path / 'blob.bin'
     target.write_bytes(b'peer max' * 1000)
-    assert sha256_file(target) == hashlib.sha256(b'peer max' * 1000).hexdigest()
+    assert file_size(target) == target.stat().st_size
 
 
 def test_write_csv_rows_header_and_rows(tmp_path):

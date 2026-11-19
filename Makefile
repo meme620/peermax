@@ -1,6 +1,6 @@
 PY := .venv/bin/python
 
-.PHONY: env doctor imports smoke lint gate selftest status run-all report test
+.PHONY: env doctor imports smoke lint spec gate selftest status run-all report test
 
 env:
 	uv venv --python 3.13 .venv
@@ -15,14 +15,20 @@ imports:
 smoke:
 	$(PY) -m peerlab smoke
 
+spec:
+	$(PY) -m peerlab spec
+
 lint:
 	$(PY) -m peerlab lint
 
 gate:
 	$(PY) -m peerlab gate
 
+contracts:
+	$(PY) -m peerlab data-contracts
+
 selftest:
-	$(PY) -m pytest tests/test_peerlab_*.py tests/test_script_utils.py tests/test_gate_*.py -q
+	$(PY) -m pytest tests/test_peerlab_*.py tests/test_script_utils.py tests/test_gate_*.py tests/test_data_contracts.py -q
 
 status:
 	$(PY) -m peerlab status

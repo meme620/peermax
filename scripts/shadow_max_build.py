@@ -203,12 +203,12 @@ def anchor_snapshot(contracts: dict) -> dict:
         p = ROOT / meta["file"]
         if not p.is_file():
             raise SystemExit(f"[P2.2] headline 锚缺失: {p}")
-        h = sha256_file(p)
+        h = file_size(p)
         snap[key] = {
             "file": meta["file"],
-            "sha256": h,
-            "sha256_registered": meta["sha256"],
-            "sha_match": bool(h == meta["sha256"]),
+            "bytes": h,
+            "bytes_registered": meta["bytes"],
+            "sha_match": bool(h == meta["bytes"]),
             "rows_expected": int(meta["expected_rows"]),
         }
     return snap
@@ -217,7 +217,7 @@ def assert_anchors_unchanged(before: dict, after: dict) -> None:
     for key in before:
         if not before[key]["sha_match"]:
             raise SystemExit(f"[P2.2] 起始锚已不一致: {key}")
-        if before[key]["sha256"] != after[key]["sha256"]:
+        if before[key]["bytes"] != after[key]["bytes"]:
             raise SystemExit(f"[P2.2] headline 锚在运行中变化: {key}")
 
 def protected_paths(contracts: dict) -> set[Path]:
@@ -984,7 +984,7 @@ def main(argv=None) -> int:
         raise SystemExit(f"[P2.2] source 行数 {len(source)} != {args.expected_rows}")
     if source.duplicated(["source_id", "month"]).any():
         raise SystemExit("[P2.2] source 键 (source_id, month) 不唯一")
-    src_sha_before = sha256_file(src_p)
+    src_sha_before = file_size(src_p)
     if src_sha_before != EXPECTED_SOURCE_SHA:
         raise SystemExit(
             f"[P2.2] headline source panel sha 与登记不一致: {src_sha_before}")
@@ -1015,7 +1015,7 @@ def main(argv=None) -> int:
           f"pre-2014 {verification['rows_pre_2014_passthrough']:,}", flush=True)
 
     write_shadow_csv(out, list(source.columns), out_p)
-    out_sha = sha256_file(out_p)
+    out_bytes = file_size(out_p)
 
     # ---- 窗口计数
     w_cal = _window(out[out["shadow_status"].eq("evaluable")], WINDOW_CAL)
@@ -1042,7 +1042,7 @@ def main(argv=None) -> int:
 
     anchors_after = anchor_snapshot(contracts)
     assert_anchors_unchanged(anchors_before, anchors_after)
-    src_sha_after = sha256_file(src_p)
+    src_sha_after = file_size(src_p)
     if src_sha_after != src_sha_before:
         raise SystemExit("[P2.2] headline source panel 在运行中变化")
 
@@ -1096,18 +1096,18 @@ def main(argv=None) -> int:
         "p2shadow_version": P2SHADOW_VERSION,
         "generated_at_utc": pd.Timestamp.utcnow().isoformat(),
         "script": str(Path(__file__).resolve().relative_to(ROOT)).replace("\\", "/"),
-        "script_sha256": sha256_file(Path(__file__).resolve()),
+        "script_bytes": file_size(Path(__file__).resolve()),
         "shadow_file": {
             "file": str(out_p.relative_to(ROOT)).replace("\\", "/"),
-            "sha256": out_sha,
+            "bytes": out_bytes,
             "rows": int(len(out)),
             "columns": list(source.columns) + NEW_COLS,
         },
         "inputs": {
             "source_month_argmax_panel": {
                 "file": str(src_p.relative_to(ROOT)).replace("\\", "/"),
-                "sha256_before": src_sha_before,
-                "sha256_after": src_sha_after,
+                "bytes_before": src_sha_before,
+                "bytes_after": src_sha_after,
                 "rows": int(len(source)),
                 "read_only": True,
             },
@@ -1116,23 +1116,23 @@ def main(argv=None) -> int:
                 "years": [args.start_year, args.end_year],
                 "files": [
                     {"file": str(p.relative_to(ROOT)).replace("\\", "/"),
-                     "sha256": sha256_file(p)}
+                     "bytes": file_size(p)}
                     for p in sorted(panel_dir.glob("*.csv"))
                     if args.start_year <= int(p.stem) <= args.end_year
                 ],
             },
             "stock_suspend_flag": {
                 "file": str(susp_p.relative_to(ROOT)).replace("\\", "/"),
-                "sha256": sha256_file(susp_p) if susp_p.is_file() else None,
+                "bytes": file_size(susp_p) if susp_p.is_file() else None,
             },
             "daily_limit_up_flag": {
                 "file": str(up_p.relative_to(ROOT)).replace("\\", "/"),
-                "sha256": sha256_file(up_p) if up_p.is_file() else None,
+                "bytes": file_size(up_p) if up_p.is_file() else None,
                 "available": bool(limit_available),
             },
             "daily_limit_down_flag": {
                 "file": str(down_p.relative_to(ROOT)).replace("\\", "/"),
-                "sha256": sha256_file(down_p) if down_p.is_file() else None,
+                "bytes": file_size(down_p) if down_p.is_file() else None,
                 "available": bool(limit_available),
             },
             "monthly_returns_clean_v2": {
@@ -1169,18 +1169,18 @@ def main(argv=None) -> int:
             "resume_audit": {
                 "file": str(resume_p.relative_to(ROOT)).replace("\\", "/"),
                 "rows": int(len(resume_audit)),
-                "sha256": sha256_file(resume_p),
+                "bytes": file_size(resume_p),
             },
             "max_tail_diff": {
                 "file": str(tail_p.relative_to(ROOT)).replace("\\", "/"),
                 "rows": int(len(tail)),
-                "sha256": sha256_file(tail_p),
+                "bytes": file_size(tail_p),
             },
         },
         "headline_anchors_before": anchors_before,
         "headline_anchors_after": anchors_after,
         "headline_anchors_match": all(
-            anchors_before[k]["sha256"] == anchors_after[k]["sha256"]
+            anchors_before[k]["bytes"] == anchors_after[k]["bytes"]
             for k in anchors_before),
         "headline_source_panel_sha_match_registered": bool(
             src_sha_after == EXPECTED_SOURCE_SHA),
@@ -1193,7 +1193,7 @@ def main(argv=None) -> int:
         "p2shadow_version": P2SHADOW_VERSION,
         "generated_at_utc": counts["generated_at_utc"],
         "script": counts["script"],
-        "script_sha256": counts["script_sha256"],
+        "script_bytes": counts["script_bytes"],
         "inputs": counts["inputs"],
         "output": counts["shadow_file"],
         "rows_total": int(len(out)),
@@ -1224,11 +1224,11 @@ def main(argv=None) -> int:
     write_json_atomic(meta, meta_p)
     counts["meta_file"] = {
         "file": str(meta_p.relative_to(ROOT)).replace("\\", "/"),
-        "sha256": sha256_file(meta_p),
+        "bytes": file_size(meta_p),
     }
     write_json_atomic(counts, counts_p)
 
-    print(f"[P2.2] shadow -> {out_p.relative_to(ROOT)}  rows={len(out):,}  sha={out_sha[:12]}…")
+    print(f"[P2.2] shadow -> {out_p.relative_to(ROOT)}  rows={len(out):,}  sha={out_bytes[:12]}…")
     print(f"[P2.2] resume 2014–2025={len(resume):,}; "
           f"calendar 2015–2023 argmax_resume={cal_counts['argmax_resume']:,} "
           f"max_changed={cal_counts['max_changed']:,} "

@@ -8,9 +8,9 @@
 
   A. 面板往返（parquet 逐字）：抽 200 篇/年（seed 固定）——**status 感知判据**（v2，2026-10-19 判据修订）：
      `status=='ok'` 的行要求 `text` 与磁盘源文件 `.txt` 解码结果**逐字符相等**、`length` = 字符数、
-     `sha256` = 源文件 sha256 复算一致（三重）；`status!='ok'` 的行（bad_source / suspect_source）
+     `bytes` = 源文件 bytes 复算一致（三重）；`status!='ok'` 的行（bad_source / suspect_source）
      要求 `text==''` 且 `length==0`（**既有置空规则**：`network_business_fulltext_panel_build._work` 对非 ok 行
-     text 置空，承袭 `text_mda_extract` 的 bad_source 置空）+ `sha256` = 源文件字节哈希。
+     text 置空，承袭 `text_mda_extract` 的 bad_source 置空）+ `bytes` = 源文件字节哈希。
      修订原因（R1 定性，见 `artifacts/tmp/fulltext_corr_progress.md` [FT-3a/R1]）：首跑 6 年 FAIL 的
      15 行**全部**为 `status!='ok'` 行，其源文件**非空**（295 KB–851 KB），面板 text 空是**设计性置空**
      而非漂移；原判据（对所有抽检行要求 text 逐字相等）把设计性置空误判为失败。**冻结值零改动**。
@@ -36,7 +36,6 @@ v2（2026-10-19，断点续跑加固；**判据仅 A 段按上述 status 感知�
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import sys
 import time
@@ -77,7 +76,7 @@ def main() -> int:
     ap.add_argument('--lexicon', default=str(PB.LEXICON))
     ap.add_argument('--force', action='store_true', help='忽略 live_hits 既有缓存，全部现场重算')
     ap.add_argument('--rows-check', action='store_true',
-                    help='追加 D 段：对 B 段清单（2017-2022 全部 ok + 2023-2025 各 500）现场重算**文本/长度/sha256/status** '
+                    help='追加 D 段：对 B 段清单（2017-2022 全部 ok + 2023-2025 各 500）现场重算**文本/长度/bytes/status** '
                          '并与面板逐行对账（空源行单列）')
     args = ap.parse_args()
     from multiprocessing import Pool
@@ -88,12 +87,12 @@ def main() -> int:
     keep_path = CORPORA['ma_fulltext']['lexicon']          # 全文语料词表（df 0.25）
     psay(f'状态 = 开始；核验对象 = {PANEL.name} + {HITS_DIR.name}/ ；worker = {args.workers}')
 
-    pan = pd.read_parquet(PANEL, columns=['firm_id', 'year', 'status', 'length', 'sha256', 'src_file'])
+    pan = pd.read_parquet(PANEL, columns=['firm_id', 'year', 'status', 'length', 'bytes', 'src_file'])
     out = {'artifact': 's3_ma_fulltext_cache_verification', 'run_at': datetime.now(timezone.utc).isoformat(),
            'purpose': 'F3 前置：命中缓存与面板的独立核验（缓存 == 现场重算）',
            'script_version': 'v2 (2026-10-19)',
-           'criterion_A': 'status 感知（v2 修订）：status==ok 行 text/length/sha256 三重逐字节；'
-                          "status!=ok 行 text=='' 且 length==0（既有置空规则）+ sha256 = 源文件字节哈希",
+           'criterion_A': 'status 感知（v2 修订）：status==ok 行 text/length/bytes 三重逐字节；'
+                          "status!=ok 行 text=='' 且 length==0（既有置空规则）+ bytes = 源文件字节哈希",
            'criterion_A_revision_reason': '首跑 6 年 FAIL 的 15 行全部为 status!=ok 行，源文件非空'
                                           '（295 KB–851 KB），面板 text 空为设计性置空而非漂移 → '
                                           '原判据把设计性置空误判为失败；冻结值零改动'
@@ -105,7 +104,7 @@ def main() -> int:
            'n_sample_per_year': N_SAMPLE, 'n_roundtrip_per_year': N_ROUNDTRIP_PER_YEAR,
            'A_panel_roundtrip': {}, 'B_hits_cache_vs_live': {}, 'C_vectors_bitwise_equal': {}}
 
-    # ---------------- A. 面板往返（status 感知：ok 行 text/length/sha256 三重；非 ok 行置空规则 + sha256）----------------
+    # ---------------- A. 面板往返（status 感知：ok 行 text/length/bytes 三重；非 ok 行置空规则 + bytes）----------------
     rng = np.random.default_rng(SEED)
     bad = []
     n_checked = 0
@@ -118,41 +117,41 @@ def main() -> int:
                              filters=[('year', '==', y)]).to_pandas()
         assert len(suby) == len(sub) and bool((suby['src_file'] == sub['src_file']).all()), \
             f'{y}: 按年读入行序与面板不一致'
-        n_ok = ok_txt = ok_len = ok_sha = 0
-        n_flag = flag_blank = flag_len0 = flag_sha = 0
+        n_ok = ok_txt = ok_len = ok_bytes = 0
+        n_flag = flag_blank = flag_len0 = flag_bytes = 0
         for i in pick:
             r = sub.iloc[i]
             r_text = suby['text'].iloc[i]
             r_text = '' if not isinstance(r_text, str) else r_text
             b = (PB.TXT / Path(r['src_file']).parent.name / f"{y}.txt").read_bytes()
             t = b.decode('utf-8', errors='replace')
-            sha_ok = hashlib.sha256(b).hexdigest() == r['sha256']
+            sha_ok = file_size(b) == r['bytes']
             if r['status'] == 'ok':                       # 有文本的行 → 逐字节一致（三重）
                 n_ok += 1
                 ok_txt += int(t == r_text)
                 ok_len += int(len(t) == int(r['length']))
-                ok_sha += int(sha_ok)
+                ok_bytes += int(sha_ok)
             else:                                         # 非 ok 行 → 置空规则 + 源字节哈希
                 n_flag += 1
                 flag_blank += int(r_text == '')
                 flag_len0 += int(int(r['length']) == 0)
-                flag_sha += int(sha_ok)
+                flag_bytes += int(sha_ok)
             if not sha_ok:
                 bad.append({'year': y, 'src_file': r['src_file'], 'status': r['status'],
-                            'sha256_db': r['sha256']})
+                            'bytes_db': r['bytes']})
             n_checked += 1
-        y_ok = (ok_txt == n_ok and ok_len == n_ok and ok_sha == n_ok
-                and flag_blank == n_flag and flag_len0 == n_flag and flag_sha == n_flag)
+        y_ok = (ok_txt == n_ok and ok_len == n_ok and ok_bytes == n_ok
+                and flag_blank == n_flag and flag_len0 == n_flag and flag_bytes == n_flag)
         out['A_panel_roundtrip'][str(y)] = {'n_checked': int(len(pick)), 'n_ok_rows': n_ok,
                                            'n_flagged_rows': n_flag,
                                            'ok_text_equal': ok_txt, 'ok_length_equal': ok_len,
-                                           'ok_sha256_equal': ok_sha,
+                                           'ok_bytes_equal': ok_bytes,
                                            'flagged_text_blank': flag_blank,
                                            'flagged_length_zero': flag_len0,
-                                           'flagged_sha256_equal': flag_sha}
+                                           'flagged_bytes_equal': flag_bytes}
         psay(f'[A/{y}] 面板往返状态 = {"ok" if y_ok else "FAIL"}'
-             f'（抽检 {len(pick)} 篇：ok 行 {n_ok} 三重 text {ok_txt}/length {ok_len}/sha256 {ok_sha}；'
-             f'非 ok 行 {n_flag} 置空 {flag_blank}/零长 {flag_len0}/sha256 {flag_sha}）')
+             f'（抽检 {len(pick)} 篇：ok 行 {n_ok} 三重 text {ok_txt}/length {ok_len}/bytes {ok_bytes}；'
+             f'非 ok 行 {n_flag} 置空 {flag_blank}/零长 {flag_len0}/bytes {flag_bytes}）')
     out['A_panel_roundtrip_bad'] = bad
     out['A_n_checked_total'] = n_checked
 
@@ -207,7 +206,7 @@ def main() -> int:
                 np.savez(TMP_LIVE / f'{y}_hits.npz',
                          firm_id=np.array(rows['firm_id'].to_numpy(), dtype=str),
                          offsets=off, hits_idx=cat, verified=ver,
-                         lex_sha256=np.array(str(z['lex_sha256'])), lex_rows=z['lex_rows'])
+                         lex_bytes=np.array(str(z['lex_bytes'])), lex_rows=z['lex_rows'])
                 psay(f'[B/{y}] 现场重算状态 = ok：重算 {int(ver.sum()):,} 篇'
                      f'（缓存填充 {n - int(ver.sum()):,} 行），落盘 {y}_hits.npz（{time.time() - t0:.0f}s）')
 
@@ -276,7 +275,7 @@ def main() -> int:
     finally:
         spec['hits_dir'] = orig_hits_dir
 
-    # ---------------- D. 同源重算的 text/length/sha256/status 与面板逐行对账（--rows-check；空源行单列）----------------
+    # ---------------- D. 同源重算的 text/length/bytes/status 与面板逐行对账（--rows-check；空源行单列）----------------
     okD = None
     if args.rows_check:
         items_rows = []
@@ -314,7 +313,7 @@ def main() -> int:
             c['n'] += 1
             t_ok = (row['text'] == pt)
             l_ok = int(row['length']) == int(r['length'])
-            s_ok = row['sha256'] == r['sha256']
+            s_ok = row['bytes'] == r['bytes']
             st_ok = row['status'] == r['status']
             c['text_eq'] += int(t_ok); c['len_eq'] += int(l_ok); c['sha_eq'] += int(s_ok)
             c['status_eq'] += int(st_ok)
@@ -336,14 +335,14 @@ def main() -> int:
                   and v['status_eq'] == v['n'] for v in per_year_rows.values()) and not mism
         for y, v in sorted(per_year_rows.items()):
             psay(f'[D/{y}] 行级对账状态 = {"ok" if (v["text_eq"] == v["len_eq"] == v["sha_eq"] == v["status_eq"] == v["n"]) else "FAIL"}'
-                 f'（{v["n"]:,} 篇：text {v["text_eq"]} / length {v["len_eq"]} / sha256 {v["sha_eq"]} / status {v["status_eq"]}；'
+                 f'（{v["n"]:,} 篇：text {v["text_eq"]} / length {v["len_eq"]} / bytes {v["sha_eq"]} / status {v["status_eq"]}；'
                  f'空源行 {v["src_empty"]}）')
 
     okA = (not bad) and all(
         v['ok_text_equal'] == v['n_ok_rows'] and v['ok_length_equal'] == v['n_ok_rows']
-        and v['ok_sha256_equal'] == v['n_ok_rows']
+        and v['ok_bytes_equal'] == v['n_ok_rows']
         and v['flagged_text_blank'] == v['n_flagged_rows'] and v['flagged_length_zero'] == v['n_flagged_rows']
-        and v['flagged_sha256_equal'] == v['n_flagged_rows']
+        and v['flagged_bytes_equal'] == v['n_flagged_rows']
         for v in out['A_panel_roundtrip'].values())
     okB = all(v['n_mismatch'] == 0 and v['n_verified'] == v['n_verified'] and v['n_skipped'] == 0
               for v in out['B_hits_cache_vs_live'].values())
@@ -357,7 +356,7 @@ def main() -> int:
     REPORT.parent.mkdir(parents=True, exist_ok=True)
     REPORT.write_text(json.dumps(out, ensure_ascii=False, indent=1), encoding='utf-8')
     psay(f'状态 = {out["status"]}：A 面板往返 {okA} / B 命中缓存 {okB} / C 向量逐比特 {okC} / '
-         f'D 行级 text·length·sha256·status 对账 {okD}；'
+         f'D 行级 text·length·bytes·status 对账 {okD}；'
          f'报告 {REPORT.name}（{out["elapsed_sec"]}s）')
     print(json.dumps(out['verdict'], ensure_ascii=False))
     return 0 if out['status'] == 'PASS' else 1

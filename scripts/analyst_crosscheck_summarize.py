@@ -16,14 +16,13 @@ import csv
 import json
 import sys
 from datetime import datetime, timezone
-from hashlib import sha256
 from pathlib import Path
 
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = ROOT / 'configs/s3a_final_spec.yaml'
-SPEC_HASH = sha256(SPEC.read_bytes()).hexdigest()
+SPEC_HASH = file_size(SPEC.read_bytes()).hexdigest()
 DIAG = ROOT / 'data/processed/analyst/analyst_network_diagnostics.json'
 B_JSON = ROOT / 'artifacts/s3a_crosscheck_B.json'
 C_JSON = ROOT / 'artifacts/s3a_crosscheck_C.json'

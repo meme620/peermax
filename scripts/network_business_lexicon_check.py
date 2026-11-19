@@ -6,7 +6,6 @@ R3 对抗：编码/全半角/空白/大小写/嵌套包含/ASCII 词/空文本 �
 
 产物：reports/data_gates/G0/s3_ma_lexicon_check.json
 """
-import hashlib
 import json
 import sys
 import time
@@ -36,9 +35,9 @@ def main():
     rep = {'run_at': datetime.now(timezone.utc).isoformat()}
     terms, meta = load_lexicon()
     rep['lexicon'] = meta
-    rep['lexicon']['sha256'] = hashlib.sha256(LEXICON.read_bytes()).hexdigest()
+    rep['lexicon']['bytes'] = file_size(LEXICON.read_bytes()).hexdigest()
     rep['lexicon']['max_len'] = max(len(t) for t in terms)
-    print(f"lexicon: {len(terms)} terms, max_len={rep['lexicon']['max_len']}, sha256={rep['lexicon']['sha256'][:16]}…")
+    print(f"lexicon: {len(terms)} terms, max_len={rep['lexicon']['max_len']}, bytes={rep['lexicon']['bytes'][:16]}…")
 
     d = pd.read_csv(CORPUS, usecols=['code', 'year', 'text', 'status'])
     d = d[d['status'] == 'ok']

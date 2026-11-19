@@ -9,7 +9,7 @@
 
 产物：
     data/raw/sw2/StockClassifyUse_stock.xls
-    data/raw/sw2/fetch_meta.json   （url/http/bytes/sha256/fetched_at + 解析诊断）
+    data/raw/sw2/fetch_meta.json   （url/http/bytes/bytes/fetched_at + 解析诊断）
 
 纪律：
     - 原子落盘（.part → rename），失败不清空既有文件
@@ -17,7 +17,6 @@
     - 只下载不加工：解析产物另由 s3_* 脚本负责
 """
 import argparse
-import hashlib
 import json
 import sys
 import time
@@ -48,7 +47,7 @@ def download() -> dict:
     part = XLS.with_suffix('.xls.part')
     part.write_bytes(blob)
     part.replace(XLS)
-    sha = hashlib.sha256(blob).hexdigest()
+    sha = file_size(blob)
     rec = {
         'source_name': '申万宏源证券研究所 SwClass2021 股票行业分类',
         'url': URL,
@@ -56,13 +55,13 @@ def download() -> dict:
         'http_status': status,
         'content_type': ctype,
         'bytes': len(blob),
-        'sha256': sha,
+        'bytes': sha,
         'magic': blob[:8].hex(),
         'fetched_at': datetime.now(timezone.utc).isoformat(),
         'elapsed_sec': round(time.time() - t0, 2),
         'local_path': str(XLS.relative_to(ROOT)).replace('\\', '/'),
     }
-    print(f"downloaded {len(blob)} bytes -> {XLS} (sha256 {sha[:16]}…)")
+    print(f"downloaded {len(blob)} bytes -> {XLS} (bytes {sha[:16]}…)")
     return rec
 
 
@@ -121,7 +120,7 @@ def main():
             'url': URL,
             'local_path': str(XLS.relative_to(ROOT)).replace('\\', '/'),
             'bytes': len(blob),
-            'sha256': hashlib.sha256(blob).hexdigest(),
+            'bytes': file_size(blob),
             'note': 'meta 由 --inspect 路径补写（未重新下载）',
         }
     meta['parse_diagnostics'] = diag

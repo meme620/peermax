@@ -13,7 +13,9 @@ from collections import defaultdict
 
 RET = os.path.join(os.path.dirname(__file__), "..", "data", "processed", "daily_returns_clean")
 OUT = os.path.join(os.path.dirname(__file__), "..", "data", "processed")
-MIN_DAYS = 15  # min_valid_trade_days 候选
+from pricing_lib import param_value
+
+MIN_DAYS = int(param_value('min_valid_days'))  # complete_month 门槛（registry 唯一来源）
 
 os.makedirs(OUT, exist_ok=True)
 

@@ -32,7 +32,16 @@ def _latest_net_ver():
     return sorted(vers, key=lambda v: int(v.rsplit('v', 1)[1]))[-1]
 
 
-NET_VER = _latest_net_ver()
+# 2026-11-19：收集期不再解析版本号——缺边表时只让依赖它的用例失败，
+# 不允许一个 AssertionError 打断整个 pytest 会话（641 个用例无法收集）。
+NET_VER = None
+
+
+def _net_ver():
+    global NET_VER
+    if NET_VER is None:
+        NET_VER = _latest_net_ver()
+    return NET_VER
 SPOT_MONTHS = None  # 由 test_edges_contracts 从该版本边表月份取首/中/末
 
 # ---------------- 0. manifest 无重复键（R12 防复发守卫） ----------------
@@ -75,27 +84,27 @@ def test_coverage_unique_key_and_version():
     cov = pd.read_csv(ANALYST / 'firm_analyst_coverage.csv', dtype=str)
     dup = cov.duplicated(['coverage_window_version', 'network_cutoff', 'firm_id', 'analyst_id']).sum()
     assert dup == 0, f"覆盖表唯一键重复 {dup}"
-    assert set(cov['coverage_window_version']) == {NET_VER}, "覆盖表版本与 edges 最新版本不一致"
+    assert set(cov['coverage_window_version']) == {_net_ver()}, "覆盖表版本与 edges 最新版本不一致"
     n = cov['network_cutoff'].nunique()
     assert n >= 1, "覆盖表无 cutoff"
     # 边表文件数必须等于覆盖表 cutoff 数（交付完整性：每月一张边表）
-    n_edge_files = len(list((ANALYST / 'edges').glob(f'edges_{NET_VER}_*.csv')))
+    n_edge_files = len(list((ANALYST / 'edges').glob(f'edges_{_net_ver()}_*.csv')))
     assert n_edge_files == n, f"边表文件数 {n_edge_files} ≠ 覆盖表 cutoff 数 {n}"
 
 
 # ---------------- 2. 边表契约（抽查 3 个月） ----------------
 
 def test_edges_contracts():
-    files = sorted((ANALYST / 'edges').glob(f'edges_{NET_VER}_*.csv'))
-    assert files, f"未发现 {NET_VER} 边表"
+    files = sorted((ANALYST / 'edges').glob(f'edges_{_net_ver()}_*.csv'))
+    assert files, f"未发现 {_net_ver()} 边表"
     picks = [files[0], files[len(files) // 2], files[-1]]
     for path in picks:
-        c = path.stem.replace(f'edges_{NET_VER}_', '')
+        c = path.stem.replace(f'edges_{_net_ver()}_', '')
         df = pd.read_csv(path, dtype=str)
         dup = df.duplicated(['network_use_case', 'network_version', 'focal_id', 'source_id']).sum()
         assert dup == 0, f"{c} 唯一键重复 {dup}"
         assert (df['focal_id'] != df['source_id']).all(), f"{c} 存在自环"
-        assert (df['network_version'] == NET_VER).all(), f"{c} network_version 列错误"
+        assert (df['network_version'] == _net_ver()).all(), f"{c} network_version 列错误"
         assert 'link_strength' in df.columns, f"{c} 缺 link_strength 列（规划 Step 7 / data_gates 合同要求）"
         assert (df['link_strength'].astype(int) == df['common_analyst_count'].astype(int)).all(), \
             f"{c} link_strength 应等于 common_analyst_count"
@@ -131,7 +140,7 @@ def test_derived_unique_key_and_version():
     d = pd.read_csv(ANALYST / 'firm_analyst_derived.csv', dtype=str)
     dup = d.duplicated(['firm_id', 'month']).sum()
     assert dup == 0, f"派生变量唯一键重复 {dup}"
-    assert set(d['network_version']) == {NET_VER}, "派生变量 network_version 与当前交付版本不一致"
+    assert set(d['network_version']) == {_net_ver()}, "派生变量 network_version 与当前交付版本不一致"
     cov = pd.read_csv(ANALYST / 'firm_analyst_coverage.csv', usecols=['network_cutoff'], dtype=str)
     assert d['month'].nunique() == cov['network_cutoff'].nunique(), "派生变量月数与覆盖表 cutoff 数不一致"
 

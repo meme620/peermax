@@ -22,7 +22,7 @@
 只读边界：
   - 输入只有 data/processed/m1_common_sample_ma_teacher_v2.parquet（只读）与 pricing_lib；
   - 不重跑 M1 / PC / 网络，不写 configs / G0 / reports；
-  - 9 个 M1 主输入 sha256 在运行前后各校验一次（前后必须一致）。
+  - 9 个 M1 主输入 bytes 在运行前后各校验一次（前后必须一致）。
 
 产物（仅 artifacts/phase3b/3b_s2_*）：
   3b_s2_weight_matrix.csv
@@ -41,8 +41,8 @@ import numpy as np
 import pandas as pd
 
 from pricing_lib import (
-    ROOT, assert_m1_contract, assert_m1_inputs_sha, fm_regression, param_value,
-    require, sha256_file, winsorize_bounds_by_month, write_json,
+    ROOT, assert_m1_contract, assert_m1_inputs, fm_regression, param_value,
+    require, file_size, winsorize_bounds_by_month, write_json,
 )
 
 SAMPLE = ROOT / 'data/processed/m1_common_sample_ma_teacher_v2.parquet'
@@ -186,9 +186,9 @@ def build_md(meta: dict, rows: list, verdict: dict) -> str:
     lines.append('')
     lines.append(f"- 生成时间（UTC）：{meta['created_at_utc']}")
     lines.append(f"- 脚本：`scripts/shadow_weight_matrix.py`"
-                 f"（sha256 `{meta['script_sha256'][:16]}…`）")
+                 f"（bytes `{meta['script_bytes'][:16]}…`）")
     lines.append(f"- 样本：`data/processed/m1_common_sample_ma_teacher_v2.parquet`"
-                 f"（sha256 `{meta['sample_sha256'][:16]}…`）")
+                 f"（bytes `{meta['sample_bytes'][:16]}…`）")
     lines.append(f"- FM 样本：{meta['fm_rows']:,} 行 / {meta['fm_months']} 月；"
                  f"规格 S1（PeerMAX + OwnMAX + PeerReturn + 8 controls），"
                  f"min_n={meta['min_n']}，NW lag={meta['nw_lag']}")
@@ -197,14 +197,14 @@ def build_md(meta: dict, rows: list, verdict: dict) -> str:
     lines.append('')
     lines.append('## 1. 输入锚（9 个 M1 主输入，运行前后各一次）')
     lines.append('')
-    lines.append('| 输入 | sha256（前=后） | before | after |')
+    lines.append('| 输入 | bytes（前=后） | before | after |')
     lines.append('| --- | --- | --- | --- |')
     for b, a in zip(meta['input_sha_before'], meta['input_sha_after']):
-        lines.append(f"| {b['input']} | `{b['sha256'][:16]}…` | "
+        lines.append(f"| {b['input']} | `{b['bytes'][:16]}…` | "
                      f"{'MATCH' if b['match'] else 'FAIL'} | "
                      f"{'MATCH' if a['match'] else 'FAIL'} |")
     lines.append('')
-    lines.append(f"结论：9/9 输入前后 sha256 一致 = "
+    lines.append(f"结论：9/9 输入前后 bytes 一致 = "
                  f"**{str(meta['input_sha_unchanged']).lower()}**；"
                  f"运行未改动任何登记输入。")
     lines.append('')
@@ -312,7 +312,7 @@ def main() -> None:
     created = datetime.now(timezone.utc).isoformat(timespec='seconds')
 
     print('[S2] 校验 9 个 M1 主输入（运行前）…', flush=True)
-    sha_before = assert_m1_inputs_sha()
+    sha_before = assert_m1_inputs()
     require(all(x['match'] for x in sha_before), '运行前输入锚存在失败项')
 
     print(f'[S2] 读取样本 {SAMPLE.name} …', flush=True)
@@ -477,21 +477,21 @@ def main() -> None:
 
     # ---- 运行后输入锚
     print('[S2] 校验 9 个 M1 主输入（运行后）…', flush=True)
-    sha_after = assert_m1_inputs_sha()
-    unchanged = all(b['sha256'] == a['sha256'] for b, a in zip(sha_before, sha_after))
-    require(unchanged, '运行前后输入 sha256 发生变化')
+    sha_after = assert_m1_inputs()
+    unchanged = all(b['bytes'] == a['bytes'] for b, a in zip(sha_before, sha_after))
+    require(unchanged, '运行前后输入 bytes 发生变化')
     require(all(a['match'] for a in sha_after), '运行后输入锚存在失败项')
 
     script_path = Path(__file__).resolve()
-    sample_sha = sha256_file(SAMPLE)
+    sample_bytes = file_size(SAMPLE)
     meta = {
         'created_at_utc': created,
         'agent': 'B3 (S-2)',
         'purpose': 'VW 权重函数敏感性矩阵：六种 firm-level WLS 权重下 S1 PeerMAX/OwnMAX/PeerReturn',
         'script_path': str(script_path.relative_to(ROOT)).replace('\\', '/'),
-        'script_sha256': sha256_file(script_path),
+        'script_bytes': file_size(script_path),
         'sample_path': str(SAMPLE.relative_to(ROOT)).replace('\\', '/'),
-        'sample_sha256': sample_sha,
+        'sample_bytes': sample_bytes,
         'fm_rows': int(len(fm)),
         'fm_months': int(fm['month'].nunique()),
         'fm_window': [str(fm['month'].min()), str(fm['month'].max())],

@@ -12,7 +12,6 @@
 import json
 import sys
 from datetime import datetime, timezone
-from hashlib import sha256
 from pathlib import Path
 
 import pandas as pd
@@ -20,7 +19,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = ROOT / 'configs/s3a_final_spec.yaml'
-SPEC_HASH = sha256(SPEC.read_bytes()).hexdigest()
+SPEC_HASH = file_size(SPEC.read_bytes()).hexdigest()
 
 RUNNER_STEPS = ['analyst_forecast_ingest.py', 'analyst_ingest_audit.py', 'analyst_forecast_clean.py',
                 'analyst_coverage_dedup.py', 'analyst_coverage_snapshot.py', 'analyst_edges_build.py',

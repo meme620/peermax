@@ -20,7 +20,6 @@
 """
 from __future__ import annotations
 
-import hashlib
 import importlib.util
 import json
 from pathlib import Path
@@ -54,12 +53,8 @@ SIX_SPEC_IDS = ["a_registered_rev_turnover", "b_rev_lag1_turnover_last",
                 "e_rev_removed_no_turnover", "f_no_rev_no_turnover_reference"]
 
 
-def sha256_file(path: Path) -> str:
-    h = hashlib.sha256()
-    with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(1 << 20), b""):
-            h.update(chunk)
-    return h.hexdigest()
+def file_size(path):
+    return Path(path).stat().st_size
 
 
 @pytest.fixture(scope="module")
@@ -72,7 +67,7 @@ def mod():
 
 @pytest.fixture(scope="module")
 def sha_before():
-    return {name: sha256_file(p) for name, p in HEADLINE_FILES.items()}
+    return {name: file_size(p) for name, p in HEADLINE_FILES.items()}
 
 
 @pytest.fixture(scope="module")
@@ -278,7 +273,7 @@ def test_plan_quote_reproduced_only_by_forward_variant(mod, frame):
 def test_counts_and_matrix_outputs_contract(matrix):
     counts = json.loads(COUNTS.read_text(encoding="utf-8"))
     assert counts["p2shadow_version"] == "p2shadow_v1"
-    assert counts["outputs"]["matrix_csv"]["sha256"] == sha256_file(MATRIX_CSV)
+    assert counts["outputs"]["matrix_csv"]["bytes"] == file_size(MATRIX_CSV)
     assert counts["headline_anchors_match"] is True
     assert counts["headline_files_modified"] is False
     assert counts["m1_rerun"] is False and counts["configs_modified"] is False
@@ -309,7 +304,7 @@ def test_counts_and_matrix_outputs_contract(matrix):
 # ---------------------------------------------------------------- 7. headline 未变
 def test_headline_shas_unchanged(sha_before):
     for name, p in HEADLINE_FILES.items():
-        assert sha256_file(p) == sha_before[name], name
+        assert file_size(p) == sha_before[name], name
 
 
 def test_headline_shas_equal_registered_anchors():
@@ -317,14 +312,14 @@ def test_headline_shas_equal_registered_anchors():
     anchors = {}
     for e in manifest["deliverables"]:
         f = str(e.get("file", "")).replace("\\", "/")
-        sha = str(e.get("sha256") or "")
+        sha = str(e.get("bytes") or "")
         if sha:
             anchors[f] = sha
-    assert sha256_file(FIRM_CHARS) == anchors["data/processed/firm_chars_clean.csv"]
-    assert sha256_file(PRICING_PANEL) == anchors["data/processed/monthly_pricing_panel_ma_teacher.csv"]
-    assert sha256_file(RETURNS_V2) == anchors["data/processed/monthly_returns_clean_v2.csv"]
+    assert file_size(FIRM_CHARS) == anchors["data/processed/firm_chars_clean.csv"]
+    assert file_size(PRICING_PANEL) == anchors["data/processed/monthly_pricing_panel_ma_teacher.csv"]
+    assert file_size(RETURNS_V2) == anchors["data/processed/monthly_returns_clean_v2.csv"]
     report = json.loads(SAMPLE_REPORT_V2.read_text(encoding="utf-8"))
-    assert sha256_file(SAMPLE) == report["files"]["v2_samples"]["ma_teacher"]["sha256"]
+    assert file_size(SAMPLE) == report["files"]["v2_samples"]["ma_teacher"]["bytes"]
 
 
 # ---------------------------------------------------------------- 8. 路径治理

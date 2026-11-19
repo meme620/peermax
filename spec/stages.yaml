@@ -1,0 +1,40 @@
+# 计算链阶段 spec：脚本与产物。由 peerlab spec 校验脚本存在性。
+version: 1
+
+stages:
+  - id: S1
+    title: 可得性盘点（universe / manifest / schema / 覆盖三分类）
+    scripts: [inventory_universe, inventory_source_manifest, inventory_schema_check, inventory_coverage, inventory_gates]
+    outputs: [reports/data_gates/G0/s1_expected_universe.json, reports/data_gates/G0/data_gate_report.json]
+  - id: S2
+    title: 日面板、日/月收益、质量门
+    scripts: [daily_panel_build, daily_panel_quality_gate, build_id_map, build_daily_returns, build_monthly_returns, build_monthly_returns_status, build_firm_chars, build_market_equity]
+    outputs: [data/processed/monthly_returns_clean_v2.csv, data/processed/firm_chars_clean.csv]
+  - id: S2.5
+    title: 自建 FF4 因子与 REV
+    scripts: [factor_build, factor_validate, build_rev_factor]
+    outputs: [data/processed/factor_returns_daily.csv, data/processed/rev_factor_monthly.csv]
+  - id: S3-MA
+    title: 产品市场网络 M-A（业务章节，--corpus teacher 为主口径）
+    scripts: [text_business_extract, network_business_cluster_grid, network_business_cluster_freeze, network_business_edges_build]
+    outputs: [data/processed/network_ma_teacher]
+  - id: S3-MB
+    title: 产品市场网络 M-B（老师 MD&A 语料 TF-IDF）
+    scripts: [network_mda_full_matrix, network_tau_calibrate, network_mda_edges_build]
+    outputs: [data/processed/network_mb_teacher]
+  - id: S3A
+    title: 分析师共同覆盖网络（12 步 runner + 9A-9M）
+    scripts: [run_analyst_pipeline, analyst_fundamental_link, analyst_industry_contrast, analyst_fm_regression, analyst_st_sensitivity, analyst_subsample, analyst_cffr, analyst_industry_absorb, analyst_decile_cumret, analyst_extra_tests, analyst_nofy_build, analyst_nofy_compare, analyst_cfret_second_order]
+    outputs: [data/processed/analyst]
+  - id: S4
+    title: MAX/PeerMAX 定价面板
+    scripts: [peermax_max_build, peermax_panel_build, peermax_panel_acceptance]
+    outputs: [data/processed/monthly_pricing_panel_ma_teacher_v4.csv]
+  - id: M1
+    title: 月度定价事实与门禁报告
+    scripts: [pricing_sample_build, pricing_fm_main, pricing_portfolio_sorts, pricing_robustness_placebo, pricing_length_industry_control, pricing_gate_report]
+    outputs: [reports/data_gates/G0/s3_m1_gate_report.json]
+  - id: SHADOW
+    title: Phase2/3 shadow 对照（只读 headline、只写 shadow）
+    scripts: [shadow_monthly_status, shadow_inference, shadow_asof_industry, shadow_weight_matrix]
+    outputs: [artifacts/phase3]

@@ -62,7 +62,7 @@ def _write_legacy(tmp_path, frame):
 
 def test_legacy_cache_migrated_values_unchanged(tmp_path, source, frame):
     legacy = _write_legacy(tmp_path, frame)
-    legacy_sha = lib.sha256_file(legacy)
+    legacy_sha = lib.file_size(legacy)
     recompute, calls = _recompute(frame)
 
     df, meta = lib.load_amount_100m_cached(
@@ -73,7 +73,7 @@ def test_legacy_cache_migrated_values_unchanged(tmp_path, source, frame):
     assert new_path.exists() and meta_path.exists()
     assert meta['cache_status'] == 'legacy_migrated'
     assert calls['n'] == 0, '迁移必须只读旧缓存，不得重算'
-    assert legacy.exists() and lib.sha256_file(legacy) == legacy_sha, '旧缓存必须保留且不改'
+    assert legacy.exists() and lib.file_size(legacy) == legacy_sha, '旧缓存必须保留且不改'
 
     old = pd.read_parquet(legacy)
     new = pd.read_parquet(new_path)
@@ -90,7 +90,7 @@ def test_meta_fields_complete(tmp_path, source, frame):
 
     assert set(lib.AMOUNT_CACHE_META_REQUIRED) <= set(meta)
     assert Path(meta['source_path']) == source.resolve()
-    assert meta['source_sha256'] == lib.sha256_file(source)
+    assert meta['source_bytes'] == lib.file_size(source)
     assert meta['liquidity_formula_id'] == lib.ILLIQ_FORMULA_ID
     assert meta['formula'] == 'illiq = |R_t| / amount_100m'
     assert 'amount_100m' in meta['formula']
@@ -98,7 +98,7 @@ def test_meta_fields_complete(tmp_path, source, frame):
     assert meta['row_count'] == len(frame)
     assert meta['columns'] == lib.AMOUNT_CACHE_COLUMNS
     assert meta['dtypes'] == {'firm_id': 'object', 'month': 'object', 'amount_100m': 'float64'}
-    assert re.fullmatch(r'[0-9a-f]{64}', meta['script_sha256'])
+    assert re.fullmatch(r'[0-9a-f]{64}', meta['script_bytes'])
     assert Path(meta['script_path']).name == 'pricing_lib.py'
     assert meta['created_at_utc'].endswith('+00:00')
 
@@ -143,14 +143,14 @@ def test_missing_sidecar_rebuilds_not_reuses(tmp_path, source, frame):
 def test_source_sha_mismatch_fails_closed(tmp_path, source, frame, capsys):
     _write_legacy(tmp_path, frame)
     lib.load_amount_100m_cached(cache_dir=tmp_path, source_path=source)
-    cache_sha = lib.sha256_file(tmp_path / lib.AMOUNT_CACHE_NAME)
+    cache_sha = lib.file_size(tmp_path / lib.AMOUNT_CACHE_NAME)
     source.write_bytes(SOURCE_BYTES + b'-changed')
 
     with pytest.raises(SystemExit):
         lib.load_amount_100m_cached(cache_dir=tmp_path, source_path=source)
     err = capsys.readouterr().err
-    assert '指纹' in err and 'source_sha256' in err
-    assert lib.sha256_file(tmp_path / lib.AMOUNT_CACHE_NAME) == cache_sha, '失败路径不得改写缓存'
+    assert '指纹' in err and 'source_bytes' in err
+    assert lib.file_size(tmp_path / lib.AMOUNT_CACHE_NAME) == cache_sha, '失败路径不得改写缓存'
 
 
 def test_explicit_rebuild_overrides_sha_mismatch(tmp_path, source, frame):
@@ -168,7 +168,7 @@ def test_explicit_rebuild_overrides_sha_mismatch(tmp_path, source, frame):
     assert calls['n'] == 1
     pd.testing.assert_frame_equal(df, fresh, check_exact=True)
     on_disk = json.loads((tmp_path / lib.AMOUNT_CACHE_META_NAME).read_text(encoding='utf-8'))
-    assert on_disk['source_sha256'] == lib.sha256_file(source)
+    assert on_disk['source_bytes'] == lib.file_size(source)
 
 
 def test_legacy_wrong_columns_refused(tmp_path, source, frame):

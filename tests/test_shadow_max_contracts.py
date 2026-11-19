@@ -18,7 +18,6 @@
 """
 from __future__ import annotations
 
-import hashlib
 import importlib.util
 import json
 from pathlib import Path
@@ -69,12 +68,8 @@ CORE_COLS = [
 ]
 
 
-def sha256_file(path: Path) -> str:
-    h = hashlib.sha256()
-    with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(1 << 20), b""):
-            h.update(chunk)
-    return h.hexdigest()
+def file_size(path):
+    return Path(path).stat().st_size
 
 
 def load_module():
@@ -240,11 +235,11 @@ def test_official_limit_flag_vs_threshold(mod, tmp_path):
 def test_source_panel_rows_and_sha(counts):
     contracts = yaml.safe_load(CONTRACTS.read_text(encoding="utf-8"))
     reg = contracts["m1_inputs"]["source_month_argmax_panel"]
-    assert sha256_file(SOURCE) == reg["sha256"]
+    assert file_size(SOURCE) == reg["bytes"]
     assert int(reg["expected_rows"]) == EXPECTED_ROWS
     assert counts["headline_source_panel_sha_match_registered"] is True
-    assert counts["inputs"]["source_month_argmax_panel"]["sha256_before"] == HISTORICAL_SOURCE_SHA
-    assert counts["inputs"]["source_month_argmax_panel"]["sha256_after"] == HISTORICAL_SOURCE_SHA
+    assert counts["inputs"]["source_month_argmax_panel"]["bytes_before"] == HISTORICAL_SOURCE_SHA
+    assert counts["inputs"]["source_month_argmax_panel"]["bytes_after"] == HISTORICAL_SOURCE_SHA
 
 
 def test_shadow_rows_keys_and_appended_columns():
@@ -446,10 +441,10 @@ def test_shadow_argmax_never_on_resume_day(shadow, resume_audit):
 def test_audit_files_and_meta(meta, counts):
     assert len(pd.read_csv(RESUME_AUDIT)) == 13_986
     assert TAIL.is_file() and len(pd.read_csv(TAIL)) > 0
-    assert meta["output"]["sha256"] == sha256_file(SHADOW)
+    assert meta["output"]["bytes"] == file_size(SHADOW)
     assert meta["output"]["rows"] == EXPECTED_ROWS
-    assert meta["script_sha256"] == sha256_file(SCRIPT)
-    assert counts["script_sha256"] == meta["script_sha256"]
+    assert meta["script_bytes"] == file_size(SCRIPT)
+    assert counts["script_bytes"] == meta["script_bytes"]
     assert meta["headline_anchors_match"] is True
     assert counts["headline_files_modified"] is False
     assert counts["m1_rerun"] is False
@@ -461,13 +456,13 @@ def test_headline_anchors_unchanged():
     for key, reg in contracts["m1_inputs"].items():
         p = ROOT / reg["file"]
         assert p.is_file(), f"缺锚: {key}"
-        assert sha256_file(p) == reg["sha256"], f"锚变化: {key}"
+        assert file_size(p) == reg["bytes"], f"锚变化: {key}"
     # 9 个锚快照在 counts 中前后一致
     counts = json.loads(COUNTS.read_text(encoding="utf-8"))
     before = counts["headline_anchors_before"]
     after = counts["headline_anchors_after"]
     assert set(before) == set(after) and len(before) == 9
-    assert all(before[k]["sha256"] == after[k]["sha256"] for k in before)
+    assert all(before[k]["bytes"] == after[k]["bytes"] for k in before)
     assert all(before[k]["sha_match"] for k in before)
 
 

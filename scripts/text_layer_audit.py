@@ -12,7 +12,7 @@ B. 模板文本检测：
   artifacts/review/s3_misalign_suspect.csv          疑似错位清单
   artifacts/review/s3_template_texts.csv            模板/近重复文本清单
 """
-import hashlib, re
+import sizes, re
 from pathlib import Path
 from collections import defaultdict
 import pandas as pd
@@ -32,7 +32,7 @@ def jac(a, b):
 def main():
     bt = pd.read_csv(BT, dtype=str, keep_default_na=False)
     bt['bg'] = bt['text'].apply(bigrams)
-    bt['h'] = bt['text'].apply(lambda t: hashlib.md5(t.encode()).hexdigest()[:12])
+    bt['h'] = bt['text'].apply(lambda t: sizes.md5(t.encode()).hexdigest()[:12])
     print(f"texts: {len(bt)}", flush=True)
 
     # A. 错位检测

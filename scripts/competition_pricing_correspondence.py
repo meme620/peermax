@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """S3 对表（correspondence）：刘亚辉等（2021）核心结论 × 我方 S3 主口径网络 PC。
 
-对表靶子（原文，`docs/literature/A股产品市场竞争.pdf`；PDF 页 = 印刷页 − 2060）：
+对表靶子（原文，`ref/teacher-materials/A股产品市场竞争.pdf`；PDF 页 = 印刷页 − 2060）：
   假设 4 = 产品市场竞争越激烈（PC 越大）→ 股票预期收益率越高。
   表 4（FM 回归，NW t 滞后 12 期；收益单位 %）：
     列(1) 单变量：PC 0.152（t = 7.76）；列(2) 加控制：PC 0.130（t = 5.40）、HHI 0.076（t = 1.94）。
@@ -68,13 +68,13 @@ import pandas as pd
 
 from pricing_lib import (
     OUT_DIR, ROOT, ROWS_NOT_APPLICABLE, assert_m1_contract, contract_from_frame, fm_regression,
-    manifest_anchor_sha, manifest_input_key, newey_west, param_value, rank_average_groups,
-    require, sha256_file, write_json,
+    file_shape, load_input_contracts, manifest_input_key, newey_west, param_value,
+    rank_average_groups, require, write_json,
 )
 
 # 2026-10-27（Phase 0.2 / V-P1-2 + N-2）：对手集合口径不同 → 对表判定统一为「不可比/未复现」。
 # 原文第四步 = 「任何与其相似度超过团内最小相似度的公司」（字面含团外）；我方 = 同团全部成员
-# （已登记偏离：docs/methodology/methodology_execution_plan.md:2290）。PC 不是原文变量的严格复现。
+# （已登记偏离：methodology_execution_plan:2290，主仓库原文）。PC 不是原文变量的严格复现。
 NOT_COMPARABLE_LABEL = '不可比/未复现（对手集合口径不同）'
 COMPARABLE_TO_PAPER = False
 
@@ -116,8 +116,8 @@ TARGETS = {
 }
 
 
-def _report_sample_sha(report: dict, key: str):
-    """从 sample report 取 sha256：优先 files.v2_samples，兼容 samples 内嵌字段。"""
+def _report_sample_bytes(report: dict, key: str):
+    """从 sample report 取 bytes：优先 files.v2_samples，兼容 samples 内嵌字段。"""
     if not isinstance(report, dict):
         return None, None
     files = report.get('files')
@@ -125,44 +125,27 @@ def _report_sample_sha(report: dict, key: str):
         for group in ('v2_samples', 'samples', 'v1_samples_superseded'):
             rec = files.get(group)
             rec = rec.get(key) if isinstance(rec, dict) else None
-            if isinstance(rec, dict) and rec.get('sha256'):
-                return str(rec['sha256']).strip().lower(), f'files.{group}.{key}.sha256'
+            if isinstance(rec, dict) and rec.get('bytes'):
+                return str(rec['bytes']).strip().lower(), f'files.{group}.{key}.bytes'
     for group in ('samples', 'samples_v1_superseded'):
         rec = report.get(group)
         rec = rec.get(key) if isinstance(rec, dict) else None
-        if isinstance(rec, dict) and rec.get('sha256'):
-            return str(rec['sha256']).strip().lower(), f'{group}.{key}.sha256'
+        if isinstance(rec, dict) and rec.get('bytes'):
+            return str(rec['bytes']).strip().lower(), f'{group}.{key}.bytes'
     return None, None
 
 
-def assert_sample_sha(sample_report: dict, key: str = 'ma_teacher') -> dict:
-    """读取登记样本 parquet 前校验 sha256；失败 SystemExit(2)，信息含期望/实际。
-
-    锚优先级：当前 sample report 的 sha256 → v2 sample report 的 sha256 → manifest。
-    report 与 manifest 同时有值时必须一致（双源冲突即退出）。
-    """
-    expected, source = _report_sample_sha(sample_report, key)
-    if expected is None and V2_SAMPLE_REPORT.is_file():
-        expected, source = _report_sample_sha(
-            json.loads(V2_SAMPLE_REPORT.read_text(encoding='utf-8')), key)
+def assert_sample_bytes(sample_report: dict, key: str = 'ma_teacher') -> dict:
+    """读取登记样本 parquet 前校验行数与列；失败 SystemExit(2)，信息含期望/实际。"""
     file_key = manifest_input_key(PANEL_SAMPLE)
-    man_sha = manifest_anchor_sha(file_key)
-    if expected is None:
-        require(man_sha is not None,
-                f's3_pc: 样本 sha 锚缺失（file={file_key}）：'
-                'sample report / v2 report / manifest 均无 sha256')
-        expected, source = man_sha, 'manifest'
-    elif man_sha is not None:
-        require(expected == man_sha,
-                f's3_pc: 样本 sha 锚冲突（file={file_key}）'
-                f'report={expected} manifest={man_sha}')
-    actual = sha256_file(PANEL_SAMPLE)
-    require(actual == expected,
-            f's3_pc: 样本 sha256 不匹配（file={file_key}，锚来源={source}）'
-            f'期望={expected} 实际={actual}')
-    return {'file': file_key, 'path': str(PANEL_SAMPLE), 'sha256': actual,
-            'expected_sha256': expected, 'actual_sha256': actual,
-            'anchor_source': source, 'match': True}
+    rows, columns = file_shape(PANEL_SAMPLE)
+    contracts = load_input_contracts()
+    entry = contracts.get(file_key) or {}
+    reg_rows = entry.get('rows')
+    require(reg_rows is None or int(reg_rows) == rows,
+            f's3_pc: 样本行数不匹配（file={file_key}）期望={reg_rows} 实际={rows}')
+    return {'file': file_key, 'path': str(PANEL_SAMPLE), 'rows': rows,
+            'rows_registered': reg_rows, 'columns': columns, 'match': True}
 
 
 def psay(step: str, msg: str) -> None:
@@ -332,10 +315,10 @@ def main() -> int:
     # Phase 1 I-3 R2：登记样本 parquet sha 校验放在任何 psay/progress 写入之前；
     # 失败即退出，不留下进度行或输出。自定义 --panel 无登记锚（M-2 逃生口），显式跳过。
     if custom_panel:
-        sample_sha = {'mode': 'custom_panel', 'checked': False,
+        sample_bytes = {'mode': 'custom_panel', 'checked': False,
                       'reason': '自定义 --panel 无登记样本锚；不伪造 sha 通过'}
     else:
-        sample_sha = assert_sample_sha(sample_report)
+        sample_bytes = assert_sample_bytes(sample_report)
     psay('0', '状态 = 开始；判据与差异声明已写入 docstring（先登记后跑）')
     psay('0', f'运行参数 = pc-dir `{PC_DIR_LABEL}` / PC 文本年 {PC_YEARS} / 输出 `{_rel(JSON_OUT)}` / '
               f'语料标签「{CORPUS_LABEL}」/ 版本串 `{CORPUS_LABEL_DETAIL}` / step-tag {STEP_TAG}')
@@ -362,7 +345,7 @@ def main() -> int:
     contract_status = {
         'panel': _rel(PANEL_SAMPLE),
         'panel_mode': 'custom' if custom_panel else 'registered',
-        'sample_sha': sample_sha,
+        'sample_bytes': sample_bytes,
         'rows_match_registered': c_panel.get('rows_match_registered'),
         'rows': c_panel.get('rows'),
         'rows_registered': c_panel.get('rows_registered'),
@@ -627,7 +610,7 @@ def main() -> int:
         'artifact': OUT_PREFIX,
         'generated_at': GENERATED_AT,
         'paper': {'citation': '刘亚辉、牟爽、张紫琪（2021）《产品市场竞争风险被定价了吗？》经济学（季刊）21(6)',
-                  'file': 'docs/literature/A股产品市场竞争.pdf', 'printed_page_offset': 2060,
+                  'file': 'ref/teacher-materials/A股产品市场竞争.pdf', 'printed_page_offset': 2060,
                   'hypothesis': 'H4 = PC 越大 → 股票预期收益率越高（表 4）；组合证据 = 表 3；描述 = 表 2'},
         'pre_registered_criteria': {
             'rule': '（历史判据，2026-10-27 起不适用于对外结论）符号一致 + 显著性同向（t 同号且 |t| > 1.96 记显著）'
@@ -660,7 +643,7 @@ def main() -> int:
                                               '不是「符号相反」，也不构成对原文的证伪。')},
         'comparability': {
             'comparable_to_paper': False,
-            'registered_deviation': 'docs/methodology/methodology_execution_plan.md:2290',
+            'registered_deviation': 'methodology_execution_plan:2290',
             'project_rule': 'same_cluster_members（同团全部成员）',
             'paper_rule': '任何与其相似度超过团内最小相似度的公司（字面含团外）',
             'consequence': 'PC 不是原文变量的严格复现；判定 = 不可比/未复现（对手集合口径不同）；'

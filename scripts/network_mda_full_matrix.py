@@ -131,8 +131,8 @@ def main():
     args = ap.parse_args()
     y0, y1 = [int(x) for x in args.years.split("-")]
 
-    import hashlib, yaml
-    spec_hash = hashlib.sha256(SPEC.read_bytes()).hexdigest() if SPEC.exists() else None
+    import sizes, yaml
+    spec_hash = file_size(SPEC.read_bytes()).hexdigest() if SPEC.exists() else None
     out = {"spec_id": "s3a_final_spec_20260909", "spec_hash": spec_hash,
            "run_at": datetime.now(timezone.utc).isoformat(),
            "df_threshold": DF_CUTOFF, "peer_target_placeholder": PEER_TARGET,

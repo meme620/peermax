@@ -53,7 +53,7 @@ def eval_cluster_only(labels, l2, base_rate):
             pair_same += int((vc * (vc - 1) // 2).sum())
     return {
         'n_clusters': int(len(ks)),
-        'size_median': float(np.median(sizes)), 'size_max': int(sizes.max()),
+        'size_median': float(np.median(sizes)), 'size_max': int(file_size()),
         'cluster_size_p90': float(np.quantile(sizes, .9)),
         'peer_median': float(np.median(peers)), 'peer_mean': round(float(peers.mean()), 1),
         'peer_p90': float(np.quantile(peers, .9)),

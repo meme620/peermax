@@ -11,38 +11,20 @@ from . import registry
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
-SECTIONS = ('目的', '参数', 'Baseline', '实现细节', '输入与前置', '产物与验收', '耗时与资源', '已知坑')
 STAGE_CODE = re.compile(r'(?<![a-z0-9])(?:s[1-4]|s25|s3a|s3b|m[1-3]|p[1-4]b?)(?![a-z0-9])', re.I)
 NUMBER_PREFIX = re.compile(r'^\d+_')
 SNAKE = re.compile(r'^[a-z][a-z0-9_]*$')
 MAX_DEPTH = 2
-ROOT_FILES = {'Makefile', 'README.md', 'requirements.txt', 'pytest.ini'}
+ROOT_FILES = {'Makefile', 'README.md', 'AGENTS.md', 'requirements.txt', 'pytest.ini'}
 
 
-def check_experiments(root: pathlib.Path, experiments) -> list:
-    """docs/experiments.md 是唯一实验文档：每个注册 id 一个 ## 块，块内八节齐全。"""
-    doc = root / 'docs' / 'experiments.md'
-    if not doc.is_file():
-        return ['缺少 docs/experiments.md']
-    text = doc.read_text(encoding='utf-8')
-    blocks = {}
-    for chunk in re.split(r'(?m)^## ', text)[1:]:
-        title = chunk.splitlines()[0].strip()
-        blocks[title] = chunk
-    problems = []
-    for exp in experiments:
-        block = blocks.get(exp.id)
-        if block is None:
-            problems.append(f'docs/experiments.md 缺 {exp.id} 一节')
-            continue
-        missing = [s for s in SECTIONS if f'### {s}' not in block]
-        if missing:
-            problems.append(f'docs/experiments.md 的 {exp.id} 缺小节：' + '、'.join(missing))
-    wanted = {exp.id for exp in experiments}
-    for title in blocks:
-        if title not in wanted:
-            problems.append(f'docs/experiments.md 的 {title!r} 不在注册表里')
-    return problems
+def check_spec(root: pathlib.Path) -> list:
+    """spec/*.yaml 与 registry 的 purpose/notes 必须可解析：引用脚本、gate、lint 检查、测试都要存在。"""
+    from . import spec
+    try:
+        return spec.validate(root)
+    except FileNotFoundError as exc:
+        return [str(exc)]
 
 
 def check_ids(experiments) -> list:
@@ -124,7 +106,6 @@ def check_local_imports(root: pathlib.Path) -> list:
 
 
 SCRIPT_LITERAL = re.compile(r'scripts/([a-z0-9_]+)\.py')
-ALLOWED_ROLES = {'library', 'stage', 'analysis', 'support', 'oneoff', 'deliverable', 'external'}
 TEXT_SUFFIXES = {'.py', '.md', '.csv', '.yaml', '.yml', '.sh'}
 
 
@@ -181,67 +162,6 @@ def check_script_literals(root: pathlib.Path, paths=None) -> list:
     return problems
 
 
-def check_inventory(root: pathlib.Path) -> list:
-    """docs/script_inventory.csv 与 scripts/ 双向一致；role 白名单；test_ref 必须存在。"""
-    import csv
-
-    path = root / 'docs' / 'script_inventory.csv'
-    if not path.is_file():
-        return ['缺少 docs/script_inventory.csv']
-    with open(path, encoding='utf-8-sig', newline='') as f:
-        rows = list(csv.DictReader(f))
-    scripts = {p.stem for p in (root / 'scripts').glob('*.py')}
-    problems = []
-    seen = set()
-    for row in rows:
-        name = (row.get('name') or '').strip()
-        rel = (row.get('path') or '').strip()
-        role = (row.get('role') or '').strip()
-        if name in seen:
-            problems.append(f'script_inventory.csv: {name} 重复登记')
-        seen.add(name)
-        if name not in scripts:
-            problems.append(f'script_inventory.csv: {name} 没有对应脚本')
-        elif rel != f'scripts/{name}.py':
-            problems.append(f'script_inventory.csv: {name} 的 path 应为 scripts/{name}.py（现 {rel!r}）')
-        if role not in ALLOWED_ROLES:
-            problems.append(f'script_inventory.csv: {name} 的 role {role!r} 不在白名单')
-        for test in (row.get('test_ref') or '').split(';'):
-            test = test.strip()
-            if test and not (root / 'tests' / test).is_file():
-                problems.append(f'script_inventory.csv: {name} 的 test_ref {test} 不存在')
-    for name in sorted(scripts - seen):
-        problems.append(f'script_inventory.csv: 缺 {name} 的一行（新脚本要登记）')
-    return problems
-
-
-def check_oneoff_imports(root: pathlib.Path) -> list:
-    """非 oneoff 脚本不得 import oneoff 脚本：证据脚本不能变成主链依赖。"""
-    import ast
-    import csv
-
-    path = root / 'docs' / 'script_inventory.csv'
-    if not path.is_file():
-        return []
-    with open(path, encoding='utf-8-sig', newline='') as f:
-        roles = {row['name']: row['role'] for row in csv.DictReader(f)}
-    problems = []
-    for script in sorted((root / 'scripts').glob('*.py')):
-        if roles.get(script.stem) == 'oneoff':
-            continue
-        tree = ast.parse(script.read_text(encoding='utf-8'))
-        for node in ast.walk(tree):
-            names = []
-            if isinstance(node, ast.Import):
-                names = [alias.name.split('.')[0] for alias in node.names]
-            elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
-                names = [node.module.split('.')[0]]
-            for name in names:
-                if roles.get(name) == 'oneoff':
-                    problems.append(f'scripts/{script.stem}.py: import 了 oneoff 脚本 {name}')
-    return problems
-
-
 def check_text_io_encoding(root: pathlib.Path) -> list:
     """文本模式 open() 与 Path.read_text/write_text 必须显式 encoding。
 
@@ -291,14 +211,12 @@ def check_script_sources(root: pathlib.Path) -> list:
 
 def run(root: pathlib.Path = ROOT, experiments=None) -> tuple:
     experiments = experiments or registry.EXPERIMENTS
-    problems = (check_experiments(root, experiments)
+    problems = (check_spec(root)
                 + check_ids(experiments)
                 + check_paths(root)
                 + check_local_imports(root)
                 + check_script_sources(root)
                 + check_text_io_encoding(root)
                 + check_hygiene(root)
-                + check_script_literals(root)
-                + check_inventory(root)
-                + check_oneoff_imports(root))
+                + check_script_literals(root))
     return (0 if not problems else 1), problems

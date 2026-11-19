@@ -4,7 +4,6 @@
 回指到唯一 spec 与输入包：spec_id / spec_hash / input_hashes / network_version /
 run_at / command / script / status。
 """
-import hashlib
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -12,7 +11,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = ROOT / 'configs/s3a_final_spec.yaml'
 _SPEC_BYTES = SPEC.read_bytes()
-_SPEC_HASH = hashlib.sha256(_SPEC_BYTES).hexdigest()
+_SPEC_HASH = file_size(_SPEC_BYTES)
 
 
 def attach_meta(payload, script_file=None, network_version=None, status='COMPUTED', **extra):

@@ -1370,10 +1370,10 @@ def write_md(r, path):
     A("- **明细 CSV 版本关系（修 5）**：本报告同目录 `s3_network_prospectus_pilot_2018_detail.csv` 为**权威交付版**"
       "（脚本 `--detail-csv` 直出，105 行）。修正轮清理了中间产物 `artifacts/tmp/tier2_prosp/pilot_2018_detail.csv`"
       "（v4 期中间件，与交付版有 **9 行 × 6 字段 = 54 处字段填充差异**：`no_section` 行在中间件里留空、"
-      "交付版填 0/True；sha256 = 45a61e31… 已留档 `artifacts/tmp/tier2_prosp_fix/f5_tmp_evidence.json`）。"
+      "交付版填 0/True；bytes = 45a61e31… 已留档 `artifacts/tmp/tier2_prosp_fix/f5_tmp_evidence.json`）。"
       "**以交付版为准，中间件不再保留、不得引用。**")
     A("- **tmp 大件清理（修 5）**：`artifacts/tmp/tier2_prosp/` 下 2 份探针 PDF（300748 165 MB / 300760 31 MB，"
-      "用于「无文本层扫描件」实测：413 页 948 字 / 620 页 2,480 字）已删除，其 sha256、字节数与页/字计数留档于"
+      "用于「无文本层扫描件」实测：413 页 948 字 / 620 页 2,480 字）已删除，其 bytes、字节数与页/字计数留档于"
       " `artifacts/tmp/tier2_prosp_fix/f5_tmp_evidence.json`（PDF 可经 P1 下载器重取；下载日志 "
       "`download_log.csv` 已登记 `all_candidates_failed` + `extract_fail`）。")
     A("- **CID 恢复缓存（修 3）**：`artifacts/tmp/tier2_prosp/cid_recover/<code>.{txt,key}`（3 份解码文本 + "

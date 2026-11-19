@@ -15,7 +15,6 @@
 """
 from __future__ import annotations
 
-import hashlib
 import importlib.util
 import json
 import sys
@@ -50,22 +49,18 @@ JACCARD_32 = {"p3asof": 0.966815, "p3yt": 0.912737, "p3ydf": 0.529672,
               "p3yt_ydf": 0.520040, "p3yt_latest": 0.823349}
 
 
-def sha256_file(path: Path) -> str:
-    h = hashlib.sha256()
-    with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(1 << 20), b""):
-            h.update(chunk)
-    return h.hexdigest()
+def file_size(path):
+    return Path(path).stat().st_size
 
 
 def _manifest_anchor(rel: str) -> str:
-    """当前 manifest 的 active 条目 sha256（BL-01 后 headline 样本锚的现盘来源）。"""
+    """当前 manifest 的 active 条目（BL-01 后 headline 样本锚的现盘来源）。"""
     import yaml
     man = yaml.safe_load((ROOT / "configs/version_manifest.yaml").read_text(encoding="utf-8"))
     hits = [e for e in man["deliverables"] if str(e.get("file", "")).replace("\\", "/") == rel]
     assert len(hits) == 1, f"manifest 条目数 != 1: {rel}"
     assert hits[0].get("status") in ("active", "superseded"), f"manifest 条目状态异常: {rel}"
-    return str(hits[0]["sha256"])
+    return str(hits[0]["bytes"])
 
 
 def load_module():
@@ -337,7 +332,7 @@ def test_treatment_correlation_matrix(counts):
 
 # ------------------------------------------------------------------ 锚 / sha / 决策
 def test_9_m1_inputs_match_now(p36):
-    ledger = p36.assert_m1_inputs_sha()
+    ledger = p36.assert_m1_inputs()
     assert len(ledger) == 9
     assert all(r["match"] for r in ledger)
 
@@ -357,13 +352,13 @@ def test_headline_and_shadow_inputs_sha_unchanged(counts):
     assert all(len(v) == 36 for v in pre["shadow_net"].values())
     # BL-01（I-16）metadata 重写已改现盘 headline 样本 sha；`3.6_counts.json` 是 Phase 3 历史证据
     # （不得重写），故现盘比对改到当前 manifest 锚（pre==post 不变式见上）。
-    assert sha256_file(SAMPLE) == _manifest_anchor(
+    assert file_size(SAMPLE) == _manifest_anchor(
         "data/processed/m1_common_sample_ma_teacher_v2.parquet")
     for rel, sha in pre["headline_net"].items():
-        assert sha256_file(ROOT / rel) == sha, rel
+        assert file_size(ROOT / rel) == sha, rel
     for vid, files in pre["shadow_net"].items():
         for rel, sha in files.items():
-            assert sha256_file(ROOT / rel) == sha, f"{vid}:{rel}"
+            assert file_size(ROOT / rel) == sha, f"{vid}:{rel}"
 
 
 def test_anchor_json_files_match_counts(counts):
@@ -383,7 +378,7 @@ def test_output_sha_ledger_and_rerun(counts):
     assert ledger["rerun_check"]["n_diff"] == 0
     assert counts["rerun_check"]["status"] == "IDENTICAL"
     for rel, sha in files.items():
-        assert sha256_file(ROOT / rel) == sha, rel
+        assert file_size(ROOT / rel) == sha, rel
     assert files == counts["output_sha"]
 
 

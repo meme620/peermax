@@ -19,7 +19,7 @@ horse race（P3.3）：OwnMAX / OwnMAX+IndustryMAX(L1,L2) / +M-A / +M-B / 两网
   - 新增 `--sample-version`（默认 v2，headline；另一版本自动作敏感性并报）与 `--out-suffix`
     （如 `--out-suffix _v2` 产出 s3_m1_pricing_table_v2.{json,md} / s3_m1_horse_race_v2.json，不覆盖 v1 基线名）。
   - 四列并报表加**窗口列 + 窗口说明**（主口径 2015-05..2023-12；ma/mb 2018-05..2023-12，防误读为同窗口）。
-  - horse race 说明句落定 A12 含 PeerReturn 的 γ=+0.172 / t=+1.75（复核引用值，v1 样本；v2 重跑 +0.175 / +1.79 待 A12 复核轮确认）。
+  - horse race 说明句的 γ/t 读数一律以产物 JSON 为准，不在源码里复制数字（2026-11-19 审核收口）。
 """
 from __future__ import annotations
 
@@ -31,10 +31,11 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from pricing_lib import IQR_POOL_REGISTERED, M1_SAMPLE_VERSION_V1, M1_SAMPLE_VERSION_V2, M1_SAMPLE_VERSION_V3, OUT_DIR, ROOT, assert_m1_contract, fm_regression, param_value, progress, sample_path, vif_table, write_json
+from pricing_lib import IQR_POOL_REGISTERED, M1_SAMPLE_VERSION_V1, M1_SAMPLE_VERSION_V2, M1_SAMPLE_VERSION_V3, M1_SAMPLE_VERSION_V4, OUT_DIR, ROOT, assert_m1_contract, fm_regression, param_value, progress, sample_path, vif_table, write_json
 
 P = param_value('m1_sample_and_spec_registry')
 NW_LAG = int(param_value('nw_lag'))
+DIRECTION = str(param_value('p_direction'))
 MIN_N = P['min_focal_count_per_month']
 MIN_MONTHS = P['min_effective_month_count']
 CONTROLS = ['size', 'bm', 'mom', 'rev', 'turnover', 'illiq', 'AnalystCoverage', 'NetworkDegree']
@@ -99,9 +100,9 @@ def spec_block(df: pd.DataFrame, key: str, iqr: float) -> dict:
     """单列主规格：EW/VW + 后复权 + 逐月状态。"""
     sub = df[df['m1_in_fm_sample'].astype(bool)].copy()
     res_ew, pm_ew = fm_regression(sub, 'R_next', MAIN, weight_col=None,
-                                  min_n=MIN_N, nw_lag=NW_LAG)
+                                  min_n=MIN_N, nw_lag=NW_LAG, direction=DIRECTION)
     res_vw, pm_vw = fm_regression(sub, 'R_next', MAIN, weight_col='market_equity',
-                                  min_n=MIN_N, nw_lag=NW_LAG)
+                                  min_n=MIN_N, nw_lag=NW_LAG, direction=DIRECTION)
     iqr_sample = float(sub['PeerMAXraw'].quantile(.75) - sub['PeerMAXraw'].quantile(.25))
     blk = {
         'role': COL_ROLE[key], 'n_rows': int(len(sub)),
@@ -123,7 +124,7 @@ def spec_block(df: pd.DataFrame, key: str, iqr: float) -> dict:
     }
     sub_post = sub[sub['R_next_postadj'].notna()]
     res_post, _ = fm_regression(sub_post, 'R_next_postadj', MAIN, weight_col=None,
-                                min_n=MIN_N, nw_lag=NW_LAG)
+                                min_n=MIN_N, nw_lag=NW_LAG, direction=DIRECTION)
     blk['post_adjusted'] = {
         'role': 'sensitivity_only（raw 为主口径）', 'n_rows': int(len(sub_post)),
         'formula_id': 'R_NEXT_POST_ADJ_v1',
@@ -316,7 +317,8 @@ def main(argv=None):
             '——该值待 A12 复核轮重跑后确认。'),
     }
     for sid, xs in specs.items():
-        res, pm = fm_regression(hr, 'R_next', xs, min_n=MIN_N, nw_lag=NW_LAG)
+        res, pm = fm_regression(hr, 'R_next', xs, min_n=MIN_N, nw_lag=NW_LAG,
+                                direction=DIRECTION)
         hr_report['specs'][sid] = {
             'x': xs, 'n_months_used': res['n_months_used'],
             'coefs': res['coefs'],
