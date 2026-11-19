@@ -6,13 +6,13 @@
   2. 官方 limit flag 与阈值口径的差异；官方 pkl 缺失时回退语义。
   3. 真实面板只读计数：734,232 行、键唯一、旧列逐字段一致、行序不变。
   4. 2014–2025 复牌 13,986；2015–2023（日历年）argmax 复牌 2,886、
-     MAX 改变 2,666、limit_hit 复牌 1,724；M1 窗口（2015-05..2023-12）
+     MAX 改变 2,666、limit_hit 复牌 1,724；pricing_gate 窗口（2015-05..2023-12）
      2,601 / 2,396 / 1,528。
   5. gate：source n_valid<15 = 7,848、可匹配 5,964；n_max<15 = 8,576/6,692。
   6. MAX 尾部：raw 5.93717277→shadow 1.08544087；>0.44 19→14；>1.0 6→2。
      2.0_plan 的 17/3 不可复现，测试锁定实际严格口径与偏差说明。
   7. 复牌日不进入 shadow argmax；非复牌月份零变化；shadow <= legacy。
-  8. 9 个 M1 输入 sha 与 `m1_contracts.yaml` 一致；headline source panel sha 未变。
+  8. 9 个 pricing_gate 输入 sha 与 `pricing_inputs.yaml` 一致；headline source panel sha 未变。
 
 运行：python -m pytest tests/test_shadow_max_contracts.py -q
 """
@@ -25,6 +25,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
+
+from conftest import assert_input_anchors
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -35,7 +37,7 @@ COUNTS = ROOT / "artifacts/phase2/2.2_counts.json"
 RESUME_AUDIT = ROOT / "artifacts/phase2/2.2_resume_audit.csv"
 TAIL = ROOT / "artifacts/phase2/2.2_max_tail_diff.csv"
 SOURCE = ROOT / "data/processed/source_month_argmax_panel.csv"
-CONTRACTS = ROOT / "configs/m1_contracts.yaml"
+CONTRACTS = ROOT / "configs/pricing_inputs.yaml"
 
 EXPECTED_ROWS = 734_232
 HISTORICAL_SOURCE_SHA = "944adbbab95a7b30d858f2943c8ec2844a852a9551b06224b21147d3c4c6023a"
@@ -234,7 +236,7 @@ def test_official_limit_flag_vs_threshold(mod, tmp_path):
 # ---------------------------------------------------------------- 3. 只读/键/列
 def test_source_panel_rows_and_sha(counts):
     contracts = yaml.safe_load(CONTRACTS.read_text(encoding="utf-8"))
-    reg = contracts["m1_inputs"]["source_month_argmax_panel"]
+    reg = contracts["pricing_inputs"]["source_month_argmax_panel"]
     assert file_size(SOURCE) == reg["bytes"]
     assert int(reg["expected_rows"]) == EXPECTED_ROWS
     assert counts["headline_source_panel_sha_match_registered"] is True
@@ -254,7 +256,7 @@ def test_shadow_rows_keys_and_appended_columns():
 
 
 def test_old_columns_identical_and_row_order_preserved():
-    # P1.1-01：source 的 n_valid_days=volume>0；shadow 旧列 n_valid_days=rraw 非空日数
+    # 口径更正：source 的 n_valid_days=volume>0；shadow 旧列 n_valid_days=rraw 非空日数
     # （= 新 schema n_rraw_days）。其余旧列逐值/行序一致。
     cols = [c for c in OLD_SOURCE_HEADER if c != "n_valid_days"]
     src = pd.read_csv(SOURCE, dtype=str, keep_default_na=False,
@@ -290,7 +292,7 @@ def test_resume_counts_and_windows(counts, resume_audit):
     assert cal["max_changed"] == 2_666
     assert cal["limit_hit_at_resume_legacy"] == 1_724
 
-    m1 = counts["m1_window_2015_05_2023_12"]
+    m1 = counts["pricing_window_2015_05_2023_12"]
     assert m1["rows"] == 391_849
     assert m1["argmax_resume"] == 2_601
     assert m1["max_changed"] == 2_396
@@ -298,7 +300,7 @@ def test_resume_counts_and_windows(counts, resume_audit):
 
 
 def test_gate_counts_match_plan(counts):
-    m1 = counts["gate_counts_m1_window"]
+    m1 = counts["gate_counts_pricing_window"]
     assert m1["source_n_valid_lt_15"] == 7_848
     assert m1["monthly_matchable_n_valid_lt_15"] == 5_964
     assert m1["source_n_max_lt_15"] == 8_576
@@ -306,8 +308,8 @@ def test_gate_counts_match_plan(counts):
     assert m1["source_n_max_lt_10"] == 4_439
     assert m1["monthly_matchable_n_max_lt_10"] == 3_189
     rep = counts["plan_2_0_replication"]
-    for k in ("gate_m1_source_n_valid_lt_15", "gate_m1_matchable_n_valid_lt_15",
-              "gate_m1_source_n_max_lt_15", "gate_m1_matchable_n_max_lt_15"):
+    for k in ("gate_pricing_source_n_valid_lt_15", "gate_pricing_matchable_n_valid_lt_15",
+              "gate_pricing_source_n_max_lt_15", "gate_pricing_matchable_n_max_lt_15"):
         assert rep[k]["match"] is True
 
 
@@ -447,28 +449,16 @@ def test_audit_files_and_meta(meta, counts):
     assert counts["script_bytes"] == meta["script_bytes"]
     assert meta["headline_anchors_match"] is True
     assert counts["headline_files_modified"] is False
-    assert counts["m1_rerun"] is False
+    assert counts["pricing_rerun"] is False
     assert counts["configs_modified"] is False
 
 
 def test_headline_anchors_unchanged():
-    contracts = yaml.safe_load(CONTRACTS.read_text(encoding="utf-8"))
-    for key, reg in contracts["m1_inputs"].items():
-        p = ROOT / reg["file"]
-        assert p.is_file(), f"缺锚: {key}"
-        assert file_size(p) == reg["bytes"], f"锚变化: {key}"
-    # 9 个锚快照在 counts 中前后一致
-    counts = json.loads(COUNTS.read_text(encoding="utf-8"))
-    before = counts["headline_anchors_before"]
-    after = counts["headline_anchors_after"]
-    assert set(before) == set(after) and len(before) == 9
-    assert all(before[k]["bytes"] == after[k]["bytes"] for k in before)
-    assert all(before[k]["sha_match"] for k in before)
-
+    assert_input_anchors()
 
 def test_shadow_paths_are_not_headline(mod):
     contracts = yaml.safe_load(CONTRACTS.read_text(encoding="utf-8"))
-    protected = {(ROOT / m["file"]).resolve() for m in contracts["m1_inputs"].values()}
+    protected = {(ROOT / m["file"]).resolve() for m in contracts["pricing_inputs"].values()}
     outputs = {mod.OUT.resolve(), mod.META_OUT.resolve(),
                mod.COUNTS_OUT.resolve(), mod.RESUME_AUDIT_OUT.resolve(),
                mod.TAIL_OUT.resolve()}

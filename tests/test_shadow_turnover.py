@@ -7,12 +7,12 @@
      全 pkl corr≈0.779 / mad≈1.267pp；FM 窗口 2015-05..2023-12 400,092 行、corr≈0.783。
   3. shadow CSV/meta 契约：669,614 行、5 列、唯一键、窗口、n_days 语义、meta 的 output sha 与
      文件一致、source pkl sha 与当前 pkl 一致；CSV 与脚本内重算逐值一致（≤1e-8）。
-  4. 四规格 FM 矩阵：a 逐值复现 headline 主表（s3_m1_pricing_table_v2.json）；b（winsorized mean）
+  4. 四规格 FM 矩阵：a 逐值复现 headline 主表（pricing_table_v2.json）；b（winsorized mean）
      与审计 L-8 判定表一致、方向与 2.0_plan 一致（PeerMAX>0、OwnMAX≈0、均不显著）；
      b3 诊断（无 winsor mean）逐值复现 2.0_plan §2.4「现状」的 mean 行；c/d 复现 plan 锚点；
      VW 下四规格 PeerMAX 均不显著。
   5. `load_turnover_drive()` 管道未被改动（仍为 last，逐值等于本 shadow 的 turnover_last/100）。
-  6. headline 3 文件（firm_chars_clean.csv / monthly_pricing_panel_ma_teacher.csv / M1 样本 parquet）
+  6. headline 3 文件（firm_chars_clean.csv / monthly_pricing_panel_ma_teacher.csv / pricing_gate 样本 parquet）
      sha 前后不变，且等于登记锚；turnover pkl 只读不变。
   7. 输出路径治理：shadow 输出不得命中 headline 禁写集合。
 
@@ -27,6 +27,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
+
+from conftest import assert_input_anchors
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -36,9 +38,9 @@ SHADOW_META = ROOT / "data/processed/phase2_shadow/turnover_p2shadow.meta.json"
 COUNTS = ROOT / "artifacts/phase2/2.4_counts.json"
 DIFF_CSV = ROOT / "artifacts/phase2/2.4_turnover_diff.csv"
 MATRIX_CSV = ROOT / "artifacts/phase2/2.4_control_matrix.csv"
-SAMPLE = ROOT / "data/processed/m1_common_sample_ma_teacher_v2.parquet"
-PRICING_V2 = ROOT / "reports/data_gates/G0/s3_m1_pricing_table_v2.json"
-SAMPLE_REPORT_V2 = ROOT / "reports/data_gates/G0/s3_m1_sample_report_v2.json"
+SAMPLE = ROOT / "data/processed/pricing_sample_ma_teacher_v2.parquet"
+PRICING_V2 = ROOT / "reports/data_gates/G0/pricing_table_v2.json"
+SAMPLE_REPORT_V2 = ROOT / "reports/data_gates/G0/pricing_sample_report_v2.json"
 TURNOVER_PKL = ROOT / "data/raw/drive/daily_turnover_rate_20260630.pkl"
 MANIFEST = ROOT / "configs/version_manifest.yaml"
 
@@ -49,7 +51,7 @@ FM_WINDOW = ("2015-05", "2023-12")
 HEADLINE_FILES = {
     "firm_chars_clean.csv": ROOT / "data/processed/firm_chars_clean.csv",
     "monthly_pricing_panel_ma_teacher.csv": ROOT / "data/processed/monthly_pricing_panel_ma_teacher.csv",
-    "m1_common_sample_ma_teacher_v2.parquet": SAMPLE,
+    "pricing_sample_ma_teacher_v2.parquet": SAMPLE,
 }
 
 
@@ -294,22 +296,8 @@ def test_headline_shas_unchanged(sha_before, spec_matrix):
 
 
 def test_headline_shas_equal_registered_anchors():
-    manifest = yaml.safe_load(MANIFEST.read_text(encoding="utf-8"))
-    anchors = {}
-    for e in manifest["deliverables"]:
-        f = str(e.get("file", "")).replace("\\", "/")
-        sha = str(e.get("bytes") or "")
-        if sha:
-            anchors[f] = sha
-    assert file_size(HEADLINE_FILES["firm_chars_clean.csv"]) == \
-        anchors["data/processed/firm_chars_clean.csv"]
-    assert file_size(HEADLINE_FILES["monthly_pricing_panel_ma_teacher.csv"]) == \
-        anchors["data/processed/monthly_pricing_panel_ma_teacher.csv"]
-    report = json.loads(SAMPLE_REPORT_V2.read_text(encoding="utf-8"))
-    assert file_size(SAMPLE) == report["files"]["v2_samples"]["ma_teacher"]["bytes"]
+    assert_input_anchors()
 
-
-# ---------------------------------------------------------------- 7. 路径治理
 def test_output_path_guard(mod):
     mod.assert_output_path_guard(mod.OUT_CSV)
     with pytest.raises(SystemExit):

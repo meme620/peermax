@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""S3 Phase B′ 契约测试：老师 MD&A 语料面板（teacher_mda_panel.csv）。
+"""network Phase B′ 契约测试：老师 MD&A 语料面板（teacher_mda_panel.csv）。
 
 运行：python tests/test_corpus_teacher_contracts.py
-对应执行契约：methodology_execution_plan.md §3 S3「语料来源与版本」块。
+对应执行契约：methodology_execution_plan.md §3 network「语料来源与版本」块。
 
 8 项（与自建语料的 test_network_mda_contracts.py 对称，但判据针对"外部导出"这一事实调整：
 无原文 PDF 层、无 CID/锚点概念，改测 hash 来源、universe 映射与行数对账）：
@@ -25,7 +25,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 PANEL = ROOT / "data/processed/teacher_mda_panel.csv"
 RAW = ROOT / "data/raw/teacher/mda_data_2023.csv"
 IDMAP = ROOT / "data/processed/firm_id_map.csv"
-INGEST_REP = ROOT / "reports/data_gates/G0/s3_bp0_corpus_ingest.json"
+INGEST_REP = ROOT / "reports/data_gates/G0/corpus_teacher_ingest.json"
 
 COLS = ["firm_id", "year", "text", "src_code", "src_year", "length", "status", "reason"]
 YEAR_LO, YEAR_HI = 2014, 2022

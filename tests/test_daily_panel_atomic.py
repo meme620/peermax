@@ -16,7 +16,7 @@ CLOSES = [10.0, 10.5, 10.2]
 
 
 def _load():
-    spec = importlib.util.spec_from_file_location("s2_build_daily_panel_atomic", SCRIPT)
+    spec = importlib.util.spec_from_file_location("build_daily_panel_atomic", SCRIPT)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod

@@ -1,4 +1,4 @@
-"""S3A 管线契约测试（批次三，2026-08-12）。
+"""analyst-network 管线契约测试（批次三，2026-08-12）。
 
 不依赖重跑，直接读现有产物验证冻结口径的硬契约：
   1. 覆盖表唯一键 + 版本号 == coverage_win12_fy12_v2
@@ -159,7 +159,7 @@ def test_step3_output_columns_contract():
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     expected = [mod.OUTPUT_RENAME.get(c, c) for c in mod.OUT_COLS]
-    actual = list(pd.read_csv(ANALYST / 's3a_step3_clean.csv', nrows=0).columns)
+    actual = list(pd.read_csv(ANALYST / 'analyst_step3_clean.csv', nrows=0).columns)
     assert expected == actual, \
         f"step3 源码输出列 {expected} 与产物表头 {actual} 不一致（源码漂移）"
 

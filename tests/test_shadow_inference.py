@@ -28,6 +28,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from conftest import assert_input_anchors
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 SCRIPT = ROOT / "scripts/shadow_inference.py"
@@ -43,7 +45,7 @@ BLOCKPERM_CSV = ART / "3.4_blockperm_reps.csv"
 COUNTS_JSON = ART / "3.4_counts.json"
 ANCHOR_PRE = ART / "3.4_anchor_pre.json"
 ANCHOR_POST = ART / "3.4_anchor_post.json"
-SAMPLE = ROOT / "data/processed/m1_common_sample_ma_teacher_v2.parquet"
+SAMPLE = ROOT / "data/processed/pricing_sample_ma_teacher_v2.parquet"
 
 YEARS = list(range(2014, 2023))
 PC_YEARS = list(range(2017, 2023))
@@ -500,18 +502,15 @@ def test_headline_files_sha_unchanged():
         p = ROOT / rel
         assert p.is_file(), f"headline 文件缺失：{rel}"
         assert file_size(p) == sha, f"headline 文件 sha 变化：{rel}"
-    assert len(pre["m1_inputs_9"]) == 9
+    assert len(pre["pricing_inputs_9"]) == 9
     if ANCHOR_POST.is_file():
         post = json.loads(ANCHOR_POST.read_text(encoding="utf-8"))
         assert post["headline_network_sha"] == ledger
-        assert post["m1_inputs_9"] == pre["m1_inputs_9"]
+        assert post["pricing_inputs_9"] == pre["pricing_inputs_9"]
 
 
-def test_m1_inputs_sha_match_manifest():
-    sys.path.insert(0, str(ROOT / "scripts"))
-    from pricing_lib import assert_m1_inputs
-    assert_m1_inputs()
-
+def test_pricing_inputs_sha_match_manifest():
+    assert_input_anchors()
 
 def test_anchor_compare_match(counts):
     cmp_ = counts.get("anchor_compare")
@@ -526,7 +525,7 @@ def test_output_path_guard_blocks_headline_and_inputs(p34):
     ok = p34.assert_output_path_guard(ART / "3.4_inference.csv")
     assert ok == (ART / "3.4_inference.csv").resolve()
     for bad in [HEADLINE_NET / "2019_similarity.csv",
-                ROOT / "reports/data_gates/G0/s3_m1_robustness_placebo.json",
+                ROOT / "reports/data_gates/G0/pricing_robustness_placebo.json",
                 ROOT / "configs/parameter_registry.yaml",
                 SAMPLE,
                 ROOT / "data/processed/monthly_pricing_panel_ma_teacher.csv",

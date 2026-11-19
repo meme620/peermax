@@ -6,10 +6,10 @@
   2. 逐年词表：`lexicon_p3ydf_{y}.csv` 与 `product_lexicon_v2_teacher_df_by_year.csv` 逐词一致、
      行序同 headline、只「救回」被 9 年上确界规则多剔的词（反向多剔 = 0）、
      2014/2015 预登记 560/819 词 + 7.26%/12.08% 命中质量（±0.05pp）；
-  3. 逐年 target / ladder：K 目标来自 3.1 交接（容差 0）、K∈[20,4000]、
+  3. 逐年 target / ladder：K 目标来自 as-of 交接（容差 0）、K∈[20,4000]、
      |realized median peer − target| ≤ 2（2017 = 5 为阶梯不可达，留档）、2017 平台构造性同 K；
   4. 边表合同：键唯一 / 无自环 / 行内权重和 = 1 / support 与 clusters 两套 peer 读数一致；
-  5. headline 未变：9 个 M1 输入锚 MATCH + headline 网络 45 文件 sha pre == post == 3.1 台账；
+  5. headline 未变：9 个 pricing_gate 输入锚 MATCH + headline 网络 45 文件 sha pre == post == 3.1 台账；
   6. 对比表 / 效应分解 / 楔子口径 / L2 标签不进入网络构造；
   7. 输出路径守卫：headline 网络 / G0 / configs / 3.1 产物 / headline 词表 → SystemExit(2)。
 """
@@ -21,6 +21,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
+
+from conftest import require_artifacts
 
 ROOT = Path(__file__).resolve().parents[1]
 ART = ROOT / 'artifacts/phase3'
@@ -41,7 +43,7 @@ PREFIX = {
 HEADLINE_PREFIX = 'pm_ma_ewcos_teacher_v1'
 P3ASOF_PREFIX = 'pm_ma_ewcos_teacher_p3asof_v1'
 DF_MAX = 0.25
-# 3.1 交接的 K 目标
+# as-of 交接的 K 目标
 K_ASOF = {2014: 38, 2015: 40, 2016: 44, 2017: 49, 2018: 50, 2019: 52, 2020: 68, 2021: 57, 2022: 64}
 K_LATEST = {2014: 26, 2015: 27, 2016: 30, 2017: 38, 2018: 37, 2019: 46, 2020: 52, 2021: 58, 2022: 62}
 REGISTERED_RESCUED = {2014: 560, 2015: 819}
@@ -114,6 +116,8 @@ def _report(v, y):
 
 # ---------------------------------------------------------------- 1 变体命名与目录
 def test_variant_registry_naming_and_dirs(mod):
+    if not any(mod.VARIANTS[v]['dir'].is_dir() for v in VARIANTS):
+        pytest.skip('缺 shadow 网络变体目录（先跑 3.1 / 3.2）')
     assert tuple(mod.VARIANT_ORDER) == VARIANTS
     prefixes = set()
     for v in VARIANTS:
@@ -138,7 +142,7 @@ def test_variant_matrix_axes(mod):
     assert mod.VARIANTS['p3yt_ydf']['target_kind'] == 'asof_per_year'
     assert mod.VARIANTS['p3yt_latest']['lexicon'] == 'headline'
     assert mod.VARIANTS['p3yt_latest']['target_kind'] == 'latest_per_year'
-    # 逐年目标向量与 3.1 交接值逐值一致
+    # 逐年目标向量与 as-of 交接值逐值一致
     assert mod.K_ASOF_PER_YEAR == K_ASOF and mod.K_LATEST_PER_YEAR == K_LATEST
     assert mod.target_for('p3yt', 2020) == 68 and mod.target_for('p3ydf', 2020) == 44
     assert mod.target_for('p3yt_latest', 2020) == 52
@@ -150,6 +154,8 @@ def test_variant_matrix_axes(mod):
 
 @pytest.mark.parametrize('v', VARIANTS)
 def test_shadow_network_files_and_versions(v):
+    if not _net_dir(v).is_dir():
+        pytest.skip(f'缺 shadow 网络目录 {v}（先跑 3.1 / 3.2）')
     for y in YEARS:
         d = _net_dir(v)
         for f in (d / f'{y}_similarity.csv', d / f'{y}_support.csv',
@@ -226,6 +232,7 @@ def test_per_year_lexicon_rescued_terms_and_hit_mass():
 
 def test_df_removed_terms_csv_contents():
     p = ART / '3.2_df_removed_terms.csv'
+    require_artifacts(p, hint='缺 df 剔除产物')
     assert p.is_file()
     d = pd.read_csv(p)
     assert set(d['text_year'].unique()) == {2014, 2015}
@@ -456,12 +463,12 @@ def test_edge_counts_match_comparison_table(comparison):
 def test_m1_anchors_match_pre_and_post():
     pre = json.loads((ART / '3.2_anchor_pre.json').read_text(encoding='utf-8'))
     post = json.loads((ART / '3.2_anchor_post.json').read_text(encoding='utf-8'))
-    assert len(pre['m1_inputs_9']) == 9 and len(post['m1_inputs_9']) == 9
-    assert all(r['match'] for r in pre['m1_inputs_ledger'])
-    assert all(r['match'] for r in post['m1_inputs_ledger'])
-    assert pre['m1_inputs_9'] == post['m1_inputs_9']
+    assert len(pre['pricing_inputs_9']) == 9 and len(post['pricing_inputs_9']) == 9
+    assert all(r['match'] for r in pre['pricing_inputs_ledger'])
+    assert all(r['match'] for r in post['pricing_inputs_ledger'])
+    assert pre['pricing_inputs_9'] == post['pricing_inputs_9']
     anc31 = json.loads((ART / '3.1_anchor_post.json').read_text(encoding='utf-8'))
-    assert pre['m1_inputs_9'] == anc31['m1_inputs_9']
+    assert pre['pricing_inputs_9'] == anc31['pricing_inputs_9']
 
 
 def test_headline_network_45_files_sha_unchanged():
@@ -630,7 +637,7 @@ def test_identical_lexicon_and_K_implies_identical_network(mod):
 def test_output_path_guard_blocks_headline_g0_configs_and_31(mod, tmp_path):
     banned = [
         HEADLINE_NET / '2014_similarity.csv',
-        ROOT / 'reports/data_gates/G0/s3_b3_ma_param_freeze_teacher.json',
+        ROOT / 'reports/data_gates/G0/network_business_param_freeze_teacher.json',
         ROOT / 'configs/parameter_registry.yaml',
         ART / '3.1_counts.json',
         ART / '3.0_plan.md',
@@ -651,6 +658,7 @@ def test_output_path_guard_blocks_headline_g0_configs_and_31(mod, tmp_path):
 
 def test_sha_ledger_rerun_identical_if_present():
     p = ART / '3.2_output_sha.json'
+    require_artifacts(p, hint='缺 sha ledger 产物')
     assert p.is_file()
     d = json.loads(p.read_text(encoding='utf-8'))
     assert d['n_files'] >= 4 * 9 * 3 + 9

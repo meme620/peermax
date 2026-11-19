@@ -1,4 +1,4 @@
-"""P1.2-01：共享聚合不变量（07 卡 :2311 点名；P1.4-05 复用同一函数）。
+"""共享聚合不变量（07 卡 :2311 点名；P1.4-05 复用同一函数）。
 
 覆盖：
 - A：两源 complete、w={0.4,0.6}、x={0.1,0.2} → 0.16；support=covered=1、missing=0、ratio=1、complete；
@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 LIB = ROOT / "scripts/pricing_lib.py"
 
 
-def _load(name="s3_m1_lib_agg"):
+def _load(name="pricing_lib_agg"):
     spec = importlib.util.spec_from_file_location(name, LIB)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)

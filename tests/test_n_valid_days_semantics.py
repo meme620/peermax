@@ -1,10 +1,10 @@
-"""Phase 1.7 / I-1 + P1-01：n_valid_days = 有效交易日（volume>0）语义测试。
+"""Phase 1.7 / I-1 + 口径更正：n_valid_days = 有效交易日（volume>0）语义测试。
 
 覆盖：
 - build_monthly_returns_status：n_valid_days 与 n_trade_days 一致（volume>0 天数），
   complete_month/return_status 同步按有效交易日判定；旧价格观测数仅作
   n_price_obs / n_price_obs_legacy 审计列。
-- 全月 volume=0 → complete_month=0（P1-01 新增用例）。
+- 全月 volume=0 → complete_month=0（口径更正 新增用例）。
 - peermax_max_build：默认 0 输出与旧逻辑逐字节一致；阈值 15 只标记/排除不足行。
 """
 import csv
@@ -96,7 +96,7 @@ def test_price_obs_vs_trade_days_and_legacy_columns_unchanged(tmp_path):
     assert got.loc[("sz000002", "2015-02"), "n_trade_days"] == 0
     assert got.loc[("sz000002", "2015-02"), "n_valid_days"] == 0
 
-    # P1-01：complete_month / return_status 按有效交易日判定
+    # 口径更正：complete_month / return_status 按有效交易日判定
     assert got.loc[("sz000001", "2015-01"), "complete_month"] == 0
     assert got.loc[("sz000002", "2015-01"), "complete_month"] == 0
     assert got.loc[("sz000002", "2015-02"), "complete_month"] == 0
@@ -112,7 +112,7 @@ def test_price_obs_vs_trade_days_and_legacy_columns_unchanged(tmp_path):
 
 
 def test_complete_month_follows_trade_days(tmp_path):
-    """价格观测足 15 天但真实交易日只有 10 天 → complete_month=0（P1-01 语义）。"""
+    """价格观测足 15 天但真实交易日只有 10 天 → complete_month=0（口径更正 语义）。"""
     mod = _load(MONTHLY_SCRIPT, "build_monthly_returns_status_i1_b")
     ship, px, panel_dir = _monthly_fixture(tmp_path)
     out = mod.build_status(ship, px, panel_dir=panel_dir)
@@ -153,7 +153,7 @@ def test_empty_panel_dir_gives_zero_trade_days(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# peermax_max_build（P1.1-01）：complete_month 边界 / D-02=A / registry fail-closed
+# peermax_max_build（口径更正）：complete_month 边界 / D-02=A / registry fail-closed
 # ---------------------------------------------------------------------------
 
 PANEL_HEADER = ["code", "date", "volume", "rraw"]
@@ -178,19 +178,40 @@ def _registry_with_min(tmp_path, entry):
     p = tmp_path / f"registry_{len(list(tmp_path.glob('registry_*.yaml')))}.yaml"
     doc = {"registry_version": "test", "parameters": [
         {"name": "tie_rule", "headline_value": "earliest",
-         "sensitivity_grid": ["earliest", "latest"]}, entry]}
+         "sensitivity_grid": ["earliest", "latest"]},
+        {"name": "limit_thresholds",
+         "headline_value": {"main": 0.095, "main_st": 0.045, "chinext_star": 0.195}},
+        {"name": "max_day_policy",
+         "headline_value": {"limit_hit": "exclude", "resume": "exclude",
+                            "listing_grace_days": 0}},
+        entry]}
     p.write_text(yaml.safe_dump(doc, allow_unicode=True, sort_keys=False), encoding="utf-8")
+    return p
+
+
+def _st_flag_pickle(tmp_path):
+    """最小 ST 面板：run() 不接受 ST 缺失（限价判定不得降级），故给一张全 False 的。"""
+    import pandas as pd
+    panel_dir = _gate_panel(tmp_path)
+    dates = sorted({r[1] for f in panel_dir.glob('*.csv')
+                    for r in list(csv.reader(open(f, encoding='utf-8')))[1:]})
+    codes = sorted({r[0][2:] for f in panel_dir.glob('*.csv')
+                    for r in list(csv.reader(open(f, encoding='utf-8')))[1:]})
+    df = pd.DataFrame({f"{c}.SZ": [False] * len(dates) for c in codes},
+                      index=pd.to_datetime(dates))
+    p = tmp_path / "st_flag.pkl"
+    df.to_pickle(p)
     return p
 
 
 def _run_gate(tmp_path, mod, **kwargs):
     return mod.run(panel_dir=_gate_panel(tmp_path), out=tmp_path / "source_month.csv",
-                   out_json=tmp_path / "s4_report.json",
-                   st_flag=tmp_path / "no_such_st.pkl", **kwargs)
+                   out_json=tmp_path / "peermax_panel_report.json",
+                   st_flag=_st_flag_pickle(tmp_path), **kwargs)
 
 
-def test_s4_complete_month_boundary_and_d02_keep(tmp_path):
-    mod = _load(MAX_SCRIPT, "s4_step1_p1_1_boundary")
+def test_complete_month_boundary_and_d02_keep(tmp_path):
+    mod = _load(MAX_SCRIPT, "step1_boundary")
     report = _run_gate(tmp_path, mod, min_valid_days=15)
     df = pd.read_csv(tmp_path / "source_month.csv", dtype=str, keep_default_na=False).set_index("source_id")
     # A: 15 日 → complete
@@ -224,8 +245,8 @@ def test_s4_complete_month_boundary_and_d02_keep(tmp_path):
     assert report["n_max_days_zero_rows"] == 0
 
 
-def test_s4_registry_min_valid_days_drives_gate(tmp_path):
-    mod = _load(MAX_SCRIPT, "s4_step1_p1_1_reg14")
+def test_registry_min_valid_days_drives_gate(tmp_path):
+    mod = _load(MAX_SCRIPT, "step1_reg14")
     reg = _registry_with_min(tmp_path, {"name": "min_valid_days", "headline_value": 14})
     report = _run_gate(tmp_path, mod, registry_path=reg)
     df = pd.read_csv(tmp_path / "source_month.csv", dtype=str, keep_default_na=False).set_index("source_id")
@@ -234,8 +255,8 @@ def test_s4_registry_min_valid_days_drives_gate(tmp_path):
     assert df.loc["sz000001", "complete_month"] == "1"
 
 
-def test_s4_min_valid_days_fail_closed(tmp_path):
-    mod = _load(MAX_SCRIPT, "s4_step1_p1_1_fail")
+def test_min_valid_days_fail_closed(tmp_path):
+    mod = _load(MAX_SCRIPT, "step1_fail")
     missing = _registry_with_min(tmp_path, {"name": "other", "headline_value": 15})
     for bad in (missing,
                 _registry_with_min(tmp_path, {"name": "min_valid_days", "headline_value": 0}),
@@ -259,11 +280,11 @@ def test_s4_min_valid_days_fail_closed(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# 真实数据只读复算（P1.1-01：source-month 与 returns v2 的 complete_month 恒等式）
+# 真实数据只读复算（口径更正：source-month 与 returns v2 的 complete_month 恒等式）
 # ---------------------------------------------------------------------------
 
 def test_real_complete_month_invariant():
-    """P1.1-01：source-month / returns v2 的 complete_month == 1{n_valid_days>=15}。"""
+    """口径更正：source-month / returns v2 的 complete_month == 1{n_valid_days>=15}。"""
     for p in (MONTHLY_V2, SOURCE_MONTH):
         if not p.exists():
             pytest.skip(f"missing {p}")

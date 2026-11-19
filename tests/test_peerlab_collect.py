@@ -17,7 +17,7 @@ def _fake_run(result_dir: Path, exp_id: str, seed: int, value: float) -> None:
     out = run_dir / 'outputs/reports/data_gates/G0'
     out.mkdir(parents=True)
     doc = {'main': {'ma_teacher': {'coefs': {'PeerMAXraw': {'beta': value, 't': 6.0}}}}}
-    (out / ('s3_m1_pricing_table_s' + str(seed) + '.json')).write_text(json.dumps(doc), encoding='utf-8')
+    (out / ('pricing_table_s' + str(seed) + '.json')).write_text(json.dumps(doc), encoding='utf-8')
     (run_dir / 'run.json').write_text('{}', encoding='utf-8')
     index = result_dir / 'index.json'
     doc_index = json.loads(index.read_text(encoding='utf-8')) if index.is_file() else {'runs': []}

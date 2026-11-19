@@ -1,13 +1,13 @@
-"""Phase 3.6 shadow 网络 M1 对比契约测试（加法，只读真实产物）。
+"""Phase 3.6 shadow 网络 pricing_gate 对比契约测试（加法，只读真实产物）。
 
 覆盖（3.0_plan §2.6 R1/R2/R3 + 3.6 任务书）：
-  1. 输出路径守卫（只允许 artifacts/phase3/3.6_* 与 phase3_shadow/p3_6_shadow_treat_*）；
+  1. 输出路径守卫（只允许 artifacts/phase3/3.6_* 与 phase3_shadow/shadow_treat_*）；
   2. 月份→文本年映射（available_at 严格小于月份；2015-01..04 无网络）；
   3. 固定样本计数（307,503 / 181,178 / 104）与 headline 复算保真门；
-  4. 对比表矩阵完整（7 变体 × 3 规格 × 2 权重 = 42 行；S1/S5/S6 定义）；
+  4. 对比表矩阵完整（7 变体 × 3 规格 × 2 权重 = 42 行；spec_full_controls/spec_no_turnover/spec_no_rev_no_turnover 定义）；
   5. headline 登记值复现 + headline_recompute 逐规格复现；
   6. 覆盖/样本损失、treatment 相关、网络 Jaccard 与 3.2 逐值对账；
-  7. 9 个 M1 输入 + headline 样本/网络 + shadow 网络 sha 前后未变；
+  7. 9 个 pricing_gate 输入 + headline 样本/网络 + shadow 网络 sha 前后未变；
   8. 输出 sha 台账与二次运行逐字节一致；
   9. Q 判据与 HOLD 决策。
 
@@ -24,6 +24,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from conftest import assert_input_anchors, require_artifacts
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
@@ -34,10 +36,10 @@ COMPARISON = ART / "3.6_network_comparison.csv"
 OUTPUT_SHA = ART / "3.6_output_sha.json"
 ANCHOR_PRE = ART / "3.6_anchor_pre.json"
 ANCHOR_POST = ART / "3.6_anchor_post.json"
-SAMPLE = ROOT / "data/processed/m1_common_sample_ma_teacher_v2.parquet"
+SAMPLE = ROOT / "data/processed/pricing_sample_ma_teacher_v2.parquet"
 HEADLINE_NET = ROOT / "data/processed/network_ma_teacher"
 SHADOW_DATA = ROOT / "data/processed/phase3_shadow"
-G0_SAMPLE = ROOT / "reports/data_gates/G0/s3_m1_sample_report_v2.json"
+G0_SAMPLE = ROOT / "reports/data_gates/G0/pricing_sample_report_v2.json"
 REGISTRY = ROOT / "configs/parameter_registry.yaml"
 TEST_FILE = Path(__file__)
 
@@ -92,15 +94,15 @@ def comp() -> pd.DataFrame:
 def sample() -> pd.DataFrame:
     return pd.read_parquet(
         SAMPLE, columns=["focal_id", "month", "network_version", "PeerMAXraw",
-                         "PeerReturn", "n_sources", "m1_in_fm_sample"])
+                         "PeerReturn", "n_sources", "pricing_in_fm_sample"])
 
 
 # ------------------------------------------------------------------ 守卫 / 规格
 def test_output_guard_allows_only_3_6_outputs(p36):
     assert p36.assert_output_path_guard(ART / "3.6_unit_test.csv") == (ART / "3.6_unit_test.csv").resolve()
     assert p36.assert_output_path_guard(
-        SHADOW_DATA / "p3_6_shadow_treat_unit.parquet") == (
-        SHADOW_DATA / "p3_6_shadow_treat_unit.parquet").resolve()
+        SHADOW_DATA / "shadow_treat_unit.parquet") == (
+        SHADOW_DATA / "shadow_treat_unit.parquet").resolve()
 
 
 @pytest.mark.parametrize("path", [
@@ -122,9 +124,9 @@ def test_output_guard_blocks_headline_configs_g0_and_non_3_6(p36, path):
 
 
 def test_spec_definitions(p36):
-    assert p36.S1[:3] == ["PeerMAXraw", "OwnMAXraw", "PeerReturn"]
-    assert p36.S5 == [c for c in p36.S1 if c != "turnover"]
-    assert p36.S6 == [c for c in p36.S1 if c not in ("rev", "turnover")]
+    assert p36.spec_full_controls[:3] == ["PeerMAXraw", "OwnMAXraw", "PeerReturn"]
+    assert p36.spec_no_turnover == [c for c in p36.spec_full_controls if c != "turnover"]
+    assert p36.spec_no_rev_no_turnover == [c for c in p36.spec_full_controls if c not in ("rev", "turnover")]
     assert len(p36.CONTROLS) == 8
     assert p36.MIN_N == 100 and p36.NW_LAG == 6
 
@@ -157,7 +159,7 @@ def test_real_month_mapping_covers_all_fm_months(counts, sample):
     assert sorted(int(k) for k in by_ty) == list(range(2014, 2023))
     assert sum(len(v) for v in by_ty.values()) == FM_MONTHS
     assert [len(by_ty[str(y)]) for y in range(2014, 2023)] == [12] * 8 + [8]
-    fm = sample[sample["m1_in_fm_sample"].astype(bool)]
+    fm = sample[sample["pricing_in_fm_sample"].astype(bool)]
     assert fm["network_version"].notna().all()
     assert len(fm) == FM_ROWS and fm["month"].nunique() == FM_MONTHS
 
@@ -217,7 +219,7 @@ def test_year_contract_detects_self_loop_and_duplicates(p36):
 def test_comparison_matrix_complete(comp):
     assert len(comp) == 42
     expected = {(v, s, w) for v in ALL_IDS + ["headline_recompute"]
-                for s in ("S1", "S5", "S6") for w in ("EW", "VW")}
+                for s in ("spec_full_controls", "spec_no_turnover", "spec_no_rev_no_turnover") for w in ("EW", "VW")}
     assert set(zip(comp["variant"], comp["spec"], comp["weight"])) == expected
     assert comp["beta_peermax"].notna().all()
     assert comp["t_peermax"].notna().all()
@@ -225,12 +227,12 @@ def test_comparison_matrix_complete(comp):
     for vid in ALL_IDS + ["headline_recompute"]:
         s = comp[comp["variant"] == vid]
         assert len(s) == 6
-        assert set(s["spec"]) == {"S1", "S5", "S6"}
+        assert set(s["spec"]) == {"spec_full_controls", "spec_no_turnover", "spec_no_rev_no_turnover"}
         assert set(s["weight"]) == {"EW", "VW"}
 
 
 def test_headline_registered_values(comp):
-    h = comp[(comp["variant"] == "headline") & (comp["spec"] == "S1")]
+    h = comp[(comp["variant"] == "headline") & (comp["spec"] == "spec_full_controls")]
     ew = h[h["weight"] == "EW"].iloc[0]
     vw = h[h["weight"] == "VW"].iloc[0]
     assert abs(ew["beta_peermax"] - 0.03427280848385429) <= 1e-12
@@ -259,7 +261,7 @@ def test_no_positive_significant_peermax(comp):
 
 
 def test_peerreturn_positive_and_ownmax_insignificant_in_s1(comp):
-    s1 = comp[(comp["spec"] == "S1")
+    s1 = comp[(comp["spec"] == "spec_full_controls")
               & (~comp["variant"].isin(["headline_recompute"]))]
     assert (s1["beta_peerreturn"] > 0).all()
     assert (s1["t_peerreturn"] > 1.9).all()
@@ -283,7 +285,7 @@ def test_coverage_counts_and_sample_loss(counts):
 
 def test_treatment_parquet_contract(counts):
     for vid in SHADOW_IDS:
-        p = SHADOW_DATA / f"p3_6_shadow_treat_{vid}.parquet"
+        p = SHADOW_DATA / f"shadow_treat_{vid}.parquet"
         assert p.is_file(), f"缺少 {p}"
         d = pd.read_parquet(p)
         assert len(d) == FM_ROWS
@@ -331,19 +333,16 @@ def test_treatment_correlation_matrix(counts):
 
 
 # ------------------------------------------------------------------ 锚 / sha / 决策
-def test_9_m1_inputs_match_now(p36):
-    ledger = p36.assert_m1_inputs()
-    assert len(ledger) == 9
-    assert all(r["match"] for r in ledger)
-
+def test_9_pricing_inputs_match_now():
+    assert_input_anchors()
 
 def test_headline_and_shadow_inputs_sha_unchanged(counts):
     cmp_ = counts["anchors"]["compare"]
     assert cmp_["status"] == "MATCH"
     assert cmp_["n_diff"] == 0
     pre, post = counts["anchors"]["pre"], counts["anchors"]["post"]
-    assert pre["m1_inputs"] == post["m1_inputs"]
-    assert len(pre["m1_inputs"]) == 9
+    assert pre["pricing_inputs"] == post["pricing_inputs"]
+    assert len(pre["pricing_inputs"]) == 9
     assert pre["headline_sample"] == post["headline_sample"]
     assert pre["headline_net"] == post["headline_net"]
     assert pre["shadow_net"] == post["shadow_net"]
@@ -353,7 +352,7 @@ def test_headline_and_shadow_inputs_sha_unchanged(counts):
     # BL-01（I-16）metadata 重写已改现盘 headline 样本 sha；`3.6_counts.json` 是 Phase 3 历史证据
     # （不得重写），故现盘比对改到当前 manifest 锚（pre==post 不变式见上）。
     assert file_size(SAMPLE) == _manifest_anchor(
-        "data/processed/m1_common_sample_ma_teacher_v2.parquet")
+        "data/processed/pricing_sample_ma_teacher_v2.parquet")
     for rel, sha in pre["headline_net"].items():
         assert file_size(ROOT / rel) == sha, rel
     for vid, files in pre["shadow_net"].items():
@@ -365,8 +364,8 @@ def test_anchor_json_files_match_counts(counts):
     assert ANCHOR_PRE.is_file() and ANCHOR_POST.is_file()
     pre = json.loads(ANCHOR_PRE.read_text(encoding="utf-8"))
     post = json.loads(ANCHOR_POST.read_text(encoding="utf-8"))
-    assert pre["m1_inputs"] == counts["anchors"]["pre"]["m1_inputs"]
-    assert post["m1_inputs"] == counts["anchors"]["post"]["m1_inputs"]
+    assert pre["pricing_inputs"] == counts["anchors"]["pre"]["pricing_inputs"]
+    assert post["pricing_inputs"] == counts["anchors"]["post"]["pricing_inputs"]
     assert pre["headline_net"] == post["headline_net"]
 
 
@@ -399,6 +398,7 @@ def test_q_status_and_hold_decision(counts):
 
 def test_memo_exists_and_says_hold():
     memo = ART / "3.6_decision_memo.md"
+    require_artifacts(memo, hint='缺 3.6 决策备忘产物')
     assert memo.is_file()
     txt = memo.read_text(encoding="utf-8")
     assert "HOLD" in txt

@@ -63,10 +63,38 @@ def _tie_panel(tmp_path):
     return panel_dir, rows
 
 
+def _write_flag_pickle(path, dates, codes, value=False):
+    """写最小涨跌停/ST 面板（DataFrame，index=日期字符串，列='000001.SZ'）。"""
+    import pandas as pd
+    df = pd.DataFrame({f"{c}.SZ": [value] * len(dates) for c in codes},
+                      index=pd.to_datetime(dates))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_pickle(path)
+    return path
+
+
+def _core_entries(limit_hit="include", resume="include", grace=0):
+    """min_valid_days / limit_thresholds / max_day_policy：run() 的必需顶层参数。
+
+    本文件的用例只验证 tie rule 与列语义，故默认 limit_hit/resume=include、grace=0，
+    避免限价剔除改变 MAX/argmax（限价口径由 test_max_day_policy 与 legacy 对照件各自覆盖）。
+    """
+    return [
+        {"name": "min_valid_days", "headline_value": 15},
+        {"name": "limit_thresholds",
+         "headline_value": {"main": 0.095, "main_st": 0.045, "chinext_star": 0.195}},
+        {"name": "max_day_policy",
+         "headline_value": {"limit_hit": limit_hit, "resume": resume,
+                            "listing_grace_days": grace}},
+    ]
+
+
 def _write_registry(tmp_path, parameters, filename="parameter_registry.yaml"):
-    """写最小临时 registry；parameters 为 list[dict]。"""
+    """写最小临时 registry；parameters 为 list[dict]（自动补 run() 必需的顶层参数）。"""
     p = tmp_path / filename
-    doc = {"registry_version": "test-1.9", "parameters": parameters}
+    names = {x.get("name") for x in parameters}
+    extra = [x for x in _core_entries() if x["name"] not in names]
+    doc = {"registry_version": "test-1.9", "parameters": list(parameters) + extra}
     p.write_text(yaml.safe_dump(doc, allow_unicode=True, sort_keys=False),
                  encoding="utf-8")
     return p
@@ -126,12 +154,24 @@ def _read_text(path):
 
 
 def _run(mod, tmp_path, **kwargs):
+    """跑 run()：ST 与涨跌停面板用合成的全 0 面板（不依赖 data/raw/drive 真值）。"""
     out = tmp_path / "source_month.csv"
-    report_path = tmp_path / "s4_report.json"
-    report = mod.run(panel_dir=kwargs.pop("panel_dir"),
-                     out=out, out_json=report_path,
-                     st_flag=tmp_path / "no_such_st.pkl",
-                     min_valid_days=kwargs.pop("min_valid_days", 15), **kwargs)
+    report_path = tmp_path / "peermax_panel_report.json"
+    panel_dir = kwargs.pop("panel_dir")
+    dates = sorted({r[1] for f in Path(panel_dir).glob("*.csv")
+                    for r in list(csv.reader(open(f, encoding="utf-8")))[1:]})
+    codes = sorted({r[0][2:] for f in Path(panel_dir).glob("*.csv")
+                    for r in list(csv.reader(open(f, encoding="utf-8")))[1:]})
+    st = _write_flag_pickle(tmp_path / "st.pkl", dates, codes)
+    # 涨跌停 flag 置为不存在：走 registry 阈值回退路径（与 legacy 对照件同口径），
+    # 同时覆盖「无 flag 时阈值生效」这条分支。
+    mod.LIMIT_HIT_FLAG = tmp_path / "no_limit_up.pkl"
+    if kwargs.get("registry_path") is None:
+        kwargs["registry_path"] = _write_registry(
+            tmp_path, [_tie_entry("选取月内最早达到该最大值的交易日作为 d*_{j,t}")],
+            filename="core_registry.yaml")
+    report = mod.run(panel_dir=panel_dir, out=out, out_json=report_path,
+                     st_flag=st, min_valid_days=kwargs.pop("min_valid_days", 15), **kwargs)
     return out, report
 
 
@@ -155,7 +195,7 @@ def test_current_registry_resolves_earliest(mod):
 
 
 def test_default_core_fields_match_legacy_and_new_gate_columns(mod, tmp_path):
-    """P1.1-01 后不再逐字节一致（n_valid_days 改 volume>0、追加 gate 列）；
+    """口径更正 后不再逐字节一致（n_valid_days 改 volume>0、追加 gate 列）；
     旧 11 列中 MAX/R/argmax/limit/tie 与旧逻辑一致；合成 fixture 无 volume → n_valid_days=0。"""
     panel_dir, panel_rows = _tie_panel(tmp_path)
     out, report = _run(mod, tmp_path, panel_dir=panel_dir)

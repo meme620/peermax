@@ -24,12 +24,14 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from conftest import assert_input_anchors
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 SCRIPT = ROOT / "scripts/shadow_origrule.py"
 SHADOW_DIR = ROOT / "data/processed/phase3_shadow"
-SHADOW_CSV = SHADOW_DIR / "pc_origrule_p3shadow.csv"
-SHADOW_META = SHADOW_DIR / "pc_origrule_p3shadow.meta.json"
+SHADOW_CSV = SHADOW_DIR / "pc_origrule_shadow.csv"
+SHADOW_META = SHADOW_DIR / "pc_origrule_shadow.meta.json"
 HEADLINE_NET = ROOT / "data/processed/network_ma_teacher"
 P3ASOF_NET = ROOT / "data/processed/network_ma_teacher_p3asof"
 ART = ROOT / "artifacts/phase3"
@@ -37,7 +39,7 @@ READOUT_CSV = ART / "3.3_origrule_readout.csv"
 COUNTS_JSON = ART / "3.3_counts.json"
 ANCHOR_PRE = ART / "3.3_anchor_pre.json"
 ANCHOR_POST = ART / "3.3_anchor_post.json"
-FREEZE_REPORT = ROOT / "reports/data_gates/G0/s3_b3_ma_param_freeze_teacher.json"
+FREEZE_REPORT = ROOT / "reports/data_gates/G0/network_business_param_freeze_teacher.json"
 
 YEARS = list(range(2014, 2023))
 HEADLINE_NODES = {2014: 2384, 2015: 2363, 2016: 2503, 2017: 2721, 2018: 2835,
@@ -333,11 +335,8 @@ def test_readout_csv_consistent_with_counts(counts):
 
 
 # ---------------------------------------------------------------- 7. headline 未变
-def test_m1_inputs_sha_anchors_match_manifest():
-    from pricing_lib import assert_m1_inputs
-    ledger = assert_m1_inputs()
-    assert len(ledger) == 9 and all(r["match"] for r in ledger)
-
+def test_pricing_inputs_sha_anchors_match_manifest():
+    assert_input_anchors()
 
 def test_headline_network_sha_unchanged_and_45_files():
     assert ANCHOR_PRE.is_file() and ANCHOR_POST.is_file(), "缺少 3.3 锚台账"
@@ -350,7 +349,7 @@ def test_headline_network_sha_unchanged_and_45_files():
             assert p.is_file(), f"headline 文件缺失: {rel}"
             assert file_size(p) == sha, f"headline 文件 sha 变化: {rel}"
     assert pre["headline_network_sha"] == post["headline_network_sha"]
-    assert pre["m1_inputs_9"] == post["m1_inputs_9"]
+    assert pre["pricing_inputs_9"] == post["pricing_inputs_9"]
     assert pre["extra_inputs"] == post["extra_inputs"]
 
 
@@ -362,11 +361,11 @@ def test_counts_anchor_compare_match(counts):
 
 # ---------------------------------------------------------------- 8. 输出路径守卫
 def test_output_path_guard_blocks_headline_and_inputs(p33):
-    ok = p33.assert_output_path_guard(SHADOW_DIR / "pc_origrule_p3shadow.csv")
-    assert ok == (SHADOW_DIR / "pc_origrule_p3shadow.csv").resolve()
+    ok = p33.assert_output_path_guard(SHADOW_DIR / "pc_origrule_shadow.csv")
+    assert ok == (SHADOW_DIR / "pc_origrule_shadow.csv").resolve()
     for bad in [HEADLINE_NET / "2019_similarity.csv",
                 P3ASOF_NET / "2019_similarity.csv",
-                ROOT / "reports/data_gates/G0/s3_ma_pc_report_teacher.json",
+                ROOT / "reports/data_gates/G0/network_business_pc_report_teacher.json",
                 ROOT / "configs/parameter_registry.yaml",
                 ROOT / "data/processed/product_lexicon_v2_teacher.csv",
                 ROOT / "data/raw/drive/operating_revenue_annual.pkl",

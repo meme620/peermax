@@ -1,17 +1,17 @@
-"""Phase 2.6 shadow M1 对比契约测试（加法；合成 + 真实产物只读）。
+"""Phase 2.6 shadow pricing_gate 对比契约测试（加法；合成 + 真实产物只读）。
 
 覆盖：
   1. 变体构造：`variant_columns`/`canonical_frame`/`filter_rows` 的 A/B/C 映射与行集语义；
-     `spec_frame` 的 x 列表（S1/S2/S3/S4/S5/S6 的 rev/turnover 开关）；`run_variant` 可运行出系数表。
+     `spec_frame` 的 x 列表（spec_full_last/spec_full_mean/spec_lag1_last/spec_lag1_mean/spec_no_turnover/spec_no_rev_no_turnover 的 rev/turnover 开关）；`run_variant` 可运行出系数表。
   2. 样本损失：合成 `add_screen_flags` 语义 + 真实数据复算 3,547 / 3,352 / 3,774 / 1,046 / 5,853 / 175,325 锚。
   3. 传播与 winsor：`aggregate_over_edges` 覆盖源重归一化且缺失不填 0；`winsorize_col` 月度边界；
      `mom_index_rule` 复刻 `build_firm_chars` 的 ys[-12:-1] 规则（缺失不填 0）。
   4. 输出路径守卫：拒绝 data/、reports/、configs/、scripts/、headline 文件；接受 artifacts/phase2/2.6_*。
   5. 产物契约：2.6_comparison.csv 的 sha/行数/列与 counts 一致；headline_G0_table_v2 行数值等于定价表 v2。
   6. headline sha 未变：样本 parquet / 定价表 / firm_chars / source 面板 / v2 月收益 sha 等于登记锚；
-     counts 的 m1_anchors_match / headline_unchanged / shadow_unchanged 全 True。
+     counts 的 pricing_anchors_match / headline_unchanged / shadow_unchanged 全 True。
   7. 校准与推广判据：headline_recompute / headline_rebuilt 对 G0 的硬门 PASS、2.4/2.5 交叉锚 ≤1e-6；
-     P1–P8 状态记录且无 FAIL（P6/P8 为待项目动作）。
+     八项推广判据状态记录且无 FAIL（两项为待项目动作）。
 
 运行：python -m pytest tests/test_shadow_pricing_compare.py -q
 """
@@ -31,8 +31,8 @@ COUNTS = ROOT / "artifacts/phase2/2.6_counts.json"
 CSV = ROOT / "artifacts/phase2/2.6_comparison.csv"
 MEMO = ROOT / "artifacts/phase2/2.6_decision_memo.md"
 
-SAMPLE_MA = ROOT / "data/processed/m1_common_sample_ma_teacher_v2.parquet"
-PRICING_TABLE_V2 = ROOT / "reports/data_gates/G0/s3_m1_pricing_table_v2.json"
+SAMPLE_MA = ROOT / "data/processed/pricing_sample_ma_teacher_v2.parquet"
+PRICING_TABLE_V2 = ROOT / "reports/data_gates/G0/pricing_table_v2.json"
 FIRM_CHARS = ROOT / "data/processed/firm_chars_clean.csv"
 SOURCE_PANEL = ROOT / "data/processed/source_month_argmax_panel.csv"
 RETURNS_V2 = ROOT / "data/processed/monthly_returns_clean_v2.csv"
@@ -42,18 +42,18 @@ SHADOW_MAX = ROOT / "data/processed/phase2_shadow/source_month_argmax_panel_p2sh
 HEADLINE_ANCHORS = {
     # BL-01（I-16）后 = metadata-only 重写（追加 window_requested / sample_window_actual）的新 sha；
     # 原列逐值不变（metadata-only 改写的验收口径）
-    "m1_common_sample_ma_teacher_v2.parquet":
+    "pricing_sample_ma_teacher_v2.parquet":
         "5e9a8504b7c7bfff811cecc4c4dc325f9e502108420df245ba38eddea04e96fd",
-    "s3_m1_pricing_table_v2.json":
+    "pricing_table_v2.json":
         "d3d6c12b0b2d33bf2471a0b73ee1d6d4b4a7fcf7ad088218e92fd7dc3d97dda3",
     "firm_chars_clean.csv":
         "28f9eedcefd5a1d2759b0068f2ed20b10144d5b29be4f27ad278845093938df8",
-    # W1 bundle / P1.1-01（2026-11-17）：source-month 原地重建（complete_month gate + 24 列），
-    # 该变化为 07 P1.1-01 授权的唯一原地数据重写；MAX/R/argmax 等旧列语义未变。
+    # W1 bundle / 口径更正（2026-11-17）：source-month 原地重建（complete_month gate + 24 列），
+    # 该变化为 先前授权的唯一原地数据重写；MAX/R/argmax 等旧列语义未变。
     "source_month_argmax_panel.csv":
         "9ef16943104b5556df317da2aa66f0ff1cb782e7ac8ac16e1edbd60b0e1a9b9a",
     # BL-01（I-17）后 = sample_version 由旧标签改 computed 标签（2000-02..2026-06）的 CSV 新 sha
-    # P1-01（2026-11-15）后 = n_valid_days/complete_month 改为有效交易日口径的新 sha
+    # 口径更正（2026-11-15）后 = n_valid_days/complete_month 改为有效交易日口径的新 sha
     "monthly_returns_clean_v2.csv":
         "29937f599cf5d5fd74acdf2908d043af883455d01dcfd949c23fb06b5218cd30",
 }
@@ -76,7 +76,7 @@ def mod():
 
 @pytest.fixture(scope="module")
 def counts():
-    assert COUNTS.is_file(), "缺少 artifacts/phase2/2.6_counts.json（先跑 p2_6 脚本）"
+    assert COUNTS.is_file(), "缺少 artifacts/phase2/2.6_counts.json（先跑 shadow 对比脚本）"
     return json.loads(COUNTS.read_text(encoding="utf-8"))
 
 
@@ -99,7 +99,7 @@ def test_variant_columns_map_expected_sources(mod):
 
 
 def test_filter_rows_modes(mod):
-    df = pd.DataFrame({"m1_in_fm_sample": [True, True, False], "screen_bc": [True, False, False],
+    df = pd.DataFrame({"pricing_in_fm_sample": [True, True, False], "screen_bc": [True, False, False],
                        "v": [1.0, 2.0, 3.0]})
     assert list(mod.filter_rows(df, "fm")["v"]) == [1.0, 2.0]
     assert list(mod.filter_rows(df, "bc")["v"]) == [1.0]
@@ -112,17 +112,17 @@ def test_spec_frame_xcols_toggles(mod):
         "size", "bm", "mom", "rev_same", "rev_lag1", "turnover_last", "turnover_mean",
         "illiq", "AnalystCoverage", "NetworkDegree"]
     cf = pd.DataFrame({c: np.arange(4, dtype=float) for c in cols})
-    _, s1 = mod.spec_frame(cf, "S1_full_last")
-    _, s2 = mod.spec_frame(cf, "S2_full_mean")
-    _, s3 = mod.spec_frame(cf, "S3_lag1_last")
-    _, s5 = mod.spec_frame(cf, "S5_no_turnover")
-    _, s6 = mod.spec_frame(cf, "S6_no_rev_no_turnover")
-    assert s1[:3] == TRIO and "rev_same" in s1 and "turnover_last" in s1
-    assert "turnover_mean" in s2 and "turnover_last" not in s2
-    assert "rev_lag1" in s3 and "rev_same" not in s3
-    assert "turnover_last" not in s5 and "turnover_mean" not in s5 and "rev_same" in s5
-    assert "rev_same" not in s6 and "rev_lag1" not in s6 and "turnover_last" not in s6
-    for xc in (s1, s2, s3, s5, s6):
+    _, spec_full_last = mod.spec_frame(cf, "spec_full_last")
+    _, spec_full_mean = mod.spec_frame(cf, "spec_full_mean")
+    _, spec_lag1_last = mod.spec_frame(cf, "spec_lag1_last")
+    _, spec_no_turnover = mod.spec_frame(cf, "spec_no_turnover")
+    _, spec_no_rev_no_turnover = mod.spec_frame(cf, "spec_no_rev_no_turnover")
+    assert spec_full_last[:3] == TRIO and "rev_same" in spec_full_last and "turnover_last" in spec_full_last
+    assert "turnover_mean" in spec_full_mean and "turnover_last" not in spec_full_mean
+    assert "rev_lag1" in spec_lag1_last and "rev_same" not in spec_lag1_last
+    assert "turnover_last" not in spec_no_turnover and "turnover_mean" not in spec_no_turnover and "rev_same" in spec_no_turnover
+    assert "rev_same" not in spec_no_rev_no_turnover and "rev_lag1" not in spec_no_rev_no_turnover and "turnover_last" not in spec_no_rev_no_turnover
+    for xc in (spec_full_last, spec_full_mean, spec_lag1_last, spec_no_turnover, spec_no_rev_no_turnover):
         assert "illiq" in xc and "AnalystCoverage" in xc and "NetworkDegree" in xc
 
 
@@ -137,7 +137,7 @@ def test_run_variant_runs_and_reports_coefs(mod):
             rows.append({
                 "focal_id": f"sz{i:06d}", "month": m,
                 "R_next": 0.01 * x1 + 0.02 * x2 + rng.normal(scale=0.1),
-                "market_equity": 1e9 + i, "m1_in_fm_sample": True, "screen_bc": True,
+                "market_equity": 1e9 + i, "pricing_in_fm_sample": True, "screen_bc": True,
                 "PeerMAXraw": x1 * 0.1, "OwnMAXraw": x2 * 0.1, "PeerReturn": x3 * 0.1,
                 "rev_same": rng.normal(size=1)[0], "rev_lag1": rng.normal(size=1)[0],
                 "turnover_last": abs(rng.normal()) / 10, "turnover_mean": abs(rng.normal()) / 10,
@@ -162,7 +162,7 @@ def test_add_screen_flags_semantics(mod):
     n = 6
     df = pd.DataFrame({
         "month": ["2020-01"] * n,
-        "m1_in_fm_sample": [True] * n,
+        "pricing_in_fm_sample": [True] * n,
         "ev_status": ["ok"] * n,
         "ev_ntd": [20, 14, 20, 20, 20, 20],
         "own_nmd": [20, 20, 14, 20, 20, 0],
@@ -233,8 +233,8 @@ def test_aggregate_over_edges_renormalizes_without_zero_fill(mod):
 
 # ---------------------------------------------------------------- 2. 样本损失（真实数据）
 def test_sample_loss_counts_real_data(mod):
-    fm = pd.read_parquet(SAMPLE_MA, columns=["focal_id", "month", "m1_in_fm_sample"])
-    fm = fm[fm["m1_in_fm_sample"].astype(bool)][["focal_id", "month"]]
+    fm = pd.read_parquet(SAMPLE_MA, columns=["focal_id", "month", "pricing_in_fm_sample"])
+    fm = fm[fm["pricing_in_fm_sample"].astype(bool)][["focal_id", "month"]]
     mon = pd.read_csv(SHADOW_MONTHLY, usecols=["firm_id", "month", "n_trade_days",
                                                "trade_days_status", "complete_month_trade15"],
                       dtype={"firm_id": str, "month": str})
@@ -269,7 +269,7 @@ def test_output_path_guard(mod):
     for bad in [ROOT / "data/processed/x.csv", ROOT / "reports/data_gates/G0/x.json",
                 ROOT / "configs/x.yaml", ROOT / "scripts/x.py",
                 ROOT / "tests/x.py", ROOT / "data/processed/monthly_returns_clean_v2.csv",
-                ROOT / "reports/data_gates/G0/s3_m1_pricing_table_v2.json"]:
+                ROOT / "reports/data_gates/G0/pricing_table_v2.json"]:
         with pytest.raises(SystemExit):
             mod.assert_output_path_guard(bad)
     for ok in [ROOT / "artifacts/phase2/2.6_comparison.csv",
@@ -299,8 +299,8 @@ def test_outputs_exist_and_match_counts(counts):
     assert set(mod_columns(df)) == set(_expected_columns())
     assert set(df["variant"]) >= set(SHADOW_VARIANTS) | {"headline_G0_table_v2"}
     assert set(df["teacher"]) == {"ma_teacher", "mb_teacher"}
-    assert set(df["spec_id"]) == {"S1_full_last", "S2_full_mean", "S3_lag1_last",
-                                  "S4_lag1_mean", "S5_no_turnover", "S6_no_rev_no_turnover"}
+    assert set(df["spec_id"]) == {"spec_full_last", "spec_full_mean", "spec_lag1_last",
+                                  "spec_lag1_mean", "spec_no_turnover", "spec_no_rev_no_turnover"}
 
 
 def mod_columns(df):
@@ -317,7 +317,7 @@ def _expected_columns():
 def test_headline_rows_in_csv_equal_pricing_table(counts):
     df = pd.read_csv(CSV)
     g0 = df[(df["variant"] == "headline_G0_table_v2") & (df["teacher"] == "ma_teacher")
-            & (df["spec_id"] == "S1_full_last")]
+            & (df["spec_id"] == "spec_full_last")]
     cell = g0[(g0["weight"] == "ew") & (g0["term"] == "PeerMAXraw")].iloc[0]
     assert cell["beta"] == pytest.approx(0.034273, abs=1e-6)
     own = g0[(g0["weight"] == "vw") & (g0["term"] == "OwnMAXraw")].iloc[0]
@@ -330,7 +330,7 @@ def test_shadow_headline_cells_match_counts_matrix(counts):
     df = pd.read_csv(CSV)
     M = counts["comparison_matrix"]["ma_teacher"]
     for variant in SHADOW_VARIANTS:
-        for spec_id in ["S1_full_last", "S6_no_rev_no_turnover"]:
+        for spec_id in ["spec_full_last", "spec_no_rev_no_turnover"]:
             for w in ["ew", "vw"]:
                 for term in TRIO:
                     row = df[(df["variant"] == variant) & (df["teacher"] == "ma_teacher")
@@ -344,8 +344,8 @@ def test_shadow_headline_cells_match_counts_matrix(counts):
 # ---------------------------------------------------------------- 5. headline 未变
 def test_headline_shas_unchanged_and_registered():
     for name, expected in HEADLINE_ANCHORS.items():
-        path = {"m1_common_sample_ma_teacher_v2.parquet": SAMPLE_MA,
-                "s3_m1_pricing_table_v2.json": PRICING_TABLE_V2,
+        path = {"pricing_sample_ma_teacher_v2.parquet": SAMPLE_MA,
+                "pricing_table_v2.json": PRICING_TABLE_V2,
                 "firm_chars_clean.csv": FIRM_CHARS,
                 "source_month_argmax_panel.csv": SOURCE_PANEL,
                 "monthly_returns_clean_v2.csv": RETURNS_V2}[name]
@@ -354,11 +354,11 @@ def test_headline_shas_unchanged_and_registered():
 
 def test_counts_governance_flags(counts):
     i = counts["inputs_sha"]
-    assert i["m1_anchors_match"] is True
+    assert i["pricing_anchors_match"] is True
     assert i["headline_unchanged"] is True
     assert i["shadow_unchanged"] is True
     assert i["shadow_chain_vs_phase2_counts"]["all_match"] is True
-    assert counts["governance"] == {"headline_files_modified": False, "m1_rerun": False,
+    assert counts["governance"] == {"headline_files_modified": False, "pricing_rerun": False,
                                     "configs_modified": False, "g0_written": False,
                                     "promotion_executed": False}
     assert "reports" not in counts["outputs"]["comparison_csv"].replace("\\", "/")
@@ -428,7 +428,7 @@ def test_p5_p6_status_derived_not_hardcoded(counts):
         counts["max_tail"]["ma_teacher"]["registered_winsorized_max_reference"]
     assert "derived" in p["P6_reproducibility"]["status_basis"]
     ev = p["P6_reproducibility"]["evidence"]
-    assert ev["m1_anchors_match"] is True and ev["shadow_chain_all_match"] is True
+    assert ev["pricing_anchors_match"] is True and ev["shadow_chain_all_match"] is True
     assert ev["comparison_csv_bytes"] == counts["outputs"]["comparison_csv_bytes"]
     assert p["P6_reproducibility"]["status"] == "PASS"
 
@@ -455,8 +455,8 @@ def test_coefficient_summary_matches_matrix(counts):
     recs = []
     for teacher in ["ma_teacher", "mb_teacher"]:
         for variant in SHADOW_VARIANTS:
-            for spec_id in ["S1_full_last", "S2_full_mean", "S3_lag1_last", "S4_lag1_mean",
-                            "S5_no_turnover", "S6_no_rev_no_turnover"]:
+            for spec_id in ["spec_full_last", "spec_full_mean", "spec_lag1_last", "spec_lag1_mean",
+                            "spec_no_turnover", "spec_no_rev_no_turnover"]:
                 for w in ["ew", "vw"]:
                     s = M[teacher][variant][spec_id][w]["coefs"]["PeerReturn"]
                     recs.append((teacher, variant, spec_id, w, s["beta"], s["t_nw"]))

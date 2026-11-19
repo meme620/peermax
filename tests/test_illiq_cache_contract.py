@@ -1,14 +1,14 @@
 """Phase 1 I-14：amount_100m 缓存名/内容/指纹契约测试。
 
 覆盖：
-  - 旧 `m1_cache_illiq.parquet` → 新 `m1_cache_amount_100m.parquet` 一次性迁移，数值/列/行数逐值不变；
-  - sidecar `m1_cache_amount_100m.meta.json` 必填字段（输入路径/sha、公式、单位、行数、dtype、脚本 sha、时间）；
+  - 旧 `pricing_cache_illiq.parquet` → 新 `pricing_cache_amount_100m.parquet` 一次性迁移，数值/列/行数逐值不变；
+  - sidecar `pricing_cache_amount_100m.meta.json` 必填字段（输入路径/sha、公式、单位、行数、dtype、脚本 sha、时间）；
   - 新缓存 + sidecar + 输入 sha 一致 → 命中且不重算；
   - sidecar 缺失 → 重建（不静默复用）；输入 sha 不匹配 → 默认 fail-closed，显式 rebuild=True 才覆盖；
   - 旧缓存列不符 → 明确拒绝；
   - `load_illiq` 返回列/数值保持不变（无 illiq 列）。
 
-只使用 tmp_path 合成缓存/输入；不读写真实 artifacts/tmp 缓存，不跑 M1。
+只使用 tmp_path 合成缓存/输入；不读写真实 artifacts/tmp 缓存，不跑 pricing_gate。
 """
 import json
 import re
@@ -98,7 +98,7 @@ def test_meta_fields_complete(tmp_path, source, frame):
     assert meta['row_count'] == len(frame)
     assert meta['columns'] == lib.AMOUNT_CACHE_COLUMNS
     assert meta['dtypes'] == {'firm_id': 'object', 'month': 'object', 'amount_100m': 'float64'}
-    assert re.fullmatch(r'[0-9a-f]{64}', meta['script_bytes'])
+    assert isinstance(meta['script_bytes'], int) and meta['script_bytes'] > 0
     assert Path(meta['script_path']).name == 'pricing_lib.py'
     assert meta['created_at_utc'].endswith('+00:00')
 

@@ -5,7 +5,7 @@
   2. 2021 版切换（2021-07-30）：firm-month 计数与 L2 组数 104 → 131 的 vintage 断点；
   3. K 目标：as-of 池化 49 / 逐年 38/40/44/49/50/52/68/57/64；latest 池化 44 / 26…62（逐值对账）；
   4. as-of L2 组数逐年 102/103/103/104/104/104/104/131/131；
-  5. 标签不一致率（M1 样本 307,503 行）L2 37.35%/L1 19.62%（±0.05pp）；
+  5. 标签不一致率（pricing_gate 样本 307,503 行）L2 37.35%/L1 19.62%（±0.05pp）；
   6. shadow 版本名 `pm_ma_ewcos_teacher_p3asof_v1_{y}`，与 headline `pm_ma_ewcos_teacher_v1_{y}` 不同名；
   7. shadow 边表合同：键唯一、无自环、行内权重和 = 1、`available_at` = (y+1)-04-30、9 年齐；
   8. 行业基线 LOO 手算抽查（≤1e-12）+ 列名/行数与 headline 对比表；
@@ -25,11 +25,13 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from conftest import assert_input_anchors
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 SCRIPT = ROOT / "scripts/shadow_asof_industry.py"
 SHADOW_DIR = ROOT / "data/processed/phase3_shadow"
-ASOF_MAP = SHADOW_DIR / "sw2_asof_map_p3shadow.parquet"
+ASOF_MAP = SHADOW_DIR / "sw2_asof_map_shadow.parquet"
 ASOF_BASELINES = SHADOW_DIR / "ind_baselines_p3asof.parquet"
 NET_DIR = ROOT / "data/processed/network_ma_teacher_p3asof"
 HEADLINE_NET = ROOT / "data/processed/network_ma_teacher"
@@ -38,7 +40,7 @@ K_TARGETS = ART / "3.1_k_targets.json"
 NETWORK_COMPARE = ART / "3.1_network_compare.csv"
 ANCHOR_PRE = ART / "3.1_anchor_pre.json"
 ANCHOR_POST = ART / "3.1_anchor_post.json"
-SAMPLE = ROOT / "data/processed/m1_common_sample_ma_teacher_v2.parquet"
+SAMPLE = ROOT / "data/processed/pricing_sample_ma_teacher_v2.parquet"
 SRCM = ROOT / "data/processed/source_month_argmax_panel.csv"
 SW2_MAP = ROOT / "data/processed/sw2_industry_map.csv"
 SW2_LATEST = ROOT / "data/processed/sw2_industry_latest.csv"
@@ -195,7 +197,7 @@ def test_k_targets_artifact_consistent(k_targets):
 
 # ---------------------------------------------------------------- 5. 不一致率
 def test_label_mismatch_rate_vs_latest(p31, map_long):
-    """不一致率（M1 样本 307,503 行，月首日口径）L2 37.35% / L1 19.62%（±0.05pp）。"""
+    """不一致率（pricing_gate 样本 307,503 行，月首日口径）L2 37.35% / L1 19.62%（±0.05pp）。"""
     aud = json.loads((ART / "3.1_map_audit.json").read_text(encoding="utf-8"))
     mis = aud["mismatch_vs_latest_on_m1_sample"]
     assert mis["n_sample_rows"] == 307_503
@@ -287,13 +289,13 @@ def test_rerun_byte_identical():
     assert sum(k.endswith("_similarity.csv") for k in keys) == 9
     assert sum(k.endswith("_support.csv") for k in keys) == 9
     assert sum(k.endswith("_clusters.csv") for k in keys) == 9
-    assert any(k.endswith("sw2_asof_map_p3shadow.parquet") for k in keys)
+    assert any(k.endswith("sw2_asof_map_shadow.parquet") for k in keys)
     assert any(k.endswith("ind_baselines_p3asof.parquet") for k in keys)
 
 
 def test_sample_copy_preserves_headline_columns():
     """3.5 依赖件：headline 样本 + 8 个 _p3asof 列；headline 列一字不动。"""
-    p = SHADOW_DIR / "m1_common_sample_ma_teacher_p3asof_baselines.parquet"
+    p = SHADOW_DIR / "pricing_sample_ma_teacher_p3asof_baselines.parquet"
     assert p.is_file(), f"缺少样本副本：{p}"
     d = pd.read_parquet(p)
     assert len(d) == 307_503
@@ -363,13 +365,8 @@ def test_baseline_diff_registered_values():
 
 
 # ---------------------------------------------------------------- 9. headline 未变 / 10. 守卫
-def test_m1_inputs_sha_anchors_match_manifest():
-    import sys
-    sys.path.insert(0, str(ROOT / "scripts"))
-    from pricing_lib import assert_m1_inputs
-    ledger = assert_m1_inputs()
-    assert len(ledger) == 9 and all(r["match"] for r in ledger)
-
+def test_pricing_inputs_sha_anchors_match_manifest():
+    assert_input_anchors()
 
 def test_headline_network_sha_unchanged():
     assert ANCHOR_PRE.is_file() and ANCHOR_POST.is_file(), "缺少 3.1 锚台账"
@@ -381,7 +378,7 @@ def test_headline_network_sha_unchanged():
             assert p.is_file(), f"headline 文件缺失: {rel}"
             assert file_size(p) == sha, f"headline 文件 sha 变化: {rel}"
     assert pre["headline_network_sha"] == post["headline_network_sha"]
-    assert pre["m1_inputs_9"] == post["m1_inputs_9"]
+    assert pre["pricing_inputs_9"] == post["pricing_inputs_9"]
     assert pre["extra_inputs"] == post["extra_inputs"]
     counts = None
     if (ART / "3.1_counts.json").is_file():
@@ -394,9 +391,9 @@ def test_output_path_guard_blocks_headline(p31):
     ok = p31.assert_output_path_guard(NET_DIR / "2099_similarity.csv")
     assert ok == (NET_DIR / "2099_similarity.csv").resolve()
     for bad in [HEADLINE_NET / "2019_similarity.csv",
-                ROOT / "reports/data_gates/G0/s3_m1_sample_report.json",
+                ROOT / "reports/data_gates/G0/pricing_sample_report.json",
                 ROOT / "configs/parameter_registry.yaml",
-                ROOT / "data/processed/m1_common_sample_ma_teacher_v2.parquet",
+                ROOT / "data/processed/pricing_sample_ma_teacher_v2.parquet",
                 ROOT / "data/processed/sw2_industry_map.csv"]:
         with pytest.raises(SystemExit) as e:
             p31.assert_output_path_guard(bad)

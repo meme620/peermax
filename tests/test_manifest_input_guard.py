@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'scripts'))
 
 from pricing_lib import (  # noqa: E402
-    M1_INPUTS, assert_m1_inputs, check_input_contract, manifest_input_key,
+    PRICING_INPUTS, assert_pricing_inputs, check_input_contract, manifest_input_key,
 )
 
 GOOD = {'rows': 4, 'rows_registered': 4, 'rows_match_registered': True,
@@ -28,8 +28,8 @@ def _write_csv(tmp_path: Path, name: str = 'input.csv', rows: int = 2,
 
 
 def _write_contracts(tmp_path: Path, entries: dict) -> Path:
-    p = tmp_path / 'm1_contracts.yaml'
-    p.write_text(yaml.safe_dump({'m1_inputs': entries}, allow_unicode=True,
+    p = tmp_path / 'pricing_inputs.yaml'
+    p.write_text(yaml.safe_dump({'pricing_inputs': entries}, allow_unicode=True,
                                 sort_keys=False), encoding='utf-8')
     return p
 
@@ -88,12 +88,12 @@ def test_subset_and_empty_rejected(tmp_path: Path, capsys) -> None:
     p = _write_csv(tmp_path)
     c = _write_contracts(tmp_path, _entry(p, rows=2))
     with pytest.raises(SystemExit) as ei:
-        assert_m1_inputs({'input': p}, manifest_path=None, spec_path=None)
+        assert_pricing_inputs({'input': p}, manifest_path=None, spec_path=None)
     assert ei.value.code == 2
     assert '非测试调用必须校验全部' in capsys.readouterr().err
     for kwargs in ({}, {'_allow_subset': True}):
         with pytest.raises(SystemExit) as ei2:
-            assert_m1_inputs({}, **kwargs)
+            assert_pricing_inputs({}, **kwargs)
         assert ei2.value.code == 2
         assert '拒绝 0/0 PASS' in capsys.readouterr().err
 
@@ -107,11 +107,11 @@ def test_parquet_supported(tmp_path: Path) -> None:
 
 
 def test_ledger_fields(tmp_path: Path) -> None:
-    from pricing_lib import M1_INPUTS
+    from pricing_lib import PRICING_INPUTS
     p = _write_csv(tmp_path, rows=2)
-    key = M1_INPUTS['monthly_returns_clean_v2']
+    key = PRICING_INPUTS['monthly_returns_clean_v2']
     c = _write_contracts(tmp_path, {key: {'file': key, 'rows': 2, 'columns': ['a', 'b']}})
-    rec = assert_m1_inputs({'monthly_returns_clean_v2': p}, _allow_subset=True,
+    rec = assert_pricing_inputs({'monthly_returns_clean_v2': p}, _allow_subset=True,
                                contracts_path=c)[0]
     assert set(rec) >= {'input', 'file', 'path', 'rows', 'rows_registered',
                         'rows_match_registered', 'columns_missing', 'match'}

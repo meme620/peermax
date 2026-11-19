@@ -16,7 +16,7 @@
   7. 2.2 联合：`MAXraw_ex_resume` 与 2.2 一致（max_changed 2,666 / 2,396）。
   8. 事件覆盖：sharebonus 2014–2017 8,580；2018–2025 corporate_action
      28,978，与 sharebonus 100% 匹配。
-  9. headline 9 输入 sha 与 `m1_contracts.yaml` 一致；headline source panel sha
+  9. headline 9 输入 sha 与 `pricing_inputs.yaml` 一致；headline source panel sha
      未变；shadow 路径不等于 headline；monthly adj 文件为逐字节复制。
 
 运行：python -m pytest tests/test_shadow_adjusted_max_contracts.py -q
@@ -43,7 +43,7 @@ DIFF = ROOT / "artifacts/phase2/2.3_adj_diff.csv"
 EXRIGHTS = ROOT / "artifacts/phase2/2.3_exrights_audit.csv"
 RESUME_AUDIT = ROOT / "artifacts/phase2/2.2_resume_audit.csv"
 SOURCE = ROOT / "data/processed/source_month_argmax_panel.csv"
-CONTRACTS = ROOT / "configs/m1_contracts.yaml"
+CONTRACTS = ROOT / "configs/pricing_inputs.yaml"
 
 EXPECTED_ROWS = 734_232
 EXPECTED_SOURCE_SHA = "9ef16943104b5556df317da2aa66f0ff1cb782e7ac8ac16e1edbd60b0e1a9b9a"
@@ -221,7 +221,7 @@ def test_real_rows_keys_and_old_columns(shadow):
     assert shadow["month"].min() == "2006-01"
     assert shadow["month"].max() == "2025-12"
 
-    # P1.1-01 后 source 的 n_valid_days = volume>0；shadow 的旧列 n_valid_days = rraw 非空日数，
+    # 口径更正 后 source 的 n_valid_days = volume>0；shadow 的旧列 n_valid_days = rraw 非空日数，
     # 对应新 schema 的 n_rraw_days。其余旧列逐字段/行序仍必须一致。
     source = pd.read_csv(SOURCE, dtype=str, keep_default_na=False,
                          usecols=OLD_COLS + ["n_rraw_days"])
@@ -362,15 +362,15 @@ def test_counts_contracts(counts):
     assert checks["max_raw_mismatch_vs_headline"] == 0
     assert checks["resume_count_mismatch_vs_2_2"] == 0
     assert checks["adj_argmax_on_resume_day"] == 0
-    assert checks["n_max_days_from_2_2_resume"]["m1_not_gated_lt15"] == 8_576
-    assert checks["n_max_days_from_2_2_resume"]["m1_n_valid_lt15"] == 7_848
+    assert checks["n_max_days_from_2_2_resume"]["pricing_not_gated_lt15"] == 8_576
+    assert checks["n_max_days_from_2_2_resume"]["pricing_n_valid_lt15"] == 7_848
 
     rep2 = counts["plan_2_0_replication"]
     assert rep2["raw_lt_neg_0_44_calendar"]["match"] is True
     assert rep2["raw_gt_0_44_calendar"]["match"] is True
     assert rep2["raw_gt_1_0_calendar"]["match"] is True
     assert rep2["resume_max_changed_calendar"]["match"] is True
-    assert rep2["resume_max_changed_m1"]["match"] is True
+    assert rep2["resume_max_changed_pricing"]["match"] is True
     # 已知偏差：adj 单独负尾部 4（全部 n_max_days=0）；adj >0.44 为 21 不是 22。
     assert rep2["adj_lt_neg_0_44_calendar"]["actual"] == 4
     assert rep2["adj_gt_0_44_calendar"]["actual"] == 21
@@ -390,7 +390,7 @@ def test_headline_sha_paths_and_provenance(counts):
     assert file_size(SOURCE) == EXPECTED_SOURCE_SHA
 
     contracts = yaml.safe_load(CONTRACTS.read_text(encoding="utf-8"))
-    for key, rec in contracts["m1_inputs"].items():
+    for key, rec in contracts["pricing_inputs"].items():
         p = ROOT / rec["file"]
         assert p.is_file(), key
         assert file_size(p) == rec["bytes"], key
@@ -399,7 +399,7 @@ def test_headline_sha_paths_and_provenance(counts):
         assert p.is_file(), p
         assert p.resolve() not in {
             (ROOT / r["file"]).resolve()
-            for r in contracts["m1_inputs"].values()
+            for r in contracts["pricing_inputs"].values()
         }
 
     assert file_size(MONTHLY_SHADOW) == file_size(MONTHLY_ADJ)
@@ -408,7 +408,7 @@ def test_headline_sha_paths_and_provenance(counts):
     assert counts["source_panel_sha_before"] == HISTORICAL_SOURCE_SHA
     assert counts["source_panel_sha_after"] == HISTORICAL_SOURCE_SHA
     assert counts["headline_files_modified"] is False
-    assert counts["m1_rerun"] is False
+    assert counts["pricing_rerun"] is False
     assert counts["configs_modified"] is False
 
     meta = json.loads(META.read_text(encoding="utf-8"))

@@ -1,4 +1,4 @@
-"""S3-MB MD&A 数据契约测试（2026-09-11）。
+"""network-mda MD&A 数据契约测试（2026-09-11）。
 
 读 data/processed/mda_texts.csv（不重跑）验证硬契约：
   1. 唯一键 (code, year) 且与原始 annual_txt 文件一一对应
@@ -13,6 +13,7 @@
 运行：python -m pytest tests/   或   python tests/test_network_mda_contracts.py
 """
 import csv
+import re
 from collections import Counter
 from pathlib import Path
 import pytest
@@ -115,7 +116,7 @@ def test_no_truncation_regression():
     assert long_share > 0.05, f'去截断回归：>30k 占比仅 {long_share:.3f}（v1 为 0）'
 
 
-CID_GLYPH_RE = __import__('re').compile(
+CID_GLYPH_RE = re.compile(
     r'[਀-૿଀-୿ఀ-౿ഀ-ൿ฀-๿'
     r'ᄀ-ᇿក-៿ꥠ-꥿가-힯-'
     r'￰-￿⺀-⻿]')

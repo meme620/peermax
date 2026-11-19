@@ -1,12 +1,12 @@
 """Phase 1 I-5：registry 参数绑定测试。
 
 验证 `winsorization_pct` / `sample_start` / `sample_end` 真正进入调用方：
-- winsor 边界由 registry 读取，且 s3_m1_1 两处 auc 调用显式传参；
+- winsor 边界由 registry 读取，且 pricing_sample_build 两处 auc 调用显式传参；
 - 样本窗口常量与 registry 截月一致，`months_between` 不再硬编码；
 - 临时 registry 注入（tmp_path）时 helper 读到新值；
 - 非法 registry 值 fail-closed（SystemExit）。
 
-只读真实 registry / 脚本源码；不跑 M1、不写 data/reports。
+只读真实 registry / 脚本源码；不跑 pricing_gate、不写 data/reports。
 """
 import ast
 import sys
@@ -211,7 +211,7 @@ def test_missing_registry_file_rejected(tmp_path):
 def test_ast_all_winsor_calls_pass_registry_bounds():
     tree = ast.parse(SCRIPT.read_text(encoding='utf-8'))
     calls = _calls(tree, 'winsorize_by_month')
-    assert len(calls) >= 2, 's3_m1_1 的两处 winsorize_by_month 调用缺失'
+    assert len(calls) >= 2, 'pricing_sample_build 的两处 winsorize_by_month 调用缺失'
     for call in calls:
         kws = {k.arg: k.value for k in call.keywords}
         assert 'lo' in kws and 'hi' in kws, f'line {call.lineno}: 未显式传 lo/hi'
@@ -241,11 +241,10 @@ def test_ast_months_between_uses_registry_window():
 
 # ---------------------------------------------------------------- IQR 披露
 def test_iqr_registry_rule_id_and_frozen_value_documented():
-    rule_id = lib.param_value('m1_sample_and_spec_registry')['iqr_scale_rule_id']
+    rule_id = lib.param_value('sample_and_spec_registry')['iqr_scale_rule_id']
     assert rule_id == lib.IQR_POOL_RULE_ID == 'IQR_POOL_TREATMENT_ONLY_v1'
     assert lib.IQR_POOL_REGISTERED == 0.02341287
-    assert '无独立数值参数' in lib.IQR_POOL_REGISTERED_SOURCE
-    numeric_iqr = [p for p in lib.load_registry()['parameters']
-                   if 'iqr' in str(p.get('name', '')).lower()
-                   and isinstance(p.get('headline_value'), (int, float))]
-    assert numeric_iqr == [], 'registry 若新增数值 IQR 参数，应改为从 registry 读取'
+    # 2026-11-19 参数口径核查：数值唯一来源改为 registry 的 iqr_pool_value，
+    # pricing_lib 导入即核对（不一致 SystemExit(2)），不再要求 registry 里没有数值键。
+    assert float(lib.param_value('iqr_pool_value')) == lib.IQR_POOL_REGISTERED
+    assert lib.IQR_POOL_REGISTERED_SOURCE.startswith('configs/parameter_registry.yaml')

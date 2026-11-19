@@ -36,4 +36,15 @@ def test_empty_input() -> None:
 
 def test_policy_from_registry() -> None:
     policy = resolve_max_day_policy()
-    assert policy == {'limit_hit': 'exclude', 'resume': 'exclude'}
+    assert policy['limit_hit'] == 'exclude'
+    assert policy['resume'] == 'exclude'
+    assert isinstance(policy['listing_grace_days'], int) and policy['listing_grace_days'] >= 0
+
+
+def test_listing_window_excluded_only_from_la_column() -> None:
+    """上市宽限窗口只作用于 la 口径：MAXraw 不受影响，la 口径剔掉窗口内交易日。"""
+    days = [('2020-01-02', 0.44, False, False), ('2020-01-03', 0.05, False, False)]
+    base = select_eligible_days(days, EXCLUDE)
+    la = select_eligible_days(days, EXCLUDE, {'2020-01-02'})
+    assert base == [('2020-01-02', 0.44), ('2020-01-03', 0.05)]
+    assert la == [('2020-01-03', 0.05)]

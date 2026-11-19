@@ -15,12 +15,12 @@ def _write_returns(root: Path, months, sample_version, source='computed_from_dat
 
 
 def _write_sample(root: Path, actual: str, requested: str = '2018-01..2018-12') -> None:
-    path = root / 'data' / 'processed' / 'm1_common_sample_ma_v3.parquet'
+    path = root / 'data' / 'processed' / 'pricing_sample_ma_v3.parquet'
     path.parent.mkdir(parents=True, exist_ok=True)
     frame = pd.DataFrame({
         'month': ['2018-04', '2018-05', '2018-06', '2018-07'],
         'network_version': [None, 'pm_ma_v1_2018', 'pm_ma_v1_2018', None],
-        'm1_in_fm_sample': [False, True, True, False],
+        'pricing_in_fm_sample': [False, True, True, False],
         'window_requested': [requested] * 4,
         'sample_window_actual': [actual] * 4,
     })
@@ -62,7 +62,7 @@ def test_static_source_fails(tmp_path: Path) -> None:
 
 
 def test_missing_columns_fail(tmp_path: Path) -> None:
-    path = tmp_path / 'data' / 'processed' / 'm1_common_sample_ma_v3.parquet'
+    path = tmp_path / 'data' / 'processed' / 'pricing_sample_ma_v3.parquet'
     path.parent.mkdir(parents=True, exist_ok=True)
     pd.DataFrame({'month': ['2018-05'], 'network_version': ['pm_ma_v1_2018']}).to_parquet(path, index=False)
     _write_returns(tmp_path, ['2018-05'], '2018-05..2018-05')

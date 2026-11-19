@@ -32,13 +32,13 @@ COLLIN = ART / "3.5_collinearity.csv"
 CROSS = ART / "3.5_cluster_industry_cross.csv"
 ANCHOR_PRE = ART / "3.5_anchor_pre.json"
 ANCHOR_POST = ART / "3.5_anchor_post.json"
-RESID = ROOT / "data/processed/phase3_shadow/m1_peer_resid_p3shadow.parquet"
-SAMPLE = ROOT / "data/processed/m1_common_sample_ma_teacher_v2.parquet"
-SAMPLE_ASOF = ROOT / "data/processed/phase3_shadow/m1_common_sample_ma_teacher_p3asof_baselines.parquet"
+RESID = ROOT / "data/processed/phase3_shadow/pricing_peer_resid_shadow.parquet"
+SAMPLE = ROOT / "data/processed/pricing_sample_ma_teacher_v2.parquet"
+SAMPLE_ASOF = ROOT / "data/processed/phase3_shadow/pricing_sample_ma_teacher_p3asof_baselines.parquet"
 ASOF_BASELINES = ROOT / "data/processed/phase3_shadow/ind_baselines_p3asof.parquet"
 HEADLINE_PANEL = ROOT / "data/processed/monthly_pricing_panel_ma_teacher.csv"
 FIRM_CHARS = ROOT / "data/processed/firm_chars_clean.csv"
-G0_A12 = ROOT / "reports/data_gates/G0/s3_m1_industry_absorb.json"
+G0_A12 = ROOT / "reports/data_gates/G0/pricing_industry_absorb.json"
 
 E7_CORR_L1 = 0.7916556878781287
 E7_CORR_L2 = 0.7769299176515353
@@ -54,7 +54,7 @@ def file_size(path):
 # Phase 3.5 shadow 的输入样本固定为 v2（历史只读）；仅此文件允许 manifest
 # status='superseded'，且必须给出理由。不得全局放宽为 active/superseded 皆可。
 _SUPERSEDED_SCOPED_ALLOW = {
-    "data/processed/m1_common_sample_ma_teacher_v2.parquet":
+    "data/processed/pricing_sample_ma_teacher_v2.parquet":
         "Phase 3.5 industry-absorb shadow 的输入样本是 v2（只读历史）；"
         "v3 已为 headline，但重建 v3 shadow 不在本测试范围",
 }
@@ -155,7 +155,7 @@ def test_synthetic_orthogonality_multivariate(p35):
 # ---------------------------------------------------------------- 2. 真实 corr / R²
 def test_real_corr_recompute(p35):
     d = pd.read_parquet(SAMPLE)
-    fm = d[d["m1_in_fm_sample"].astype(bool)]
+    fm = d[d["pricing_in_fm_sample"].astype(bool)]
     for col, expected in (("ind_l1_max_ew", E7_CORR_L1), ("ind_l2_max_ew", E7_CORR_L2)):
         s = fm.dropna(subset=["PeerMAXraw", col])
         c = float(np.corrcoef(s["PeerMAXraw"], s[col])[0, 1])
@@ -164,7 +164,7 @@ def test_real_corr_recompute(p35):
 
 def test_real_first_stage_r2_recompute(p35):
     d = pd.read_parquet(SAMPLE)
-    fm = d[d["m1_in_fm_sample"].astype(bool)]
+    fm = d[d["pricing_in_fm_sample"].astype(bool)]
     fs = p35.within_month_residual(fm, "PeerMAXraw", ["ind_l2_max_ew"])
     assert fs["n_rows"] == 179_193
     assert fs["n_months"] == 104
@@ -229,9 +229,9 @@ def test_a12_spec_matrix_present(absorb):
 
 def test_a12_headline_reproduction(absorb):
     g0 = json.loads(G0_A12.read_text(encoding="utf-8"))
-    for sid, gid in (("a12_l1_full", "m1_industry_absorb_l1"),
-                     ("a12_l2_full", "m1_industry_absorb_l2"),
-                     ("a12_both_full", "m1_industry_absorb_both")):
+    for sid, gid in (("a12_l1_full", "pricing_industry_absorb_l1"),
+                     ("a12_l2_full", "pricing_industry_absorb_l2"),
+                     ("a12_both_full", "pricing_industry_absorb_both")):
         r = absorb[(absorb["spec_id"] == sid) & (absorb["basis"] == "latest")].iloc[0]
         g = g0["specs"][gid]
         assert abs(r["beta"] - g["beta_with"]["beta"]) < 1e-9
@@ -301,8 +301,8 @@ def test_anchors_pre_post_match(counts):
     a = counts["anchors"]
     assert a["compare"]["status"] == "MATCH"
     assert a["compare"]["n_diff"] == 0
-    assert len(a["pre"]["m1_inputs_9"]) == 9
-    assert a["pre"]["m1_inputs_9"] == a["post"]["m1_inputs_9"]
+    assert len(a["pre"]["pricing_inputs_9"]) == 9
+    assert a["pre"]["pricing_inputs_9"] == a["post"]["pricing_inputs_9"]
     assert a["pre"]["extra_inputs"] == a["post"]["extra_inputs"]
 
 
@@ -320,22 +320,22 @@ def test_headline_sample_firmchars_panel_sha_unchanged(counts):
     # （不得重写），故现盘比对改到当前 manifest 锚；pre==post 历史不变式保留。
     assert pre["headline_sample_parquet"]["bytes"] == post["headline_sample_parquet"]["bytes"]
     assert file_size(SAMPLE) == _manifest_anchor(
-        "data/processed/m1_common_sample_ma_teacher_v2.parquet")
+        "data/processed/pricing_sample_ma_teacher_v2.parquet")
 
 
-def test_m1_inputs_sha_still_match(counts):
+def test_pricing_inputs_sha_still_match(counts):
     import yaml
-    from pricing_lib import assert_m1_inputs
-    ledger = assert_m1_inputs()
+    from pricing_lib import assert_pricing_inputs
+    ledger = assert_pricing_inputs()
     actual = {r["input"]: r["bytes"] for r in ledger}
     assert len(actual) == 9
-    pre = counts["anchors"]["pre"]["m1_inputs_9"]
+    pre = counts["anchors"]["pre"]["pricing_inputs_9"]
     assert set(pre) == set(actual)
-    # BL-01（I-17）允许 clean_v2 变化；W1 bundle（P1.1-01）允许 source_month 变化；9 项都必须等于当前 m1_contracts 锚
+    # BL-01（I-17）允许 clean_v2 变化；W1 bundle（口径更正）允许 source_month 变化；9 项都必须等于当前 pricing_inputs 锚
     assert {k for k in actual if actual[k] != pre[k]} <= {"monthly_returns_clean_v2", "source_month_argmax_panel"}
-    contracts = yaml.safe_load((ROOT / "configs/m1_contracts.yaml").read_text(encoding="utf-8"))
+    contracts = yaml.safe_load((ROOT / "configs/pricing_inputs.yaml").read_text(encoding="utf-8"))
     for key, sha in actual.items():
-        assert sha == contracts["m1_inputs"][key]["bytes"], f"{key}: m1_contracts 锚不一致"
+        assert sha == contracts["pricing_inputs"][key]["bytes"], f"{key}: pricing_inputs 锚不一致"
 
 
 def test_headline_sample_counts_unchanged(counts):
@@ -374,7 +374,7 @@ def test_resid_parquet_contract(resid, counts):
 def test_output_path_guard(p35):
     assert p35.assert_output_path_guard(ART / "3.5_counts.json")
     assert p35.assert_output_path_guard(
-        ROOT / "data/processed/phase3_shadow/m1_peer_resid_p3shadow.parquet")
+        ROOT / "data/processed/phase3_shadow/pricing_peer_resid_shadow.parquet")
     for bad in (SAMPLE, HEADLINE_PANEL, FIRM_CHARS, G0_A12,
                 ROOT / "data/processed/network_ma_teacher/2019_similarity.csv",
                 ROOT / "configs/parameter_registry.yaml"):

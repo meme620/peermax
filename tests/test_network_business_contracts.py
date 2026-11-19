@@ -1,4 +1,4 @@
-"""S3-MA 业务文本数据契约测试（2026-09-13，P0.3）。
+"""network-business 业务文本数据契约测试（2026-09-13，P0.3）。
 
 读 data/processed/business_texts.csv（不重跑提取）验证硬契约：
   1. 唯一键 (code, year)

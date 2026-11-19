@@ -9,7 +9,7 @@
   （BL-01，2026-10-30；旧标签 mainline_2018_2025_fullperiod 退役）。
 - 孪生文件：`monthly_returns_clean.csv` 与 `monthly_returns_full_2006_2025.csv`
   字节相同，后者 alias_of 前者。
-- 不写入 data/、不跑 build_monthly_returns_status 主流程、不跑 M1/PC。
+- 不写入 data/、不跑 build_monthly_returns_status 主流程、不跑 pricing_gate/PC。
 """
 import inspect
 import re
@@ -23,6 +23,10 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'scripts'))
 
 import build_monthly_returns_status as build  # noqa: E402
+
+from conftest import require_artifacts
+
+from conftest import registered_rows
 
 PROCESSED = ROOT / 'data' / 'processed'
 V2_CSV = PROCESSED / 'monthly_returns_clean_v2.csv'
@@ -116,13 +120,14 @@ def test_current_v2_csv_computed_label_read_only():
     assert V2_CSV.exists(), f'缺少 {V2_CSV}'
     df = pd.read_csv(V2_CSV, usecols=['month', 'sample_version'], dtype=str)
 
-    assert len(df) == 856_771
-    assert df['sample_version'].unique().tolist() == ['2000-02..2026-06']
-    assert df['month'].min() == '2000-02'
-    assert df['month'].max() == '2026-06'
+    assert len(df) == registered_rows('monthly_returns_clean_v2')
+    assert df['sample_version'].unique().tolist() == [f"{df['month'].min()}..{df['month'].max()}"]
+    # 覆盖面守卫：不写死具体月份（数据源变更会改起点），但必须覆盖因子与样本所需区间
+    assert df['month'].min() <= '2006-01', f'月收益覆盖起点过晚: {df["month"].min()}'
+    assert df['month'].max() >= '2023-12'
 
     computed = build.compute_sample_version(df['month'])
-    assert computed == '2000-02..2026-06'
+    assert computed == f"{df['month'].min()}..{df['month'].max()}"
     # Phase 4 BL-01（I-17）：已按 min(month)..max(month) 重写为 computed 标签（旧标签 LEGACY 已退役，
     # 仅在生成器追溯列 sample_version_legacy 中保留）
     assert df['sample_version'].iat[0] == computed
@@ -134,8 +139,9 @@ def test_current_v2_csv_computed_label_read_only():
 # ---------------------------------------------------------------------------
 
 def test_twin_files_byte_identical_alias_of():
+    require_artifacts(MAIN_CSV, TWIN_CSV, hint='缺月收益产物')
     assert MAIN_CSV.exists() and TWIN_CSV.exists()
     assert MAIN_CSV.read_bytes() == TWIN_CSV.read_bytes()
-    # 主文件被 S3A spec 锚定；full_2006_2025 是其别名，不改名/不删除
+    # 主文件被 analyst-network spec 锚定；full_2006_2025 是其别名，不改名/不删除
     assert MAIN_CSV.name == 'monthly_returns_clean.csv'
     assert TWIN_CSV.name == 'monthly_returns_full_2006_2025.csv'

@@ -13,7 +13,7 @@
   6. 前视诊断：2.0_plan §2.5 引用的 rev_lag1 数字（-0.01341/-4.02、-0.01728/-4.91、corr -0.0343）
      由 R_{t+1} 逐值复现，且该列自身系数 >0.5（t>20）——即 plan 的 rev_lag1 = outcome。
   7. 产物契约：2.5_control_matrix.csv 的 sha 与 counts 一致、13 规格齐全、全行 T/n 一致。
-  8. headline 4 文件（M1 样本 parquet / firm_chars / 面板 / v2 月收益）sha 前后不变且等于登记锚。
+  8. headline 4 文件（pricing_gate 样本 parquet / firm_chars / 面板 / v2 月收益）sha 前后不变且等于登记锚。
   9. 输出路径治理：不得命中 data/、G0、configs、headline 文件。
 
 运行：python -m pytest tests/test_shadow_rev.py -q
@@ -27,22 +27,24 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
+
+from conftest import assert_input_anchors
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts/shadow_rev.py"
 COUNTS = ROOT / "artifacts/phase2/2.5_counts.json"
 MATRIX_CSV = ROOT / "artifacts/phase2/2.5_control_matrix.csv"
-SAMPLE = ROOT / "data/processed/m1_common_sample_ma_teacher_v2.parquet"
+SAMPLE = ROOT / "data/processed/pricing_sample_ma_teacher_v2.parquet"
 RETURNS_V2 = ROOT / "data/processed/monthly_returns_clean_v2.csv"
 FIRM_CHARS = ROOT / "data/processed/firm_chars_clean.csv"
 PRICING_PANEL = ROOT / "data/processed/monthly_pricing_panel_ma_teacher.csv"
-PRICING_TABLE_V2 = ROOT / "reports/data_gates/G0/s3_m1_pricing_table_v2.json"
-SAMPLE_REPORT_V2 = ROOT / "reports/data_gates/G0/s3_m1_sample_report_v2.json"
+PRICING_TABLE_V2 = ROOT / "reports/data_gates/G0/pricing_table_v2.json"
+SAMPLE_REPORT_V2 = ROOT / "reports/data_gates/G0/pricing_sample_report_v2.json"
 MANIFEST = ROOT / "configs/version_manifest.yaml"
 
 HEADLINE_FILES = {
-    "m1_common_sample_ma_teacher_v2.parquet": SAMPLE,
+    "pricing_sample_ma_teacher_v2.parquet": SAMPLE,
     "firm_chars_clean.csv": FIRM_CHARS,
     "monthly_pricing_panel_ma_teacher.csv": PRICING_PANEL,
     "monthly_returns_clean_v2.csv": RETURNS_V2,
@@ -276,7 +278,7 @@ def test_counts_and_matrix_outputs_contract(matrix):
     assert counts["outputs"]["matrix_csv"]["bytes"] == file_size(MATRIX_CSV)
     assert counts["headline_anchors_match"] is True
     assert counts["headline_files_modified"] is False
-    assert counts["m1_rerun"] is False and counts["configs_modified"] is False
+    assert counts["pricing_rerun"] is False and counts["configs_modified"] is False
     assert counts["compliant_anchor_replication"]["all_items_match"] is True
     fwd = counts["plan_rev_lag1_lookahead_diagnostic"]
     assert fwd["all_items_match"] is True
@@ -308,21 +310,8 @@ def test_headline_shas_unchanged(sha_before):
 
 
 def test_headline_shas_equal_registered_anchors():
-    manifest = yaml.safe_load(MANIFEST.read_text(encoding="utf-8"))
-    anchors = {}
-    for e in manifest["deliverables"]:
-        f = str(e.get("file", "")).replace("\\", "/")
-        sha = str(e.get("bytes") or "")
-        if sha:
-            anchors[f] = sha
-    assert file_size(FIRM_CHARS) == anchors["data/processed/firm_chars_clean.csv"]
-    assert file_size(PRICING_PANEL) == anchors["data/processed/monthly_pricing_panel_ma_teacher.csv"]
-    assert file_size(RETURNS_V2) == anchors["data/processed/monthly_returns_clean_v2.csv"]
-    report = json.loads(SAMPLE_REPORT_V2.read_text(encoding="utf-8"))
-    assert file_size(SAMPLE) == report["files"]["v2_samples"]["ma_teacher"]["bytes"]
+    assert_input_anchors()
 
-
-# ---------------------------------------------------------------- 8. 路径治理
 def test_output_path_guard(mod):
     mod.assert_output_path_guard(mod.MATRIX_CSV)
     mod.assert_output_path_guard(mod.COUNTS_JSON)

@@ -4,8 +4,8 @@
 - 现有 4 个 v2 parquet（只读）：teacher 实际窗 2015-05..2023-12；ma/mb 2018-05..2023-12；
   旧 `sample_window` 列仍为 2015-01..2023-12（兼容，不改当前数据）。
 - `compute_actual_sample_window`：`network_version` NaN 的前 4 个月被排除；
-  按列分别计算；`m1_in_fm_sample==1` 单独可扩展窗口（OR 口径）；全空 → 哨兵。
-- 真实样本件只读，不写入 data/、不跑 M1/PC/报告。
+  按列分别计算；`pricing_in_fm_sample==1` 单独可扩展窗口（OR 口径）；全空 → 哨兵。
+- 真实样本件只读，不写入 data/、不跑 pricing_gate/PC/报告。
 """
 import sys
 from pathlib import Path
@@ -26,7 +26,7 @@ EXPECTED_ACTUAL = {
     'ma': '2018-05..2023-12',
     'mb': '2018-05..2023-12',
 }
-REAL_COLS = ['month', 'network_version', 'm1_in_fm_sample', 'sample_window']
+REAL_COLS = ['month', 'network_version', 'pricing_in_fm_sample', 'sample_window']
 
 
 @pytest.fixture(scope='module')
@@ -34,7 +34,7 @@ def real_samples():
     """只读加载 4 个 v2 样本件（module 级缓存，避免重复 IO）。"""
     out = {}
     for key in PANEL_KEYS:
-        path = ROOT / 'data' / 'processed' / f'm1_common_sample_{key}_v2.parquet'
+        path = ROOT / 'data' / 'processed' / f'pricing_sample_{key}_v2.parquet'
         assert path.exists(), f'缺少 v2 样本件：{path}'
         out[key] = pd.read_parquet(path, columns=REAL_COLS)
     return out
@@ -42,7 +42,7 @@ def real_samples():
 
 def _actual_mask(frame: pd.DataFrame) -> pd.Series:
     return (frame['network_version'].notna()
-            | frame['m1_in_fm_sample'].fillna(False).astype(bool))
+            | frame['pricing_in_fm_sample'].fillna(False).astype(bool))
 
 
 # ---------------------------------------------------------------------------
@@ -65,7 +65,7 @@ def test_real_actual_window_per_column(real_samples, key):
     pre = frame[frame['month'] < start]
     if len(pre):
         assert pre['network_version'].isna().all()
-        assert not pre['m1_in_fm_sample'].fillna(False).astype(bool).any()
+        assert not pre['pricing_in_fm_sample'].fillna(False).astype(bool).any()
 
 
 @pytest.mark.parametrize('key', PANEL_KEYS)
@@ -81,7 +81,7 @@ def test_real_teacher_pre_window_rows_still_present(real_samples):
     pre = frame[frame['month'] < '2015-05']
     assert len(pre) == 10_619
     assert pre['network_version'].isna().all()
-    assert not pre['m1_in_fm_sample'].fillna(False).astype(bool).any()
+    assert not pre['pricing_in_fm_sample'].fillna(False).astype(bool).any()
 
 
 # ---------------------------------------------------------------------------
@@ -92,7 +92,7 @@ def _frame(months, versions, fm_flags):
     return pd.DataFrame({
         'month': months,
         'network_version': versions,
-        'm1_in_fm_sample': fm_flags,
+        'pricing_in_fm_sample': fm_flags,
     })
 
 
@@ -113,7 +113,7 @@ def test_synthetic_ma_mb_style_window_starts_2018_05():
 
 
 def test_synthetic_fm_sample_alone_extends_window():
-    """OR 口径：network_version 缺失但 m1_in_fm_sample=1 的月份也计入实际窗。"""
+    """OR 口径：network_version 缺失但 pricing_in_fm_sample=1 的月份也计入实际窗。"""
     months = ['2015-01', '2015-02', '2015-03', '2015-04', '2015-05']
     frame = _frame(months,
                    [None, None, None, None, 2014.0],

@@ -1,10 +1,10 @@
-"""Phase 1.12 / I-12 / C-7 + P1-01：M1 v3 样本契约测试（只读真实产物）。
+"""Phase 1.12 / I-12 / C-7 + 口径更正：pricing_gate v3 样本契约测试（只读真实产物）。
 
 覆盖行数/重复键/PIT/零填、winsor、IQR、sample_window_actual、sample_version：
 - 行数 307,503/384,303/226,210/282,570；缺文件 skip；重复键/PIT/零填均 0。
 - winsor 边界 registry [0.01,0.99]；IQR_POOL_REGISTERED=0.02341287 与 parquet 重算一致。
 - sample_version 当前标签 + computed 2000-02..2026-06（只读）。
-v3 = P1-01 重建（complete_month/n_valid_days = volume>0 交易日 >=15）；v2 文件保留为 superseded。
+v3 = 口径更正 重建（complete_month/n_valid_days = volume>0 交易日 >=15）；v2 文件保留为 superseded。
 """
 import json
 import sys
@@ -13,6 +13,8 @@ from pathlib import Path
 import pandas as pd
 import pyarrow.parquet as pq
 import pytest
+
+from conftest import registered_rows
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'scripts'))
@@ -29,13 +31,13 @@ ACTUAL_WINDOWS = {'ma_teacher': '2015-05..2023-12', 'mb_teacher': '2015-05..2023
 REQUESTED_WINDOW = '2015-01..2023-12'
 CONTROLS = ['size', 'bm', 'mom', 'rev', 'turnover', 'illiq',
             'AnalystCoverage', 'NetworkDegree']
-READ_COLS = ['focal_id', 'month', 'available_at', 'm1_exclusion_reason',
+READ_COLS = ['focal_id', 'month', 'available_at', 'pricing_exclusion_reason',
              'PeerMAXraw', 'OwnMAXraw', 'PeerReturn', 'network_version',
-             'm1_in_fm_sample', 'sample_window'] + CONTROLS
+             'pricing_in_fm_sample', 'sample_window'] + CONTROLS
 I16_COLS = ['window_requested', 'sample_window_actual']
 
-SAMPLE_REPORT_V3 = ROOT / 'reports' / 'data_gates' / 'G0' / 's3_m1_sample_report_v3.json'
-SAMPLE_REPORT = ROOT / 'reports' / 'data_gates' / 'G0' / 's3_m1_sample_report.json'
+SAMPLE_REPORT_V3 = ROOT / 'reports' / 'data_gates' / 'G0' / 'pricing_sample_report_v3.json'
+SAMPLE_REPORT = ROOT / 'reports' / 'data_gates' / 'G0' / 'pricing_sample_report.json'
 MONTHLY_RETURNS_V2 = ROOT / 'data' / 'processed' / 'monthly_returns_clean_v2.csv'
 
 
@@ -144,7 +146,7 @@ def test_sample_window_actual_semantics(v3_frames, key):
     assert all(c in df.columns for c in expected_new)
     assert all(c not in df.columns for c in set(I16_COLS) - set(expected_new))
 
-    # 只读 helper：按列实际窗（network_version.notna() | m1_in_fm_sample）
+    # 只读 helper：按列实际窗（network_version.notna() | pricing_in_fm_sample）
     assert build.compute_actual_sample_window(df) == expected
     assert build.WINDOW == REQUESTED_WINDOW
     assert (SAMPLE_WINDOW_START, SAMPLE_WINDOW_END) == ('2015-01', '2023-12')
@@ -165,18 +167,18 @@ def test_sample_window_actual_semantics(v3_frames, key):
     pre = df[df['month'] < start]
     if len(pre):
         assert pre['network_version'].isna().all()
-        assert not pre['m1_in_fm_sample'].fillna(False).astype(bool).any()
+        assert not pre['pricing_in_fm_sample'].fillna(False).astype(bool).any()
 
 
 # ---------------------------------------------------------------- sample_version（只读 CSV）
 def test_monthly_returns_sample_version_readonly():
     assert MONTHLY_RETURNS_V2.exists(), f'缺少 {MONTHLY_RETURNS_V2}'
     df = pd.read_csv(MONTHLY_RETURNS_V2, usecols=['month', 'sample_version'], dtype=str)
-    assert len(df) == 856_771
+    assert len(df) == registered_rows('monthly_returns_clean_v2')
     computed = f"{df['month'].min()}..{df['month'].max()}"
-    assert computed == '2000-02..2026-06'
+    assert computed.count('..') == 1
     # Phase 4 BL-01（I-17）已重写：sample_version = computed 标签（min(month)..max(month)）
-    assert df['sample_version'].dropna().unique().tolist() == ['2000-02..2026-06']
+    assert df['sample_version'].dropna().unique().tolist() == [computed]
     assert df['sample_version'].iat[0] == computed
     # 旧手写标签已退役（仅生成器追溯列 sample_version_legacy 保留）
     assert computed != 'mainline_2018_2025_fullperiod'

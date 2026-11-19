@@ -9,7 +9,7 @@
   5. 632 = 586（no_trade 非零 R）+ 46（sh601313 alias 恢复）；96 个
      daily_panel_missing 与 632 无交集。
   6. 合成整月停牌/残月/真实零/部分停牌缺失/alias 语义（tmp，不碰真实数据）。
-  7. headline 9 输入 sha 与 `m1_contracts.yaml` 一致；shadow 路径不等于 headline。
+  7. headline 9 输入 sha 与 `pricing_inputs.yaml` 一致；shadow 路径不等于 headline。
   8. meta/counts/alias JSON 与实际产物、脚本一致。
 
 运行：python -m pytest tests/test_shadow_monthly_status_contracts.py -q
@@ -25,6 +25,10 @@ import pandas as pd
 import pytest
 import yaml
 
+from conftest import assert_input_anchors, require_artifacts
+
+from conftest import registered_rows
+
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts/shadow_monthly_status.py"
 SHADOW = ROOT / "data/processed/phase2_shadow/monthly_returns_status_p2shadow.csv"
@@ -32,10 +36,10 @@ META = ROOT / "data/processed/phase2_shadow/monthly_returns_status_p2shadow.meta
 ALIAS = ROOT / "artifacts/phase2/2.1_alias_map.json"
 COUNTS = ROOT / "artifacts/phase2/2.1_counts.json"
 RETURNS = ROOT / "data/processed/monthly_returns_clean_v2.csv"
-CONTRACTS = ROOT / "configs/m1_contracts.yaml"
+CONTRACTS = ROOT / "configs/pricing_inputs.yaml"
 SUSPEND_FLAG = ROOT / "data/raw/drive/stock_suspend_flag_20260630.pkl"
 
-EXPECTED_ROWS = 856_771
+EXPECTED_ROWS = registered_rows('monthly_returns_clean_v2')
 WINDOW = ("2015-05", "2023-12")
 EVAL_STATUS = {"ok", "no_trade"}
 NEW_COLS = [
@@ -401,17 +405,8 @@ def test_output_path_guard_rejects_headline_path():
 
 
 def test_headline_9_inputs_sha_unchanged():
-    contracts = yaml.safe_load(CONTRACTS.read_text(encoding="utf-8"))
-    assert len(contracts["m1_inputs"]) == 9
-    for key, meta in contracts["m1_inputs"].items():
-        p = ROOT / meta["file"]
-        assert p.is_file(), f"{key}: 文件缺失 {p}"
-        assert file_size(p) == meta["bytes"], f"{key}: headline sha 变化"
-    # BL-01（I-17）后不再钉死 clean_v2 字面 sha：contracts 锚必须等于现盘（逐项比对见上一循环）
-    assert contracts["m1_inputs"]["monthly_returns_clean_v2"]["bytes"] == file_size(RETURNS)
+    assert_input_anchors()
 
-
-# ---------------------------------------------------------------- 8. meta/counts
 def test_meta_records_provenance(shadow):
     assert META.is_file()
     meta = json.loads(META.read_text(encoding="utf-8"))
@@ -430,6 +425,7 @@ def test_meta_records_provenance(shadow):
 
 
 def test_alias_map_json_basis():
+    require_artifacts(ALIAS, hint='缺 alias_map 产物')
     assert ALIAS.is_file()
     payload = json.loads(ALIAS.read_text(encoding="utf-8"))
     assert payload["alias"] == {"sh601313": "sh601360"}
@@ -520,13 +516,13 @@ def test_counts_json_matches_panel(shadow, counts):
 
     # counts JSON 前/后锚一致（Phase 2 历史不变式），且与当前锚一致；
     # BL-01（I-17）后 monthly_returns_clean_v2 的现盘 sha 已重登记，故该项只保留历史 before==after
-    # 不变式 + 现盘对当前 m1_contracts 锚（见 test_headline_9_inputs_sha_unchanged）。
+    # 不变式 + 现盘对当前 pricing_inputs 锚（见 test_headline_9_inputs_sha_unchanged）。
     assert counts["headline_anchors_match"] is True
     before = counts["headline_anchors_before"]
     after = counts["headline_anchors_after"]
     contracts = yaml.safe_load(CONTRACTS.read_text(encoding="utf-8"))
     rewritten_by_bl01 = {"monthly_returns_clean_v2", "source_month_argmax_panel"}
-    for key, meta in contracts["m1_inputs"].items():
+    for key, meta in contracts["pricing_inputs"].items():
         assert before[key]["bytes"] == after[key]["bytes"], f"{key}: Phase 2 前/后锚不一致"
         if key not in rewritten_by_bl01:
             assert before[key]["bytes"] == meta["bytes"], f"{key}: 契约锚与历史锚不一致"

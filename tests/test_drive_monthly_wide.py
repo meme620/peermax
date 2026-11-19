@@ -34,7 +34,7 @@ sys.path.insert(0, str(ROOT / 'scripts'))
 
 import pricing_lib as lib  # noqa: E402
 
-P2_4_SCRIPT = ROOT / 'scripts/shadow_turnover.py'
+TURNOVER_SCRIPT = ROOT / 'scripts/shadow_turnover.py'
 
 CODES = ['000002.SZ', '600000.SH', '000001.SZ']  # 000001.SZ 全 NaN -> 长表无行
 DAYS = ['2014-07-01', '2014-07-02', '2014-07-03', '2014-07-31',
@@ -149,18 +149,18 @@ def test_mean_is_not_last_old_bug_regression(monkeypatch, pkl):
 
 
 # ------------------------------------------------------- 2) 与 Phase 2.4 自实现月均值对拍
-def test_mean_matches_p2_4_self_implementation(monkeypatch, pkl):
+def test_mean_matches_turnover_self_implementation(monkeypatch, pkl):
     """逐值对拍 `shadow_turnover.monthly_frames` 自实现月均值（含 NaN 位置）。"""
-    spec = importlib.util.spec_from_file_location('shadow_turnover', P2_4_SCRIPT)
-    p2_4 = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(p2_4)
-    ref = p2_4.monthly_frames(p2_4.load_turnover_wide(pkl))['turnover_mean']
+    spec = importlib.util.spec_from_file_location('shadow_turnover', TURNOVER_SCRIPT)
+    turnover_mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(turnover_mod)
+    ref = turnover_mod.monthly_frames(turnover_mod.load_turnover_wide(pkl))['turnover_mean']
     wide, _ = _capture_wide(monkeypatch, pkl, 'mean')
     pd.testing.assert_frame_equal(wide, ref, check_exact=True)
     assert np.array_equal(wide.to_numpy(), ref.to_numpy(), equal_nan=True)
     assert wide.index.tolist() == ref.index.tolist()
     diff = (wide - ref).abs()
-    assert float(diff.max().max()) == 0.0, 'mean 与 p2_4 自实现月均值出现非零差'
+    assert float(diff.max().max()) == 0.0, 'mean 与 turnover 自实现月均值出现非零差'
 
 
 # ------------------------------------------------------- 3) 未知 how / 禁止写法

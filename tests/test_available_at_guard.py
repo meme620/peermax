@@ -1,4 +1,4 @@
-"""Phase 1 I-7 护栏：S4 Step2 的 available_at 不得缺失、空值或伪造。
+"""Phase 1 I-7 护栏：panel Step2 的 available_at 不得缺失、空值或伪造。
 
 覆盖：
   1. 当前真实网络目录：4 个主目录 36/36、全部有 build_report 的目录 79/79 通过（只读）。
@@ -11,6 +11,8 @@ import json
 from pathlib import Path
 
 import pytest
+
+from conftest import require_artifacts
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / 'scripts/peermax_panel_build.py'
@@ -111,6 +113,8 @@ def test_real_four_main_dirs_36_reports_pass(mod):
 
 
 def test_real_all_network_dirs_79_reports_pass(mod):
+    if not list(NET_ROOT.glob('network*')):
+        pytest.skip('缺网络产物目录（先跑网络构边）')
     dirs = sorted(
         p for p in NET_ROOT.glob('network*')
         if p.is_dir() and list(p.glob('*_build_report.json')))

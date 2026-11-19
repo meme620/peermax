@@ -6,7 +6,7 @@
 - VW：`weight_col` 走 sqrt(w) WLS，与独立参考一致，且与 EW 结果不同（证明权重生效）。
 - 退化输入：T<2、全 NaN/全缺失、n<min_n、秩亏——返回值/per_month reason 明确。
 
-全部为合成数据（numpy/pandas 内存构造），不读真实 parquet/CSV，不写任何文件，不重跑 M1/PC。
+全部为合成数据（numpy/pandas 内存构造），不读真实 parquet/CSV，不写任何文件，不重跑 pricing_gate/PC。
 """
 import math
 import sys

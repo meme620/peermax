@@ -1,4 +1,4 @@
-"""Phase 1 I-9 护栏：S4 Step2 网络版本必须来自 manifest `network_versions` 白名单。
+"""Phase 1 I-9 护栏：panel Step2 网络版本必须来自 manifest `network_versions` 白名单。
 
 覆盖：
   1. manifest 顶层块结构、登记目录集合（4 主目录 + 6 个有报告变体，共 10）、
@@ -88,6 +88,8 @@ def test_manifest_network_versions_block():
 
 
 def test_manifest_covers_all_dirs_with_build_reports():
+    if not list(NET_ROOT.glob('network*')):
+        pytest.skip('缺网络产物目录（先跑网络构边）')
     specs = _manifest()['network_versions']
     reported = {d.name for d in NET_ROOT.glob('network*')
                 if d.is_dir() and list(d.glob('*_build_report.json'))}
@@ -108,6 +110,8 @@ def test_pilot_network_not_registered(mod, capsys):
 
 # ---------------------------------------------------------------- 真实目录对账
 def test_real_dirs_match_manifest_years(mod):
+    if not list(NET_ROOT.glob('network*')):
+        pytest.skip('缺网络产物目录（先跑网络构边）')
     specs = _manifest()['network_versions']
     for name, spec in specs.items():
         d = NET_ROOT / name
