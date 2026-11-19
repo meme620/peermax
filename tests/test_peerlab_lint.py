@@ -61,6 +61,11 @@ def test_deep_and_single_file_dirs_rejected() -> None:
     assert any('层级' in p for p in problems)
     assert any('只装一个文件' in p for p in problems)
 
+def test_gitkeep_placeholder_ignores_depth() -> None:
+    problems = lint.check_path_names(['data/raw/drive/.gitkeep', 'data/processed/analyst/edges/.gitkeep'])
+    assert problems == []
+
+
 def test_data_dir_with_single_file_allowed() -> None:
     problems = lint.check_path_names(['data/external/reference.xlsx'])
     assert not any('只装一个文件' in p for p in problems)

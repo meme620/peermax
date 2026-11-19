@@ -97,12 +97,19 @@ def check_configs(root: pathlib.Path = ROOT):
     return not missing, lines
 
 
+def payload_count(base: pathlib.Path) -> int:
+    """只数真实载荷；.gitkeep 一类占位文件不算数据就绪。"""
+    if not base.is_dir():
+        return 0
+    return sum(1 for p in base.rglob('*') if p.is_file() and not p.name.startswith('.'))
+
+
 def check_data(root: pathlib.Path = ROOT):
     lines = []
     ready = 0
     for name in RAW_DIRS:
         path = root / 'data' / 'raw' / name
-        count = sum(1 for p in path.rglob('*') if p.is_file()) if path.is_dir() else 0
+        count = payload_count(path)
         if count:
             ready += 1
             lines.append(f'  [就绪] data/raw/{name}: {count} 个文件')
@@ -112,7 +119,7 @@ def check_data(root: pathlib.Path = ROOT):
     lines.append(f"  [{'就绪' if external.is_file() else '缺失'}] {EXTERNAL_FILE}")
     for label, rel in (('产物', PROCESSED_DIR), ('产物', GATES_DIR)):
         base = root / rel
-        count = sum(1 for p in base.rglob('*') if p.is_file()) if base.is_dir() else 0
+        count = payload_count(base)
         lines.append(f'  [{label}] {rel}: {count} 个文件')
     lines.append(f'  小结: raw 目录 {ready}/{len(RAW_DIRS)} 就绪')
     return True, lines

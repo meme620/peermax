@@ -60,6 +60,8 @@ def check_path_names(paths) -> list:
     problems = []
     for rel in paths:
         pure = pathlib.PurePosixPath(rel)
+        if pure.name == '.gitkeep':
+            continue  # 占位文件不承载内容，不参与命名与层级约束
         for part in pure.parts[:-1]:
             if STAGE_CODE.search(part):
                 problems.append(f'{rel}: 目录名含阶段代号 {part!r}')

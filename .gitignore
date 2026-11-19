@@ -7,10 +7,13 @@ __pycache__/
 # codegraph 索引：本地可重建，不入库
 .codegraph/
 
-# 数据：raw/ 是老师提供的 4.4 GB 原始包，不入库；external/ 与 processed/ 进跟踪
-data/raw/
+# 数据：raw/ 二进制不入库（Release 附件分发），目录骨架用 .gitkeep 入库；external/ 与 processed/ 进跟踪
+data/raw/**
+!data/raw/**/
+!data/raw/**/.gitkeep
 data/processed/*
-!data/processed/.gitkeep
+!data/processed/**/
+!data/processed/**/.gitkeep
 
 # 审计工作记录：不入库
 artifacts/

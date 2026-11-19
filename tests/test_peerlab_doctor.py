@@ -39,9 +39,12 @@ def test_configs_yaml_坏了算失败(tmp_path: Path) -> None:
 def test_data_只报告不判失败(tmp_path: Path) -> None:
     (tmp_path / 'data/raw/drive').mkdir(parents=True)
     (tmp_path / 'data/raw/drive/x.pkl').write_bytes(b'x')
+    (tmp_path / 'data/raw/analyst').mkdir(parents=True)
+    (tmp_path / 'data/raw/analyst/.gitkeep').write_text('', encoding='utf-8')
     ok, lines = doctor.check_data(tmp_path)
     assert ok is True
     assert any('[就绪] data/raw/drive: 1 个文件' in line for line in lines)
+    assert any('[空]   data/raw/analyst' in line for line in lines)
     assert any('raw 目录 1/14 就绪' in line for line in lines)
 
 

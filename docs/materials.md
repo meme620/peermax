@@ -5,7 +5,7 @@
 52 个文件分两处存放：
 
 - **10 份文档在 `ref/`**，随仓库入库。
-- **42 个数据文件在 `data/raw/` 与 `data/external/`**，合计 4.11 GiB，不入 Git。
+- **42 个数据文件在 `data/raw/` 与 `data/external/`**，合计 4.11 GiB；`external/` 那个 xlsx 随仓库入库，`raw/` 的 41 个二进制打包挂在 Release `data-raw-v1` 下（见 §9）。
 - 数据文件由交付包 `04_teacher_data.zip` 解出，搬运时逐个计算 sha256 并与交付包清单比对，42/42 一致后才删除原目录。
 
 ## 1. 目录结构
@@ -122,11 +122,20 @@ PDF 元数据已核：作者 `Yangyi Liu`，创建日期分别为 2026-04-09 / 2
 
 | 路径 | 入库 | 内容 | 理由 |
 |---|---|---|---|
-| `data/raw/**` | 否 | 42 个原始文件中的 41 个，4.2 GB | pkl/zip/7z 二进制，单 teacher 语料就 1.05 GB；进 Git 会把 `.git` 永久撑到 GB 级，且无法在不改写历史的情况下撤回 |
+| `data/raw/**` | 目录骨架是（每个子目录一个 `.gitkeep`），二进制否 | 42 个原始文件中的 41 个，4.10 GiB | 单文件最大 1.05 GB（teacher 语料），超过 GitHub 100 MiB 单文件上限；二进制改由 Release `data-raw-v1` 分发（见 9.1） |
 | `data/external/sw_industry_all_stkcds_20260915.xlsx` | 是 | 169 KB，申万 2021 版分类 | 代码读取的外部参照，体积小 |
 | `data/processed/**` | 是（当前只有 `.gitkeep`） | 派生面板、网络、样本 | 结果层；跑链生成后逐文件审核再入库，产物名沿用主仓库登记名 |
 
-`data/raw/` 的退役条件：改用 Git LFS 或外部对象存储后，把该目录纳入跟踪并重跑校验；在那之前保持忽略。
+### 9.1 raw 二进制：Release 附件
+
+41 个二进制约 4.10 GiB，zstd 压到 1.53 GiB，作为单个附件 `peermax-data-raw.tar.zst` 挂在 tag `data-raw-v1` 的 Release 下（GitHub 单附件上限 2 GiB）。tar 内路径相对 `data/raw/`，解包后目录结构与本地一致。
+
+```sh
+gh release download data-raw-v1 --repo meme620/peermax --pattern 'peermax-data-raw.tar.zst' --dir /tmp
+tar --zstd -xf /tmp/peermax-data-raw.tar.zst -C data/raw
+```
+
+需要 zstd（`brew install zstd`、`apt install zstd`）；没有 `gh` 就从 Release 页面直接下。这批文件含 CNRDS/CFND/WSVI 授权数据与老师的 MD&A 语料，2026-11-19 确认公开分发。
 
 ## 10. data/raw/ 各目录就绪状态
 
@@ -170,4 +179,4 @@ PDF 元数据已核：作者 `Yangyi Liu`，创建日期分别为 2026-04-09 / 2
 - 全量 42 个文件、4,403 MB：`raw/` 41 个、`external/` 1 个、`processed/` 0 个。
 - 26 个文件在代码或文档里被按名引用；其余 16 个（全部在 `data/raw/drive/`，约 408 MB）没有按名引用，但被 `audit_drive_batch1.py` 的 `glob('*.pkl')` 目录扫描覆盖，不是孤儿文件。
 - `data/raw/cfnd/`（127 MB）与 `data/raw/wsvi/`（512 MB）当前**没有任何脚本读取**，只作为老师原始包留档；删或留由项目决定，本轮不动。
-- `data/raw/institutional/`、`data/processed/analyst/edges/` 为空目录，不入 Git。
+- `data/raw/institutional/`、`data/processed/analyst/edges/` 当前为空，用 `.gitkeep` 占位入库，clone 后目录结构完整。
