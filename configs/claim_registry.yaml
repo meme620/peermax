@@ -1,16 +1,16 @@
-claim_registry_version: 1.0-baseline
+claim_registry_version: 1.1-baseline
 claims:
-  - claim_id: M1_headline
+  - claim_id: pricing_headline_claim
     status: blocked
-    blocked_reason: 'S5_status=FAIL：M1-1 符号 / M1-2 单侧显著性 / M1-3 经济量级 / M1-4 组合 spread / M1-5 EW-VW 一致性 五项全未过；按 spec/design.yaml 的 m1_gates 停止 standalone MAX-pricing claim，只保留描述性关联'
+    blocked_reason: 'pricing_gate_status=FAIL：sign 符号 / one_sided_significance 单侧显著性 / economic_magnitude 经济量级 / portfolio_spread 组合 spread / ew_vw_consistency EW-VW 一致性 五项全未过；按 spec/design.yaml 的 pricing_gates 停止 standalone MAX-pricing claim，只保留描述性关联'
     treatment: PeerMAXraw
     outcome: R_next
     unit: firm-month
     horizon: next_month
     formula_id:
-      - F_M1_HEADLINE_v1
+      - F_PRICING_HEADLINE_v1
     input_tables:
-      - data/processed/m1_common_sample_ma_teacher_v3.parquet
+      - data/processed/pricing_sample_ma_teacher_v3.parquet
     input_fields:
       - PeerMAXraw
       - OwnMAXraw
@@ -19,20 +19,21 @@ claims:
     required_gates:
       - G1
       - G2
-      - G5
-  - claim_id: M1_portfolio
+      - G3
+  - claim_id: pricing_portfolio_claim
     status: candidate
     treatment: PeerMAXraw
     outcome: R_next
     unit: firm-month
     horizon: next_month
     formula_id:
-      - F_M1_PORTFOLIO_v1
+      - F_PRICING_PORTFOLIO_v1
     input_tables:
-      - data/processed/m1_common_sample_ma_teacher_v2.parquet
+      - data/processed/pricing_sample_ma_teacher_v3.parquet
     input_fields:
       - PeerMAXraw
       - R_next
     required_gates:
       - G1
-      - G5
+      - G2
+      - G3

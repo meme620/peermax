@@ -1,11 +1,29 @@
 manifest_version: 1.0.110
 meta:
   baseline_date: '2026-11-18'
-  note: 新基线重建：网络版本白名单与 M1 输入登记；输入行数/列名合同在 configs/m1_contracts.yaml
+  note: 新基线重建：网络版本白名单与 pricing 输入登记；输入行数/列名合同在 configs/pricing_inputs.yaml
 network_versions:
   network_ma:
-    version_prefix: pm_ma_v1
-    years: &id001
+    version_prefix: pm_ma_ewcos_v1
+    years: &self_years
+      - 2017
+      - 2018
+      - 2019
+      - 2020
+      - 2021
+      - 2022
+      - 2023
+      - 2024
+      - 2025
+    available_at_rule: (y+1)-04-30
+  network_mb:
+    version_prefix: pm_mb_tfidf_v1
+    years: *self_years
+    available_at_rule: (y+1)-04-30
+  network_ma_teacher:
+    version_prefix: pm_ma_ewcos_teacher_v1
+    years: &teacher_years
+      - 2014
       - 2015
       - 2016
       - 2017
@@ -14,22 +32,13 @@ network_versions:
       - 2020
       - 2021
       - 2022
-      - 2023
-    available_at_rule: (y+1)-04-30
-  network_mb:
-    version_prefix: pm_mb_v1
-    years: *id001
-    available_at_rule: (y+1)-04-30
-  network_ma_teacher:
-    version_prefix: pm_ma_teacher_v1
-    years: *id001
     available_at_rule: (y+1)-04-30
   network_mb_teacher:
-    version_prefix: pm_mb_teacher_v1
-    years: *id001
+    version_prefix: pm_mb_tfidf_teacher_v1
+    years: *teacher_years
     available_at_rule: (y+1)-04-30
   network_ma_fulltext:
-    version_prefix: pm_ma_fulltext_v1
+    version_prefix: pm_ma_ewcos_fulltext_v1
     years:
       - 2017
       - 2018
@@ -39,60 +48,60 @@ network_versions:
       - 2022
     available_at_rule: (y+1)-04-30
   network_ma_teacher_idf:
-    version_prefix: pm_ma_teacher_idf_v1
-    years: *id001
+    version_prefix: pm_ma_idf_teacher_v1
+    years: *teacher_years
     available_at_rule: (y+1)-04-30
   network_ma_teacher_medadj:
-    version_prefix: pm_ma_teacher_medadj_v1
-    years: *id001
+    version_prefix: pm_ma_ewcos_teacher_medadj_v1
+    years: *teacher_years
     available_at_rule: (y+1)-04-30
   network_ma_teacher_df10:
-    version_prefix: pm_ma_teacher_df10_v1
-    years: *id001
+    version_prefix: pm_ma_ewcos_teacher_v1
+    years: *teacher_years
     available_at_rule: (y+1)-04-30
   network_ma_teacher_df100:
-    version_prefix: pm_ma_teacher_df100_v1
-    years: *id001
+    version_prefix: pm_ma_ewcos_teacher_v1
+    years: *teacher_years
     available_at_rule: (y+1)-04-30
   network_mb_stub:
-    version_prefix: pm_mb_stub_v1
+    version_prefix: pm_mb_tfidf_v1
     years:
       - 2021
     available_at_rule: (y+1)-04-30
 deliverables:
   - file: data/processed/monthly_returns_clean_v2.csv
     status: pending
-    role: m1_input
-    note: 行数与列名合同见 configs/m1_contracts.yaml
+    role: pricing_input
+    note: 行数与列名合同见 configs/pricing_inputs.yaml
   - file: data/processed/monthly_returns_adj_full_2006_2025.csv
     status: pending
-    role: m1_input
-    note: 行数与列名合同见 configs/m1_contracts.yaml
+    role: pricing_input
+    note: 行数与列名合同见 configs/pricing_inputs.yaml
   - file: data/processed/source_month_argmax_panel.csv
     status: pending
-    role: m1_input
-    note: 行数与列名合同见 configs/m1_contracts.yaml
+    role: pricing_input
+    note: 行数与列名合同见 configs/pricing_inputs.yaml
   - file: data/processed/market_equity_panel_full_2006_2025.csv
     status: pending
-    role: m1_input
-    note: 行数与列名合同见 configs/m1_contracts.yaml
+    role: pricing_input
+    note: 行数与列名合同见 configs/pricing_inputs.yaml
   - file: data/processed/sw2_industry_latest.csv
     status: pending
-    role: m1_input
-    note: 行数与列名合同见 configs/m1_contracts.yaml
+    role: pricing_input
+    note: 行数与列名合同见 configs/pricing_inputs.yaml
   - file: data/processed/analyst/firm_analyst_derived.csv
     status: pending
-    role: m1_input
-    note: 行数与列名合同见 configs/m1_contracts.yaml
+    role: pricing_input
+    note: 行数与列名合同见 configs/pricing_inputs.yaml
   - file: data/processed/firm_chars_clean.csv
     status: pending
-    role: m1_input
-    note: 行数与列名合同见 configs/m1_contracts.yaml
+    role: pricing_input
+    note: 行数与列名合同见 configs/pricing_inputs.yaml
   - file: data/processed/firm_id_map.csv
     status: pending
-    role: m1_input
-    note: 行数与列名合同见 configs/m1_contracts.yaml
+    role: pricing_input
+    note: 行数与列名合同见 configs/pricing_inputs.yaml
   - file: data/processed/market_equity_panel.csv
     status: pending
-    role: m1_input
-    note: 行数与列名合同见 configs/m1_contracts.yaml
+    role: pricing_input
+    note: 行数与列名合同见 configs/pricing_inputs.yaml

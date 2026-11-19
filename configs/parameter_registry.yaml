@@ -1,52 +1,86 @@
-registry_version: 1.5.33-peermax-baseline
+registry_version: 1.6.1-peermax-baseline
 meta:
   baseline_date: '2026-11-19'
   source: 按代码与契约测试重建；非主仓库原文件
-  audit_fix: '2026-11-19 审核修复：M1-3/M1-4/M1-5 阈值改回 spec/design.yaml m1_gates 登记的键值；补 ma_k_target_teacher；新增阈值与口径参数，替换脚本内硬编码'
+  audit_fix: '2026-11-19 参数口径核查修复：K_Consist 改为由 K_Econ/IQR 派生；补 headline/legacy 样本指针、
+    主控制集、listing_grace_days、placebo_draws、VIF 阈值、NW 滞后网格、市值/ST/微盘缺失口径；修正
+    network_cutoff_rule 与 limit_hit_source 的字面量。change_log 见文件头。'
+change_log:
+  - id: CO-2026-11-19-naming
+    date: '2026-11-19'
+    scope: 命名规范化（参数名去阶段代号）
+    rationale: 文件名与产物名去阶段代号后，参数名仍残留阶段代号前缀，读取面与登记面不一致
+    params: [sample_and_spec_registry, analyst_weight_rule]
+    renames:
+      pricing_sample_and_spec_registry: sample_and_spec_registry
+    version_from: 1.6.0-peermax-baseline
+    version_to: 1.6.1-peermax-baseline
+    approval: 用户要求彻底修复命名（2026-11-19 本工作区会话）
+  - id: CO-2026-11-19-parameters
+    date: '2026-11-19'
+    scope: 参数与选择口径核查（reports/review/2026-11-19-parameters.md）
+    rationale: 登记值与执行口径不一致、预注册条款无执行者、样本版本四层漂移
+    params: [K_Consist_Pricing, max_day_policy, pricing_main_controls_v1, placebo_draws, vif_per_month_max,
+      nw_lag_sensitivity, shadow_legacy_sample_version, market_value_basis, st_policy,
+      microcap_missing_policy, network_cutoff_rule, limit_hit_source]
+    version_from: 1.5.33-peermax-baseline
+    version_to: 1.6.0-peermax-baseline
+    approval: 用户批准 reports/review/2026-11-19-fix-plan.md
 parameters:
   - name: sample_start
     headline_value: '2015-01-01'
-    note: 契约测试 test_registry_param_binding 断言
+    note: 事件月窗口起点；实际 FM 首发月为 2015-05（网络 available_at=(y+1)-04-30），见 spec/design.yaml windows.effective
   - name: sample_end
     headline_value: '2023-12-31'
-    note: 同上
+    note: 事件月窗口终点；受网络版本年份（version_manifest network_versions 止于 2023）约束
   - name: winsorization_pct
     headline_value:
       - 0.01
       - 0.99
-    note: 月截面 winsor 分位；契约测试断言
+    note: 月截面 winsor 分位；作用于 treatment/controls/outcome（pricing_sample_build 显式传边界）
   - name: nw_lag
     headline_value: 6
-    note: Newey-West Bartlett 滞后；源码注释 NW_LAG=6
+    note: Newey-West Bartlett 滞后（主口径）；敏感性网格见 nw_lag_sensitivity
+  - name: nw_lag_sensitivity
+    headline_value:
+      - 0
+      - 3
+      - 6
+      - 12
+    note: gate 用已存 β 序列逐 lag 重算 β/t/单侧 p；lag=6 行必须与主表一致
   - name: min_valid_days
     headline_value: 15
-    note: complete_month = volume>0 交易日 >= 15；build_monthly_returns_status 注释
-  - name: alpha_m1
+    note: complete_month = volume>0 交易日 >= 15（月均 20.3 的 75%）
+  - name: alpha_pricing
     headline_value: 0.05
-    note: 单侧显著性门 M1-2 的 alpha；spec/design.yaml m1_gates 的 registry_key
-  - name: K_Econ_M1
+    note: 单侧显著性门 one_sided_significance 与 TOST 等价的 alpha；spec/design.yaml pricing_gates 的 registry_key
+  - name: K_Econ_Pricing
     headline_value: 0.003
-    note: M1-3 经济量级门 |beta*IQR| 阈值；spec/design.yaml m1_gates 的 registry_key（月收益单位）
-  - name: K_Spread_M1
+    note: economic_magnitude 经济量级门 |beta*IQR| 阈值（月收益单位）；spec/design.yaml pricing_gates 的 registry_key
+  - name: K_Spread_Pricing
     headline_value: 0.003
-    note: M1-4 组合 spread 阈值；spec/design.yaml m1_gates 的 registry_key（月收益单位）
-  - name: K_Consist_M1
-    headline_value: 0.5
+    note: portfolio_spread 组合 spread 阈值（月收益单位）；spec/design.yaml pricing_gates 的 registry_key
+  - name: K_Consist_Pricing
+    headline_value: 0.128135
+    derived_from: K_Econ_Pricing / iqr_pool_value
     sensitivity_grid:
-      - 0.25
+      - 0.128135
       - 0.5
-      - 0.75
-    note: 'M1-5 EW/VW 一致性阈值，beta 单位；spec/design.yaml m1_gates 的 registry_key 登记值（×IQR≈1.17%/月）'
+    note: 'ew_vw_consistency EW/VW 等价界，β 单位；= K_Econ_Pricing / IQR_pool = 0.003 / 0.02341287 = 0.128135β ≈ 0.30%/月，
+      与经济量级门同尺度。0.5（旧值，≈1.17%/月=3.9×K_Econ）保留为敏感性值。pricing_lib 导入即断言派生关系'
   - name: portfolio_breakpoints
     headline_value:
       - 0.2
       - 0.4
       - 0.6
       - 0.8
-    note: 五分位断点；基线取值
+    note: 五分位断点；headline = EW 五分位（design 的 pricing_gates portfolio_spread）
   - name: random_seed
     headline_value: 20260727
-    note: 源码注释登记值（network_density_null 等）
+    note: 随机化组件（placebo 网络、edge precision、density null）的 seed base
+  - name: placebo_draws
+    headline_value: 500
+    note: placebo 随机重指派次数 R；经验 p = (1+#{β_k <= β_real})/(R+1)；R 与 seed_base 写入产物
   - name: rewiring_reps
     headline_value: 1000
     note: 零模型重连次数；契约测试断言 1000
@@ -77,69 +111,100 @@ parameters:
   - name: ma_k_target_teacher
     headline_value: 44
     note: M-A 主口径（老师 MD&A 语料）逐年 K 目标同伴数；network_business_cluster_freeze 读取
-  - name: m1_sample_and_spec_registry
+  - name: sample_and_spec_registry
     headline_value:
-      sample_version: m1_s5_v3_20261115
+      sample_version: pricing_sample_v3_20261115
       min_focal_count_per_month: 100
       min_effective_month_count: 60
       iqr_scale_rule_id: IQR_POOL_TREATMENT_ONLY_v1
       iqr_scale_rule: treatment-only 宇宙单一池化 IQR（数值 0.02341287，见 pricing_lib.IQR_POOL_REGISTERED）
       portfolio_tie_rule_id: rank_average
-      tost_rule_id: TOST_EW_VW_K_Consist_M1
-    note: M1 样本与规格登记块；min_focal=100 由契约测试断言，其余为基线值
+      tost_rule_id: TOST_EW_VW_K_Consist_Pricing
+    note: pricing 样本与规格登记块；sample_version 是 headline 唯一指针（pricing_* 与 peerlab 均读此值）
+  - name: shadow_legacy_sample_version
+    headline_value: pricing_sample_v2_2015_2023
+    note: shadow_* 全套未重跑时读此值（非 headline）；退役条件 = shadow 全套重跑到 sample_and_spec_registry.sample_version 后删除本参数与读取点
+  - name: pricing_main_controls_v1
+    headline_value:
+      list: [size, bm, mom, rev, turnover, illiq, AnalystCoverage, NetworkDegree]
+      timing: 事件月 t（size/bm/turnover/illiq/AnalystCoverage/NetworkDegree）与 t-1 及更早（mom/rev）
+      rationale:
+        size: 规模溢价与流动性；log 市值
+        bm: 价值因子
+        mom: 12 月动量（t-12..t-1，不含 t 月，避免与 outcome 重叠）
+        rev: 1 月反转（t-1 月收益）
+        turnover: 换手率；注意力与交易压力的直接对照
+        illiq: Amihud 非流动性（|R_t|/成交额）
+        AnalystCoverage: 关注度；同时是样本屏（缺失即 control_missing）
+        NetworkDegree: analyst-network 共同分析师网络度数；与产品网络度数分开
+    note: 主规格控制集唯一来源；pricing_* 不得再写字面量。两控制缺失屏造成的样本收缩在 gate 报告里报数
   - name: sample_filter_thresholds
     headline_value:
       microcap_exclusion: monthly_market_equity_q10
       ipo_exclusion: listed_less_than_6_months
       st_stratify: st_flag_focal
-      limit_hit_source: daily_limit_hit_flag
+      limit_hit_source: daily_limit_up_flag+daily_limit_down_flag
       no_network_support: network_support_status!=support
     note: 样本筛除口径；字段名由 pricing_sample_build 读取，值为基线口径
+  - name: market_value_basis
+    headline_value: total_market_value
+    note: 微盘筛除与 VW 权重的市值口径；流通市值日频序列不可得（analyst_spec registered_deviations 指向本键）
+  - name: st_policy
+    headline_value: include_st
+    note: ST 股含入主样本并按 focal 侧分层并报（analyst_spec registered_deviations 指向本键）
+  - name: microcap_missing_policy
+    headline_value: include
+    note: market_equity 缺失时不做微盘筛除（fillna(False)）；缺失行数在样本报告 microcap_missing_rows 并报
   - name: panel_versions
     headline_value:
-      ma_teacher: s4_panel_ma_teacher_2015_01_2023_12_v1
-      mb_teacher: s4_panel_mb_teacher_2015_01_2023_12_v1
-      ma: s4_panel_ma_2018_01_2023_12_v1
-      mb: s4_panel_mb_2018_01_2023_12_v1
-    note: S4 面板版本指针；peermax_panel_build.load_registry_panel_versions 读取
+      ma_teacher: panel_ma_teacher_2015_01_2023_12_v1
+      mb_teacher: panel_mb_teacher_2015_01_2023_12_v1
+      ma: panel_ma_2018_01_2023_12_v1
+      mb: panel_mb_2018_01_2023_12_v1
+    note: panel 面板版本指针；peermax_panel_build.load_registry_panel_versions 读取
   - name: coverage_window
     headline_value: 12
-    note: S3A 分析师覆盖的 12 月滚动窗口（analyst_gate1_consistency_check 读取）
+    note: analyst-network 分析师覆盖的 12 月滚动窗口（analyst_gate1_consistency_check 读取）
   - name: epsilon_weight
     headline_value: 0.0001
     note: 有效边权重平方和下限 1e-4（network_diagnostics docstring）
   - name: network_cutoff_rule
-    headline_value: 月末（month_end）
+    headline_value: month_end
     note: 网络时点取月末（analyst_smoketest_window_sensitivity 变体之一）
-  - name: s3a_weight_rule
+  - name: analyst_weight_rule
     headline_value: equal_weight_over_common_analysts
-    note: S3A 共同分析师边的权重规则（一致性检查按子串匹配）
+    note: analyst-network 共同分析师边的权重规则（一致性检查按子串匹配）
   - name: limit_thresholds
     headline_value:
       main: 0.095
       main_st: 0.045
       chinext_star: 0.195
-    note: 涨跌停派生阈值（|rraw| >= 阈值判 limit_hit）；peermax_max_build 读取；供应商 flag 可得时优先用 flag
+    note: 涨跌停派生阈值（|rraw| >= 阈值判 limit_hit）；供应商 flag 无覆盖时才用；peermax_max_build 读取
   - name: ca_ratio_jump
     headline_value: 0.01
     note: qfq/raw 比值相邻日跳变阈值，用于 ca_flag 候选除权日（ca_flag 已弃用，仅审计）
   - name: ca_flag_status
     headline_value: deprecated
-    note: ca_flag 由 SHAREBONUS 除权日表替代；仍写入面板仅作审计，消费方不得据此过滤
+    note: ca_flag 由 SHAREBONUS 除权日表替代；仍写入面板仅作审计，消费方不得据此过滤。退役条件 = shadow_adjusted_max_build 的复权 MAX 升为登记口径后删除该列
   - name: iqr_pool_value
     headline_value: 0.02341287
-    note: M1 经济量级的 treatment-only 池化 IQR 登记值；pricing_lib.IQR_POOL_REGISTERED 导入即核对该值
+    note: pricing 经济量级的 treatment-only 池化 IQR 登记值；pricing_lib.IQR_POOL_REGISTERED 导入即核对该值
   - name: pc_coverage_years
     headline_value: 6
     note: PC 竞争强度可得年数（文本年 2017-2022）；营收年表仅 FY2016-2024，文本年 2014-2016 缺且不填 0
   - name: p_direction
     headline_value: negative
-    note: M1-2 单侧检验方向；pricing_lib.fm_regression 与 gate 共用
+    note: sign/one_sided_significance 方向；pricing_lib.fm_regression 与 gate 共用
   - name: max_day_policy
     headline_value:
       limit_hit: exclude
       resume: exclude
-    note: MAX/argmax 的日样本口径；涨跌停日与停牌复牌首日剔除，另报含全部日的 MAXraw_incl_all
+      listing_grace_days: 5
+    note: MAX/argmax 的日样本口径；剔除涨跌停日、停牌复牌首日、上市后前 N 个交易日（新股无涨跌幅限制期）。
+      MAXraw 只剔前两项；listing_grace_days 用于并列列 MAXraw_la。MAXraw_incl_all 仍为全样本审计列
+  - name: vif_per_month_max
+    headline_value: 10
+    note: 逐月 VIF 上限；超过的月份标 non_interpretable（报数不删行），gate 报告汇总超阈月份
   - name: iqr_drift_tolerance
     headline_value: 0.1
     note: 样本实算 IQR 与登记值的相对漂移上限；超过即停机复核

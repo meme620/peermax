@@ -11,5 +11,7 @@ pre-commit:
 pre-push:
   commands:
     gate:
-      # 退出码：0 全通过 / 1 判据违反（阻断）/ 2 缺产物 blocked（放行，数据门在有数据的机器上才判得动）
-      run: sh -c '.venv/bin/python -m peerlab gate; code=$?; [ "$code" -eq 0 ] || [ "$code" -eq 2 ]'
+      # 退出码：0 全通过 / 1 判据违反（阻断）/ 2 缺产物 blocked
+      # blocked 放行（数据门要在有数据的机器上才判得动），但必须显式提示"本次未判定"，
+      # 否则 6 门全 blocked 时这道门与不存在没有区别。
+      run: sh -c '.venv/bin/python -m peerlab gate; code=$?; if [ "$code" -eq 2 ]; then echo "[gate] 本次数据门未判定（缺产物）；推送放行，判据仍为未验证"; fi; [ "$code" -eq 0 ] || [ "$code" -eq 2 ]'

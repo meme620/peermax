@@ -7,11 +7,11 @@ __pycache__/
 # codegraph 索引：本地可重建，不入库
 .codegraph/
 
-# 数据：raw/ 二进制不入库（Release 附件分发），目录骨架用 .gitkeep 入库；external/ 与 processed/ 进跟踪
+# 数据：raw/ 二进制不入库（Release 附件分发）；processed/ 只入库目录骨架（.gitkeep），生成产物留本地
 data/raw/**
 !data/raw/**/
 !data/raw/**/.gitkeep
-data/processed/*
+data/processed/**
 !data/processed/**/
 !data/processed/**/.gitkeep
 

@@ -1,0 +1,76 @@
+pricing_inputs_version: 2.1.0
+meta:
+  baseline_date: '2026-11-19'
+  rule: 行数与列名是复现门槛；文件内容变动由行数或列名变化暴露
+  note: rows 为 null 时 check_input_contract 直接 fail-closed（pricing_lib 要求 rows 已登记）；columns
+    为 null 表示只锁行数
+  rows_registered_at: '2026-11-20'
+pricing_inputs:
+  monthly_returns_clean_v2:
+    file: data/processed/monthly_returns_clean_v2.csv
+    rows: 844952
+    columns:
+    - firm_id
+    - month
+    - R
+    - n_valid_days
+    - complete_month
+    - return_status
+    - month_start
+    - month_end
+    - sample_version
+    - available_at
+  monthly_returns_adj_full_2006_2025:
+    file: data/processed/monthly_returns_adj_full_2006_2025.csv
+    rows: 874618
+    columns:
+    - firm_id
+    - month
+    - R
+  source_month_argmax_panel:
+    file: data/processed/source_month_argmax_panel.csv
+    rows: 744615
+    columns:
+    - source_id
+    - month
+    - MAXraw
+    - MAXraw_la
+    - argmax_date
+    - n_valid_days
+    - R
+    - tie_rule_version
+    - formula_id
+    - limit_hit_at_argmax
+    - qualification_status
+    - st_flag_at_argmax
+    - complete_month
+    - available_at
+    - n_excluded_listing
+  market_equity_panel_full_2006_2025:
+    file: data/processed/market_equity_panel_full_2006_2025.csv
+    rows: 850487
+    columns: null
+  sw2_industry_latest:
+    file: data/processed/sw2_industry_latest.csv
+    rows: 5938
+    columns: null
+  firm_analyst_derived:
+    file: data/processed/analyst/firm_analyst_derived.csv
+    rows: 501245
+    columns: null
+  firm_chars_clean:
+    file: data/processed/firm_chars_clean.csv
+    rows: 850487
+    columns: null
+  firm_id_map:
+    file: data/processed/firm_id_map.csv
+    rows: 5535
+    columns:
+    - firm_id
+    - code6
+    - board
+    - ipo_date
+  market_equity_panel:
+    file: data/processed/market_equity_panel.csv
+    rows: 850487
+    columns: null

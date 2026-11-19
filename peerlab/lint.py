@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import ast
+import builtins
 import collections
 import pathlib
 import re
@@ -49,8 +51,7 @@ def check_path_names(paths) -> list:
                 problems.append(f'{rel}: 目录名含阶段代号 {part!r}')
             if NUMBER_PREFIX.match(part):
                 problems.append(f'{rel}: 目录名带数字前缀 {part!r}')
-        config_exception = pure.parts[0] == 'configs' and pure.suffix in {'.yaml', '.yml'}
-        if STAGE_CODE.search(pure.stem) and not config_exception:
+        if STAGE_CODE.search(pure.stem):
             problems.append(f'{rel}: 文件名含阶段代号')
         if NUMBER_PREFIX.match(pure.stem):
             problems.append(f'{rel}: 文件名带数字前缀')
@@ -196,6 +197,40 @@ def check_text_io_encoding(root: pathlib.Path) -> list:
     return problems
 
 
+ARTIFACT_EXT = r'(?:json|md|csv|parquet|pptx|xlsx|yaml|yml|txt|log|pkl)'
+ARTIFACT_TOKEN = re.compile(r'[A-Za-z0-9_{}\-]*[A-Za-z0-9_{}]\.' + ARTIFACT_EXT + r'\b')
+FINAL_TOKEN = re.compile(r'(?i)(?:^|[^a-z0-9])final(?:[^a-z0-9]|$)')
+
+
+def check_artifact_names(root: pathlib.Path, paths=None) -> list:
+    """产物文件名字面量不得含阶段代号或 final。
+
+    磁盘上最终叫什么由脚本里写的字符串决定，只查路径本身管不住产物名。
+    tests/ 跳过：测试会往 tmp_path 合成同形 fixture。
+    """
+    if paths is None:
+        out = subprocess.run(['git', 'ls-files', '-z'], cwd=root, capture_output=True, text=True)
+        paths = [line for line in out.stdout.split('\0') if line]
+    problems = []
+    for rel in paths:
+        if rel.startswith(('tests/', 'ref/', 'data/')):
+            continue
+        if pathlib.PurePosixPath(rel).suffix not in TEXT_SUFFIXES and rel != 'Makefile':
+            continue
+        path = root / rel
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding='utf-8', errors='ignore')
+        for match in ARTIFACT_TOKEN.finditer(text):
+            token = match.group(0)
+            stem = token.rsplit('.', 1)[0]
+            if stem.isupper() or len(stem) < 3:
+                continue
+            if STAGE_CODE.search(stem) or FINAL_TOKEN.search(stem):
+                problems.append(f'{rel}: 产物名含阶段代号或 final {token!r}')
+    return problems
+
+
 def check_script_sources(root: pathlib.Path) -> list:
     """scripts/ 已拍平到一层：再出现两层相对回退或 parents[2] 就是把仓库根算错。"""
     problems = []
@@ -209,6 +244,57 @@ def check_script_sources(root: pathlib.Path) -> list:
     return problems
 
 
+_UNDEF_SKIP = {
+    'self', 'cls', '__file__', '__name__', 'True', 'False', 'None',
+}
+
+
+def check_undefined_names(root: pathlib.Path) -> list:
+    """scripts/ 内被调用但未在本模块定义/导入的名字：批量改名事故的机械兜底。
+
+    只看 Call 节点里的裸 Name（不含属性调用与内建）；模块级 def/import/赋值与
+    函数内外层参数都算已定义。误报代价低（能改到），漏报代价高（2026-11-19 的
+    sizes→file_size 事故 15 处全属此类，compileall 与既有 lint 都放行）。
+    """
+    problems = []
+    builtin_names = set(dir(builtins))
+    for path in sorted((root / 'scripts').glob('*.py')):
+        rel = path.relative_to(root).as_posix()
+        try:
+            tree = ast.parse(path.read_text(encoding='utf-8'))
+        except SyntaxError:
+            continue
+        defined = set()
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                defined.add(node.name)
+            elif isinstance(node, ast.Import):
+                for a in node.names:
+                    defined.add((a.asname or a.name).split('.')[0])
+            elif isinstance(node, ast.ImportFrom):
+                for a in node.names:
+                    defined.add(a.asname or a.name)
+            elif isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store):
+                defined.add(node.id)
+            elif isinstance(node, ast.arg):
+                defined.add(node.arg)
+            elif isinstance(node, ast.ExceptHandler) and node.name:
+                defined.add(node.name)
+            elif isinstance(node, (ast.Global, ast.Nonlocal)):
+                defined.update(node.names)
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
+            if not isinstance(func, ast.Name):
+                continue
+            name = func.id
+            if name in defined or name in builtin_names or name in _UNDEF_SKIP:
+                continue
+            problems.append(f'{rel}:{node.lineno}: 调用未定义的名字 {name}()')
+    return problems
+
+
 def run(root: pathlib.Path = ROOT, experiments=None) -> tuple:
     experiments = experiments or registry.EXPERIMENTS
     problems = (check_spec(root)
@@ -216,7 +302,9 @@ def run(root: pathlib.Path = ROOT, experiments=None) -> tuple:
                 + check_paths(root)
                 + check_local_imports(root)
                 + check_script_sources(root)
+                + check_artifact_names(root)
                 + check_text_io_encoding(root)
                 + check_hygiene(root)
+                + check_undefined_names(root)
                 + check_script_literals(root))
     return (0 if not problems else 1), problems

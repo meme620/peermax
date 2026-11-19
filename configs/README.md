@@ -1,34 +1,32 @@
 # configs/
 
-六个冻结配置，2026-11-18 按「新基线」重建（原主仓库 registry 1.5.32 / manifest 1.0.110 不在本机）。
+六个冻结配置。参数来源分三类：契约测试断言、源码 docstring、设计口径取值，每条在文件里带 `note`；数值只登记在本目录，`spec/` 用 `registry_key` / `registry_keys` 引用参数名。
 
 | 文件 | 作用 | 谁读 |
 |---|---|---|
-| `parameter_registry.yaml` | 参数登记表（26 条）：样本窗口、winsor、NW 滞后、M1 门禁阈值、S3A 冻结参数、面板版本指针 | `pricing_lib` 导入即校验；`peermax_panel_build`、`pricing_gate_report`、`analyst_gate1_consistency_check` 等 |
-| `version_manifest.yaml` | 版本清单：网络版本白名单（10 个目录）、M1 主输入登记 | `pricing_lib.load_manifest_entries`、`peermax_panel_build.load_versions` |
-| `s3a_final_spec.yaml` | S3A 规格：输入路径、网络版本与规则、样本偏差登记 | `analyst_*` 全套 |
-| `m1_contracts.yaml` | M1 九个主输入的合同（路径 / sha256 / 行数） | `shadow_monthly_status` 等 Phase2 脚本 |
-| `claim_registry.yaml` | claim 与七类连接登记（M1_headline、M1_portfolio） | `check_link_audit.py`、`tests/test_analyst_contracts.py` |
+| `parameter_registry.yaml` | 参数登记表：样本窗口、winsor、NW 滞后与敏感性网格、pricing 门禁阈值、headline/shadow 样本指针、主控制集、MAX 日样本口径、预注册推断参数 | `pricing_lib` 导入即校验；`pricing_*`、`shadow_*`、`peermax_panel_build`、`analyst_gate1_consistency_check` 等 |
+| `version_manifest.yaml` | 版本清单：网络版本白名单（10 个目录） | `pricing_lib.load_manifest_entries`、`peermax_panel_build.load_versions` |
+| `analyst_spec.yaml` | 分析师网络规格：输入路径、网络版本与规则、样本偏差登记、governance 版本串 | `analyst_*` 全套 |
+| `pricing_inputs.yaml` | 定价层九个主输入的合同：路径 / `rows` / `columns` | `pricing_lib.check_input_contract`、`shadow_monthly_status` 等 Phase2 脚本 |
+| `claim_registry.yaml` | claim 与七类连接登记（pricing_headline_claim、pricing_portfolio_claim） | `check_link_audit.py`、`tests/test_link_audit_semantics.py` |
 | `scope_card.yaml` | 最小口径卡（treatment/outcome/窗口/上限） | `check_link_audit.py` |
 
-## 基线的来源
+## 改口径的流程
 
-- **契约测试断言的值**：`sample_start=2015-01-01`、`sample_end=2023-12-31`、`winsorization_pct=[0.01,0.99]`、`min_focal_count_per_month=100`、`rewiring_reps=1000`。
-- **源码注释/docstring 的值**：`nw_lag=6`、`min_valid_days=15`、`m_b_tau_fixed=0.25`、`df_threshold=0.25`、`min_product_terms=10`、`cluster_linkage=average`、`random_seed=20260727`、`sw2_median_peer_target=56`、`epsilon_weight=1e-4`。
-- **基线取值（原值不可得，按项目口径取保守值）**：`alpha_m1=0.05`、`K_Econ_M1=0.05`、`K_Spread_M1=0.05`、`K_Consist_M1=0.05`、`min_effective_month_count=60`、`portfolio_breakpoints=[0.2,0.4,0.6,0.8]`、`panel_versions` 四个版本串、`sample_filter_thresholds` 五个口径串。
+改登记值、headline 规则或样本定义：
 
-每个参数在文件里带 `note` 标明来源。这不是主仓库那份冻结 registry 的复制品，引用前先看文件头。
+1. 在 `parameter_registry.yaml` 的 `change_log` 追加一条（id / date / scope / rationale / params / version 前后）；
+2. 升 `registry_version`，同步 `analyst_spec.yaml` 的 `governance.registry_version`（`pricing_lib` 导入即核对，不一致退出 2）；
+3. 跑 `python -m peerlab spec`、`make lint` 与相称的 pytest。
 
-## 还没锚定的东西
+派生参数不得手填：`K_Consist_Pricing` 必须等于 `K_Econ_Pricing / iqr_pool_value`，`pricing_lib` 导入即断言。样本指针只有两个：`sample_and_spec_registry.sample_version`（headline）与 `shadow_legacy_sample_version`（shadow 全套，重跑后删除）。
 
-`version_manifest.yaml` 的 `deliverables` 与 `m1_contracts.yaml` 的 `m1_inputs` 里，9 个 M1 主输入目前 `sha256: null`、`status: pending`——`data/processed/` 为空，算不出真实哈希。`s3a_final_spec.yaml` 的 `provenance.input_hashes` 同理。
+## 输入合同的登记步骤
 
-补锚步骤（数据生成后）：
+`data/processed/` 产出一份主输入后：
 
-1. 对每个主输入算 `shasum -a 256`，写进 `version_manifest.yaml` 的 `deliverables[].sha256` 并把 `status` 改成 `active`；
-2. 同一哈希与行数写进 `m1_contracts.yaml` 的 `m1_inputs[].sha256 / expected_rows`；
-3. 把四份主输入的哈希写进 `s3a_final_spec.yaml` 的 `provenance.input_hashes`；
-4. 重算 `s3a_final_spec.yaml` 的 `governance.manifest_sha256 / registry_sha256`（manifest/registry 改过就要重算）；
-5. 跑 `python scripts/check_link_audit.py`、`python -m peerlab smoke --imports`、`python -m pytest tests -q`。
+1. 数出行数，写进 `pricing_inputs.yaml` 对应条目的 `rows`；
+2. 需要锁列名的，把列名列表写进 `columns`；
+3. 跑 `python -m peerlab smoke --imports` 与 `python -m pytest tests -q`。
 
-在锚补齐之前，任何读 sha 的脚本都会按 fail-closed 退出 2——这是设计行为，不要用猜测值填。
+`rows` 为 null 时 `check_input_contract` 直接 fail-closed（不会退化成"文件存在"）；`columns` 为 null 表示只锁行数。

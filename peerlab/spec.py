@@ -1,7 +1,8 @@
 """spec/ 下的 YAML 是文档的可执行替身：每条引用都要能解析到实体。
 
 校验对象：
-- spec/design.yaml：变量 implemented_by 的脚本、M1 判据的 registry 键、数据门与约束的 enforced_by 引用、红线引用；
+- spec/design.yaml：变量 implemented_by 的脚本、任何层级的 registry_key / registry_keys
+  参数名、数据门与约束的 enforced_by 引用、红线引用；
 - spec/stages.yaml：阶段脚本存在；
 - spec/inputs.yaml：消费者脚本存在，required 的路径必须在盘上。
 """
@@ -28,6 +29,38 @@ def _registry_keys(root: pathlib.Path) -> set:
     path = pathlib.Path(root) / 'configs' / 'parameter_registry.yaml'
     data = yaml.safe_load(path.read_text(encoding='utf-8'))
     return {item['name'] for item in data.get('parameters', [])}
+
+
+def _registry_names(value, where):
+    """registry_key(s) 的值可以是标量、列表或「标签 → 键名」映射。"""
+    if isinstance(value, dict):
+        for label, item in value.items():
+            yield from _registry_names(item, f'{where}.{label}')
+    elif isinstance(value, list):
+        for item in value:
+            yield from _registry_names(item, where)
+    elif value:
+        yield where, value
+
+
+def _registry_refs(node, where='design'):
+    """遍历 design，产出 (位置, 参数名)：字段名 registry_key / registry_keys 即引用。"""
+    if isinstance(node, dict):
+        label = node.get('id') or node.get('name')
+        here = f'{where}[{label}]' if label else where
+        for key, value in node.items():
+            if key in ('registry_key', 'registry_keys'):
+                yield from _registry_names(value, f'{here}.{key}')
+            elif isinstance(value, (dict, list)):
+                yield from _registry_refs(value, f'{here}.{key}')
+    elif isinstance(node, list):
+        for item in node:
+            yield from _registry_refs(item, where)
+
+
+def check_registry_refs(design, keys) -> list:
+    return [f'{where}: registry 无参数 {key}'
+            for where, key in _registry_refs(design) if key not in keys]
 
 
 def _resolve(token: str, root: pathlib.Path) -> str | None:
@@ -85,11 +118,9 @@ def validate(root) -> list:
         for script in var.get('implemented_by', []):
             if not (root / 'scripts' / (script + '.py')).is_file():
                 problems.append(f'design.variables {var["name"]}: 缺脚本 scripts/{script}.py')
-    for gate in design.get('m1_gates', []):
-        key = gate.get('registry_key')
-        if key and key not in keys:
-            problems.append(f'design.m1_gates {gate["id"]}: registry 无参数 {key}')
-        _check_refs([gate], 'enforced_by', root, 'design.m1_gates', problems)
+    problems.extend(check_registry_refs(design, keys))
+    for gate in design.get('pricing_gates', []):
+        _check_refs([gate], 'enforced_by', root, 'design.pricing_gates', problems)
     _check_refs(design.get('data_gates'), 'enforced_by', root, 'design.data_gates', problems)
     _check_refs(design.get('data_contracts'), 'enforced_by', root, 'design.data_contracts', problems)
     _check_refs([design.get('sample_filters') or {}], 'enforced_by', root, 'design.sample_filters', problems)
@@ -125,7 +156,7 @@ def summary(root) -> dict:
     inputs = _load(root, 'inputs.yaml')
     return {
         'variables': len(design.get('variables', [])),
-        'm1_gates': len(design.get('m1_gates', [])),
+        'pricing_gates': len(design.get('pricing_gates', [])),
         'data_gates': len(design.get('data_gates', [])),
         'constraints': len(design.get('constraints', [])),
         'red_lines': len(design.get('red_lines', [])),
@@ -133,6 +164,6 @@ def summary(root) -> dict:
         'inputs': len(inputs.get('inputs', [])),
         'experiments': len(registry.EXPERIMENTS),
         'enforced_refs': sum(len(entry.get('enforced_by') or [])
-                             for group in ('m1_gates', 'data_gates', 'constraints', 'red_lines')
+                             for group in ('pricing_gates', 'data_gates', 'constraints', 'red_lines')
                              for entry in design.get(group, [])),
     }

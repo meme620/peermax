@@ -100,16 +100,16 @@ def check_sample_metadata(root: Path) -> dict:
     标签写死后按版本筛样本会静默选错行。
     """
     processed = root / 'data' / 'processed'
-    samples = sorted(processed.glob('m1_common_sample_*.parquet'))
+    samples = sorted(processed.glob('pricing_sample_*.parquet'))
     returns = processed / 'monthly_returns_clean_v2.csv'
     if not samples or not returns.is_file():
         return {'problems': [], 'checked': 0,
-                'blocked': '缺 m1_common_sample_*.parquet 或 monthly_returns_clean_v2.csv'}
+                'blocked': '缺 pricing_sample_*.parquet 或 monthly_returns_clean_v2.csv'}
     import pandas as pd
     import pyarrow.parquet as pq
 
     rule = _script('pricing_sample_build').compute_actual_sample_window
-    need = ['month', 'network_version', 'm1_in_fm_sample', 'window_requested', 'sample_window_actual']
+    need = ['month', 'network_version', 'pricing_in_fm_sample', 'window_requested', 'sample_window_actual']
     problems = []
     for path in samples:
         names = pq.ParquetFile(path).schema.names
@@ -294,7 +294,7 @@ def check_firm_chars_analyst_cov(root: Path) -> dict:
     """firm_chars_clean.csv 必须带 analyst_cov 且非空。
 
     来源：analyst_chars_merge.py 在 runner 之外手工回填这一列（gate2 记为 step11 不在 runner）。
-    列丢了，M1 的 AnalystCoverage 控制变量整列 NaN，只在样本报告里表现为 control_missing。
+    列丢了，pricing_gate 的 AnalystCoverage 控制变量整列 NaN，只在样本报告里表现为 control_missing。
     """
     path = root / 'data' / 'processed' / 'firm_chars_clean.csv'
     if not path.is_file():
