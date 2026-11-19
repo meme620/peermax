@@ -6,7 +6,7 @@ PeerMAX（A 股产品市场同侪的彩票型收益溢出）的代码与材料�
 
 | 文件 | 回答什么 |
 |---|---|
-| `spec/design.yaml` | 设计口径的可执行版：变量→实现脚本、样本与 PIT、M1 判据→registry 键、数据门→gate、结构约束→lint、十条识别红线 |
+| `spec/design.yaml` | 设计口径的可执行版：变量→实现脚本、样本与 PIT、pricing 判据→registry 键、数据门→gate、结构约束→lint、十条识别红线 |
 | `spec/stages.yaml` | 阶段 → 脚本 → 产物 |
 | `spec/inputs.yaml` | 外部输入 → 消费者脚本 → 是否必需 |
 | `peerlab/registry.py` | 实验 spec（id / steps / requires / outputs / notes）；`python -m peerlab experiments` 直接读 |
@@ -17,7 +17,7 @@ PeerMAX（A 股产品市场同侪的彩票型收益溢出）的代码与材料�
 ## 目录
 
 - `scripts/`：192 个 `.py` + `ocr_tesseract_chunk.sh`，平铺一层；脚本用 `Path(__file__).resolve().parents[1]` 定位仓库根。
-- `tests/`：45 个测试模块 + `conftest.py`（33 契约 + 5 peerlab 单测 + 1 共享模块单测 + 6 数据门单测）。
+- `tests/`：56 个测试模块 + `conftest.py`（含 5 peerlab 单测、7 数据门单测、1 共享模块单测）。
 - `peerlab/`：执行 CLI 与注册表（10 个实验、`SEEDS = (0, 1, 2, 3, 4)`）。
 - `configs/`：六个 YAML，按新基线重建（`configs/README.md` 记来源与未锚项）。
 - `ref/`：权威外部输入（立项文档 5、老师团队材料 3、组内论文 2）。`data/raw/`：老师包与 Drive，二进制走 Release `data-raw-v1`。`data/processed/`：空。`result/`：结果层。
@@ -39,11 +39,11 @@ python -m pytest tests/ -q   # 契约测试，必须显式写 tests/；缺 data/
 ## 数据与参数纪律
 
 - `configs/parameter_registry.yaml` 是权威（逐参数登记取值与来源）。改登记值、headline 规则或样本定义要走 change order、升版本、同步 `configs/version_manifest.yaml`；不得为让结果过关热改登记值。
-- 样本版本不可变（`m1_s5_v1_2015_2023` / `v2` / `v3_20261115` / `v4_20261116`）。重建用新版本名，旧 parquet 保留不覆盖。
+- 样本版本不可变（`pricing_sample_v1_2015_2023` / `v2` / `v3_20261115` / `v4_20261116`）。重建用新版本名，旧 parquet 保留不覆盖。
 - PIT：join 用 `max{available_at < month}`（严格小于），不引入同月信息；契约测试与 Gate1 provenance/metadata 审计会抓。
 - 缺失不是 0：`missing` / `not_covered` / `not_matched` / `unknown_timing` 分开编码；`actual_display` 缺失时 `V` 保持 missing，不得写 `V=D`。
-- fail-closed 不许绕：`pricing_lib` 导入即校验 registry、`version_manifest` 校验 sha 锚，缺条目或与实测不符直接 `SystemExit(2)`；不要用实测值回填或自动刷新 manifest。
-- 不得宣称 empirical pass：`S5_status = FAIL`（M1 五项 gate 全未过），standalone MAX-pricing claim 停止、只保留描述性关联；契约测试、合成 fixture、shadow 运行都属非经验证据。
+- fail-closed 不许绕：`pricing_lib` 导入即校验 registry（参数完整性、值域、派生关系、`registry_version` 与 `analyst_spec.yaml` governance 对齐），输入合同按 `configs/pricing_inputs.yaml` 的 rows/columns 实测核对，缺条目或不符直接 `SystemExit(2)`；不要用实测值回填或自动刷新合同。
+- 不得宣称 empirical pass：`pricing_gate_status = FAIL`（pricing 五项 gate 全未过），standalone MAX-pricing claim 停止、只保留描述性关联；契约测试、合成 fixture、shadow 运行都属非经验证据。
 
 ## 改动与校验
 

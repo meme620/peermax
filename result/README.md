@@ -37,4 +37,4 @@ python -m peerlab report              # 重算 tables/ 与 summary.md
 
 没有任何有效运行。`configs/` 已按新基线重建；`data/processed/` 为空，上游网络与面板还没生成，10 个实验在就绪检查阶段全部受阻（0 就绪）。`smoke/report.md` 记录了逐实验的缺口。
 
-推进顺序见 `spec/stages.yaml`：先网络与面板，再 M1 样本与定价表。
+推进顺序见 `spec/stages.yaml`：先网络与面板，再 pricing 样本与定价表。
