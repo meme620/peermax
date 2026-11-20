@@ -5,11 +5,10 @@
 对应 plan §5.7A 与 §5.7。headline 仍是连续 PeerMAXraw；
 组合与形状诊断只作 supporting/exploratory 证据。空组与零分母写状态、不填 0。
 产出：reports/data_gates/G0/pricing_portfolio_deciles.json、pricing_diagnostics.json
-用法：python scripts/pricing_portfolio_sorts.py [--sample-version {v1,v2}] [--out-suffix _v2]
+用法：python scripts/pricing_portfolio_sorts.py [--sample-version v5] [--out-suffix _s0]
 
-2026-10-11 F-2（v2 样本重跑批）：新增 `--sample-version`（2026-11-19 起默认 v3 headline；另一版本自动作敏感性并报）
-与 `--out-suffix`（如 `--out-suffix _v2` 产出 pricing_portfolio_deciles_v2.json / pricing_diagnostics_v2.json，
-不覆盖 v1 基线名）；组合与诊断块补**窗口标注**（FM 月范围）。
+`--sample-version` 只接受 registry 登记的 headline 版本；`--out-suffix` 区分同种子的多份产物名。
+组合与诊断块带**窗口标注**（FM 月范围）。
 """
 from __future__ import annotations
 
@@ -18,7 +17,7 @@ import argparse
 import numpy as np
 import pandas as pd
 
-from pricing_lib import IQR_POOL_REGISTERED, SAMPLE_VERSION_V1, SAMPLE_VERSION_V2, SAMPLE_VERSION_V3, SAMPLE_VERSION_V4, OUT_DIR, SAMPLE_VERSION_LABEL, fm_regression, joint_wald, newey_west, one_sided_p, param_value, progress, rank_average_groups, rcs_basis, sample_path, treatment_only_mask, two_sided_p, write_json
+from pricing_lib import HEADLINE_SAMPLE_VERSION, IQR_POOL_REGISTERED, OUT_DIR, SAMPLE_VERSION_LABEL, fm_regression, joint_wald, newey_west, one_sided_p, param_value, progress, rank_average_groups, rcs_basis, sample_path, treatment_only_mask, two_sided_p, write_json
 
 P = param_value('sample_and_spec_registry')
 NW_LAG = int(param_value('nw_lag'))
@@ -86,25 +85,20 @@ def portfolio_table(df: pd.DataFrame, n_groups: int) -> dict:
 
 def parse_args(argv=None):
     ap = argparse.ArgumentParser(description='A8：pricing_gate 组合分位（五/十分位）与函数形式诊断')
-    ap.add_argument('--sample-version', choices=['v1', 'v2', 'v3', 'v4'], default=SAMPLE_VERSION_LABEL,
-                    help=f'headline 样本版本（默认读 registry 指针 = {SAMPLE_VERSION_LABEL}）；v1/v2 为历史版本；'
-                         '另一版本自动作敏感性并报')
+    ap.add_argument('--sample-version', choices=[SAMPLE_VERSION_LABEL], default=SAMPLE_VERSION_LABEL,
+                    help=f'headline 样本版本（只接受 registry 指针 = {SAMPLE_VERSION_LABEL}）')
     ap.add_argument('--out-suffix', default='',
-                    help="产物文件名后缀，如 '_v2'（产出 pricing_portfolio_deciles_v2.json / "
-                         "pricing_diagnostics_v2.json，不覆盖 v1 基线名；默认空 = 现有默认名）")
+                    help="产物文件名后缀，如 '_s0'（产出 pricing_portfolio_deciles_s0.json / "
+                         "pricing_diagnostics_s0.json；默认空 = 无后缀名）")
     return ap.parse_args(argv)
 
 
 def main(argv=None):
     args = parse_args(argv)
     ver = args.sample_version
-    other = {'v4': 'v3', 'v3': 'v2', 'v2': 'v1', 'v1': 'v2'}[ver]
     sfx = args.out_suffix
-    ver_id = {'v1': SAMPLE_VERSION_V1, 'v2': SAMPLE_VERSION_V2,
-              'v3': SAMPLE_VERSION_V3, 'v4': SAMPLE_VERSION_V4}[ver]
-    other_id = {'v1': SAMPLE_VERSION_V1, 'v2': SAMPLE_VERSION_V2,
-                'v3': SAMPLE_VERSION_V3, 'v4': SAMPLE_VERSION_V4}[other]
-    progress(f'A8 开始：组合分位与函数形式诊断（headline={ver_id} + {other} 敏感性；'
+    ver_id = HEADLINE_SAMPLE_VERSION
+    progress(f'A8 开始：组合分位与函数形式诊断（headline={ver_id}；'
              f'out_suffix={sfx or "(空)"}）')
     df_all = pd.read_parquet(sample_path('ma_teacher', ver))
     df = df_all[df_all['pricing_in_fm_sample'].astype(bool)].copy()
@@ -119,36 +113,21 @@ def main(argv=None):
     rep_pf = {'spec_id': 'pricing_portfolio_q / pricing_portfolio_d',
               'sample_version': ver_id,
               'headline_sample_version': ver_id,
-              'sample_version_v1_superseded': SAMPLE_VERSION_V1,
-              'sample_version_v2': SAMPLE_VERSION_V2,
               'out_suffix': sfx,
               'fm_window': fm_window, 'n_rows_fm': int(len(df)),
               'window_note': ('组合表按 headline 样本（主口径 ma_teacher）构造；'
-                              f'本版本 FM 窗口 = {fm_window[0]}..{fm_window[1]}（{df["month"].nunique()} 月）。'
-                              'v1（未施加 microcap 筛除）敏感性块另有其自身窗口，两版窗口与 N 不可混读。'),
+                              f'FM 窗口 = {fm_window[0]}..{fm_window[1]}（{df["month"].nunique()} 月）。'),
               'tie_rule_id': P['portfolio_tie_rule_id'], 'K_Spread_Pricing': K_SPREAD,
               'headline_spec': 'continuous PeerMAXraw（组合仅作 supporting evidence）',
               'column_role': '本表按**主口径**（ma_teacher＝中文法 × 老师 MD&A，主表列）构造；'
-                             '方法稳健性（mb_teacher）/ 文本稳健性（ma）/ 语料对照（mb）四列在主规格 FM 表中并报'
+                             '方法稳健性（mb_teacher）列在主规格 FM 表中并报'
                              '（pricing_table.json / pricing_robustness_placebo.json 的 pricing_rob_col_*）',
-              'outcome': 'raw（R_NEXT_MONTH_COMPLETE_v1）为主；后复权（R_NEXT_POST_ADJ_v1）敏感性见 '
-                         'pricing_table.json:post_adjusted 与 pricing_robustness_placebo.json:pricing_rob_postadj',
+              'outcome': '后复权（R_NEXT_MONTH_COMPLETE_v1）为主；未复权口径敏感性（R_NEXT_MONTH_RAW_v1）见 '
+                         'pricing_table.json:raw_outcome 与 pricing_robustness_placebo.json:pricing_rob_raw',
               'quintile': portfolio_table(df, 5), 'decile': portfolio_table(df, 10)}
-    # 另一版本敏感性（v1 = 未施加 microcap 筛除）
-    df1_all = pd.read_parquet(sample_path('ma_teacher', other))
-    df1 = df1_all[df1_all['pricing_in_fm_sample'].astype(bool)].copy()
-    rep_pf[f'{other}_sensitivity'] = {
-        'status': f'{other}_superseded_registered_deviation'
-                  + ('（未施加 microcap/次新股筛除）' if other == 'v1' else ''),
-        'sample_version': other_id,
-        'fm_window': [str(df1['month'].min()), str(df1['month'].max())],
-        'quintile': portfolio_table(df1, 5),
-        'n_rows': int(len(df1)),
-    }
     write_json(OUT_DIR / f'pricing_portfolio_deciles{sfx}.json', rep_pf)
     progress(f"A8 五分位 EW spread = {rep_pf['quintile']['spread']['ew']['mean']:.5f} "
-             f"(t={rep_pf['quintile']['spread']['ew']['t_nw']:.2f})；"
-             f"{other} 五分位 EW spread = {rep_pf[f'{other}_sensitivity']['quintile']['spread']['ew']['mean']:.5f}")
+             f"(t={rep_pf['quintile']['spread']['ew']['t_nw']:.2f})")
 
     # ---------------- 形状诊断
     d = df.copy()
@@ -156,7 +135,7 @@ def main(argv=None):
             'out_suffix': sfx, 'fm_window': fm_window, 'n_rows_fm': int(len(df)),
             'headline': 'continuous PeerMAXraw',
             'column_role': '诊断按主口径（ma_teacher）构造；四列并报见 pricing_table.json',
-            'outcome': 'raw 主口径（后复权敏感性见 pricing_table.json:post_adjusted）',
+            'outcome': '后复权主口径（未复权敏感性见 pricing_table.json:raw_outcome）',
             'kink_threshold_c': c_med, 'kink_rule': '(MAX-c)+ 的 c = 池化中位数（treatment-only 宇宙，'
                                                    'outcome-blind 事前固定口径；2026-10-10 复核修复 I4 同批统一）',
             'kink_threshold_scope': {'treatment_only_n': int(len(to)),

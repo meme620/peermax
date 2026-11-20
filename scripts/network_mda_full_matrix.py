@@ -22,7 +22,14 @@ from fileio import file_size
 
 ROOT = Path(__file__).resolve().parents[1]
 V2 = ROOT / "data/processed/mda_texts.csv"
+TEACHER = ROOT / "data/processed/teacher_mda_panel.csv"
 OUT = ROOT / "reports/data_gates/G0/network_mda_full_matrix.json"
+# 语料源与 network_tau_calibrate.CORPORA / network_mda_edges_build --corpus 同口径：
+# teacher = 老师 MD&A 导出（M-B 主口径，id_col=firm_id）；self = 自建 CNINFO 抽取（对照链）。
+CORPORA = {
+    'self': {'path': V2, 'id_col': 'code'},
+    'teacher': {'path': TEACHER, 'id_col': 'firm_id'},
+}
 SPEC = ROOT / "configs/analyst_spec.yaml"
 DF_CUTOFF = 0.25          # registry: df_threshold（2026-09-13 冻结）
 PEER_TARGET = 10          # 占位目标（正式 τ 校准待申万二级）
@@ -35,13 +42,14 @@ STOPWORDS = set("""的 了 和 与 及 或 在 是 为 对 到 由 于 以 并 �
 TOKEN_RE = re.compile(r"^[\u4e00-\u9fffA-Za-z][\u4e00-\u9fffA-Za-z0-9]{0,}$")
 
 
-def load_texts(text_year):
+def load_texts(text_year, corpus="teacher"):
+    spec = CORPORA[corpus]
     rows = []
     csv.field_size_limit(10 ** 9)
-    with open(V2, encoding="utf-8", newline="") as f:
+    with open(spec['path'], encoding="utf-8", newline="") as f:
         for r in csv.DictReader(f):
             if r["status"] == "ok" and r["year"] == str(text_year):
-                rows.append((r["code"], r["text"]))
+                rows.append((r[spec['id_col']], r["text"]))
     return rows
 
 
@@ -59,13 +67,13 @@ def tokenize(text, jieba):
     return toks
 
 
-def year_metrics(text_year, sample):
+def year_metrics(text_year, sample, corpus="teacher"):
     import jieba
     jieba.setLogLevel(60)
     from sklearn.feature_extraction.text import TfidfVectorizer
     from sklearn.preprocessing import normalize
 
-    rows = load_texts(text_year)
+    rows = load_texts(text_year, corpus)
     if not rows:
         return {"text_year": text_year, "error": "no_ok_rows"}
     codes = [c for c, _ in rows]
@@ -127,8 +135,11 @@ def year_metrics(text_year, sample):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--years", default="2017-2025")
+    ap.add_argument("--years", default="2014-2022")
     ap.add_argument("--sample", type=int, default=600)
+    ap.add_argument("--corpus", choices=sorted(CORPORA), default="teacher",
+                    help="文本语料源：teacher=老师 MD&A 导出（M-B 主口径）；"
+                         "self=自建 CNINFO 抽取（对照链）")
     args = ap.parse_args()
     y0, y1 = [int(x) for x in args.years.split("-")]
 
@@ -136,11 +147,12 @@ def main():
     out = {"spec_id": "analyst_spec_20260909", "spec_hash": spec_hash,
            "run_at": datetime.now(timezone.utc).isoformat(),
            "df_threshold": DF_CUTOFF, "peer_target_placeholder": PEER_TARGET,
+           "corpus": args.corpus,
            "note": ("M-B 全期相似度矩阵；τ 为占位（中位 peer≈10），正式校准待申万二级数据到位；"
                     "文本年 y-1 → 网络年 y，故 2017-2025 文本年对应 2018-2026 网络年（2026 年无收益数据，仅作分布）"),
            "years": []}
     for y in range(y0, y1 + 1):
-        m = year_metrics(y, args.sample)
+        m = year_metrics(y, args.sample, args.corpus)
         out["years"].append(m)
         print(json.dumps(m, ensure_ascii=False), flush=True)
     OUT.write_text(json.dumps(out, ensure_ascii=False, indent=1), encoding="utf-8")

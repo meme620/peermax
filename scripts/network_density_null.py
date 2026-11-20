@@ -144,7 +144,8 @@ def main() -> None:
     ap.add_argument('--graph-check-reps', type=int, default=200,
                     help='逐 replicate 真实抽样的抽查次数（0 = 跳过）')
     ap.add_argument('--graph-check-year', type=int, default=None, help='抽查年份（缺省 = 首个有数据年）')
-    ap.add_argument('--out-json', default=str(REPD / 'network_density_null.json'))
+    ap.add_argument('--out-json', default=None,
+                    help='缺省 = REPD/network_density_null_s{seed}.json（seed 不同不互相覆盖）')
     args = ap.parse_args()
 
     reps = args.reps
@@ -306,7 +307,7 @@ def main() -> None:
         'status': 'PASS' if all(checks.values()) else 'FAIL',
         'year_axis_note': YEAR_AXIS_NOTE,
     }
-    outp = Path(args.out_json)
+    outp = Path(args.out_json) if args.out_json else REPD / f'network_density_null_s{seed}.json'
     outp.parent.mkdir(parents=True, exist_ok=True)
     outp.write_text(json.dumps(rep, ensure_ascii=False, indent=2), encoding='utf-8')
     print(f'[T1-③] status={rep["status"]} checks={checks}', flush=True)

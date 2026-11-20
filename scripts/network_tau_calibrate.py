@@ -3,7 +3,7 @@
 Plan §8 Phase B1 的可执行实现：
   1. 目标值：申万二级同行业 peer 数（组内 N-1）在**入网公司**上的**公司层面中位数**，
      跨 9 个文本年池化 → `sw2_median_peer_target`（registry 冻结值）。
-  2. 校准：TF-IDF 余弦（df<=0.25，mda_texts ok 行）在**抽样 focal**上求 τ，
+  2. 校准：TF-IDF 余弦（df<=0.25，teacher_mda_panel ok 行）在**抽样 focal**上求 τ，
      使池化中位 peer 数 = 目标（中位 peer 数是 τ 的阶梯函数 → 二分 + 区间细扫）。
   3. 诊断：逐文本年的中位/均值 peer 数、孤立公司、质量保留比；并给出
      「组层面中位规模」目标下的备选 τ（次级口径，供稳健性）。
@@ -27,23 +27,46 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 from network_mda_edges_build import build_similarity
 
-V2 = ROOT / 'data/processed/mda_texts.csv'
 LAT = ROOT / 'data/processed/sw2_industry_latest.csv'
+IDMAP = ROOT / 'data/processed/firm_id_map.csv'
 REPD = ROOT / 'reports/data_gates/G0'
-PROBE = ROOT / 'data/processed/network_mb' / 'tau_calibration_probe.csv'
+PROBE = ROOT / 'data/processed/network_mb_teacher' / 'tau_calibration_probe.csv'
 FOCAL_SAMPLE = 1000          # 每年抽样 focal 数（peer 计数仍用全部 source）
 SEED = 20260914
-TXTS = [2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025]
-TXTS_TEACHER = [2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022]   # 老师语料（B′1）
+TXTS_TEACHER = [2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022]
+# 语料只有老师 MD&A 导出（自建 CNINFO 语料链已按 CO-2026-11-20-teacher-only 退役）。
 CORPORA = {
-    'self': {'path': V2, 'years': TXTS, 'id_col': 'code'},
     'teacher': {'path': ROOT / 'data/processed/teacher_mda_panel.csv',
                 'years': TXTS_TEACHER, 'id_col': 'firm_id'},
 }
 
 
 # ---------- 1) SW2 目标 ----------
-def sw2_target(years, corpus='self'):
+def _network_pool_filter(mda):
+    """施加与构网相同的样本筛选（剔 J/S、剔上市<2 年）。mda 需含 code6 与 year。"""
+    import pandas as pd
+    idm = pd.read_csv(IDMAP, dtype={'code6': str})
+    idm['code6'] = idm['code6'].str.zfill(6)
+    swl = pd.read_csv(LAT, dtype={'code6': str, 'l1_code': str})
+    swl = swl[swl['is_current_version'] == True].drop_duplicates('code6')  # noqa: E712
+    ref = idm[['code6', 'ipo_date']].merge(swl[['code6', 'l1_code']], on='code6', how='left')
+    ref['menlei'] = np.where(ref['l1_code'].isin(('480000', '490000')), 'J',
+                             np.where(ref['l1_code'] == '510000', 'S', 'NA'))
+    ref['ipo'] = pd.to_datetime(ref['ipo_date'], errors='coerce')
+    m = mda.merge(ref[['code6', 'menlei', 'ipo']], on='code6', how='left')
+    cutoff = pd.to_datetime(m['year'].astype(str) + '-12-31')
+    drop_js = m['menlei'].isin(('J', 'S'))
+    drop_ipo = m['ipo'].notna() & (m['ipo'] + pd.DateOffset(years=2) > cutoff)
+    return m[~drop_js & ~drop_ipo]
+
+
+def sw2_target(years, corpus='teacher', network_pool=False):
+    """申万二级行业 peer 数目标。
+
+    network_pool=False（既有口径）：teacher 面板全部 ok 行，不剔 J/S、不剔上市<2 年。
+    network_pool=True：施加与构网完全相同的筛选（剔 J/S、剔上市<2 年）——registry
+    ma_k_target_definition 登记的就是这两组口径的差异（45 vs 37）。
+    """
     import pandas as pd
     lat = pd.read_csv(LAT, dtype={'code6': str})
     lat['code6'] = lat['code6'].str.zfill(6)
@@ -53,6 +76,8 @@ def sw2_target(years, corpus='self'):
     # 两个面板的 id 均为项目面板码（sz/sh + 六位），统一剥前缀取六位代码
     mda['code6'] = mda[spec['id_col']].astype(str).str[2:].str.zfill(6)
     mda = mda[mda['year'].isin(years)]
+    if network_pool:
+        mda = _network_pool_filter(mda)
     m = mda.merge(lat[['code6', 'l2_code']], on='code6', how='left')
     # 未匹配到申万分类的行不进 peer 计数（其 peer 数无定义）；np.median 遇 NaN 会整体变 NaN，必须显式剔除并登记
     n_unmatched = int(m['l2_code'].isna().sum())
@@ -79,7 +104,7 @@ def sw2_target(years, corpus='self'):
 
 
 # ---------- 2) 相似度抽样 ----------
-def sampled_sims(years, k=FOCAL_SAMPLE, seed=SEED, corpus='self'):
+def sampled_sims(years, k=FOCAL_SAMPLE, seed=SEED, corpus='teacher'):
     """每年返回 (focal_idx_sorted_sims_desc, n_nodes, codes)。"""
     out = {}
     rng = np.random.default_rng(seed)
@@ -139,7 +164,7 @@ def calibrate(sims_by_year, target, lo=0.0, hi=0.5, iters=50):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--years', type=int, nargs='*', default=None)
-    ap.add_argument('--corpus', choices=['self', 'teacher'], default='self')
+    ap.add_argument('--corpus', choices=['teacher'], default='teacher')
     args = ap.parse_args()
     years = args.years if args.years else CORPORA[args.corpus]['years']
     corpus = args.corpus
@@ -205,7 +230,7 @@ def main():
         'note': '正式 network_edges 由 B2 用 --tau 产出；本文件的 τ 为 B1 校准结果，注册 freeze 后使用。',
     }
     REPD.mkdir(parents=True, exist_ok=True)
-    suffix = '' if corpus == 'self' else '_' + corpus
+    suffix = '_' + corpus
     out_json = REPD / ('network_tau_calibration' + suffix + '.json')
     probe_fp = PROBE.with_name('tau_calibration_probe' + suffix + '.csv')
     out_json.write_text(json.dumps(rep, ensure_ascii=False, indent=2), encoding='utf-8')

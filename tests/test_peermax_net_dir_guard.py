@@ -30,18 +30,24 @@ def test_fulltext_default_paths_are_isolated():
 
 
 def test_canonical_defaults_unchanged():
+    """主口径两列的默认输出名（C7：自建语料 ma/mb 两列已退役，不再有默认输出）。"""
     mod = _load()
-    args = SimpleNamespace(use_case='ma', out=None, report=None)
-    out, rp = mod.resolve_outputs(args, ROOT / 'data/processed/network_ma')
-    assert out.name == 'monthly_pricing_panel_ma.csv'
-    assert rp.name == 'peermax_panel_build_ma_report.json'
-    out, rp = mod.resolve_outputs(args, ROOT / 'data/processed/network_ma_teacher')
+    out, rp = mod.resolve_outputs(SimpleNamespace(use_case='ma', out=None, report=None),
+                                  ROOT / 'data/processed/network_ma_teacher')
     assert out.name == 'monthly_pricing_panel_ma_teacher.csv'
     assert rp.name == 'peermax_panel_build_ma_teacher_report.json'
     out, rp = mod.resolve_outputs(SimpleNamespace(use_case='mb', out=None, report=None),
-                                  ROOT / 'data/processed/network_mb')
-    assert out.name == 'monthly_pricing_panel_mb.csv'
-    assert rp.name == 'peermax_panel_build_mb_report.json'
+                                  ROOT / 'data/processed/network_mb_teacher')
+    assert out.name == 'monthly_pricing_panel_mb_teacher.csv'
+    assert rp.name == 'peermax_panel_build_mb_teacher_report.json'
+
+
+def test_retired_self_corpus_dir_requires_explicit_paths():
+    """已退役的自建语料目录不再有默认输出名：必须显式给 --out/--report。"""
+    mod = _load()
+    args = SimpleNamespace(use_case='ma', out=None, report=None)
+    with pytest.raises(SystemExit):
+        mod.resolve_outputs(args, ROOT / 'data/processed/network_ma')
 
 
 def test_unknown_net_dir_without_explicit_paths_refuses():

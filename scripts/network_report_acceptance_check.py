@@ -82,9 +82,13 @@ def main():
         edge_nodes = set(edges['focal_id'])
         zero_weight_rows = int((edges['weight'] == 0).sum())
 
+        # status 取值域：写坏的支持列（如被邻接表覆盖）不得被当成合法表通过
+        bad_status_vals = sorted(set(sup['network_support_status'].astype(str))
+                                 - {'support', 'no-network-support'})
         yr_ok = (dup == 0 and self_loop == 0 and bad_sum == 0 and
                  avail == [expect_avail] and versions == [expect_ver] and
                  edge_nodes == support_nodes and zero_weight_rows == 0 and
+                 not bad_status_vals and
                  (max_weight_err is None or max_weight_err < 1e-5))
         overall_ok = overall_ok and yr_ok
         per_year.append({
@@ -92,6 +96,7 @@ def main():
             'available_at': avail[0] if len(avail) == 1 else avail,
             'enrolled_corpus': n_expected, 'nodes_support': len(support_nodes),
             'nodes_no_support': len(nsupport_nodes), 'n_edges': int(len(edges)),
+            'bad_support_status_values': bad_status_vals,
             'dup_keys': dup, 'self_loops': self_loop, 'bad_row_sum': bad_sum,
             'max_weight_recompute_rel_err': max_weight_err, 'zero_weight_rows': zero_weight_rows,
             'median_peer': float(edges.groupby('focal_id').size().median()) if len(edges) else 0.0,

@@ -23,6 +23,21 @@ def test_build_command_injects_seed_and_suffix():
     assert cmd_seeded[-2:] == ['--seed', '2']
 
 
+def test_smoke_args_replace_per_step_not_append():
+    """-smoke 必须按 step 整块替换 args；实验级追加会把 --years 塞进每个 step（口径冲突）。"""
+    exp = registry.get('network-mda-text')
+    for step in exp.steps:
+        assert step.args_smoke is not None, f'{step.script} 缺 args_smoke'
+        smoke = runner.build_command(exp, step, 0, smoke=True)
+        # 追加语义的典型症状：同一 step 里 --years 出现两次，argparse 取末值而脚本按区间解析
+        assert smoke.count('--years') <= 1, f'{step.script} 出现重复 --years: {smoke}'
+    full = runner.build_command(exp, exp.steps[0], 0)
+    assert full[full.index('--years') + 1] == '2014-2022'
+    smoke = runner.build_command(exp, exp.steps[0], 0, smoke=True)
+    assert smoke[smoke.index('--years') + 1] == '2021-2021'
+    assert '--corpus' in smoke and smoke[smoke.index('--corpus') + 1] == 'teacher'
+
+
 def test_readiness_reports_missing(tmp_path: Path):
     exp = registry.get('fm-main-table')
     check = runner.readiness(exp, tmp_path)
@@ -34,8 +49,8 @@ def test_readiness_reports_missing(tmp_path: Path):
     (tmp_path / 'data/processed').mkdir(parents=True)
     check = runner.readiness(exp, tmp_path)
     assert check['ready'] is False
-    assert 'data/processed/pricing_sample_ma_teacher_v3.parquet' in check['missing']
-    (tmp_path / 'data/processed/pricing_sample_ma_teacher_v3.parquet').write_bytes(b'')
+    assert 'data/processed/pricing_sample_ma_teacher_v5.parquet' in check['missing']
+    (tmp_path / 'data/processed/pricing_sample_ma_teacher_v5.parquet').write_bytes(b'')
     assert runner.readiness(exp, tmp_path)['ready'] is True
 
 

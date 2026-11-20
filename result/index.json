@@ -1,3 +1,244 @@
 {
-  "runs": []
+  "runs": [
+    {
+      "run_id": "estimation-sample--s0--20261120T121427Z",
+      "exp": "estimation-sample",
+      "seed": 0,
+      "status": "failed",
+      "smoke": false,
+      "started_at": "2026-11-20T12:14:27+00:00",
+      "seconds": 15.31,
+      "git_commit": "d884780"
+    },
+    {
+      "run_id": "estimation-sample--s0--20261120T122154Z",
+      "exp": "estimation-sample",
+      "seed": 0,
+      "status": "failed",
+      "smoke": false,
+      "started_at": "2026-11-20T12:21:54+00:00",
+      "seconds": 11.89,
+      "git_commit": "d884780"
+    },
+    {
+      "run_id": "estimation-sample--s0--20261120T122435Z",
+      "exp": "estimation-sample",
+      "seed": 0,
+      "status": "failed",
+      "smoke": false,
+      "started_at": "2026-11-20T12:24:35+00:00",
+      "seconds": 10.9,
+      "git_commit": "d884780"
+    },
+    {
+      "run_id": "estimation-sample--s0--20261120T122537Z",
+      "exp": "estimation-sample",
+      "seed": 0,
+      "status": "failed",
+      "smoke": false,
+      "started_at": "2026-11-20T12:25:37+00:00",
+      "seconds": 24.3,
+      "git_commit": "d884780"
+    },
+    {
+      "run_id": "estimation-sample--s0--20261120T122758Z",
+      "exp": "estimation-sample",
+      "seed": 0,
+      "status": "failed",
+      "smoke": false,
+      "started_at": "2026-11-20T12:27:58+00:00",
+      "seconds": 23.84,
+      "git_commit": "d884780"
+    },
+    {
+      "run_id": "estimation-sample--s0--20261120T123825Z",
+      "exp": "estimation-sample",
+      "seed": 0,
+      "status": "failed",
+      "smoke": false,
+      "started_at": "2026-11-20T12:38:25+00:00",
+      "seconds": 21.39,
+      "git_commit": "d884780"
+    },
+    {
+      "run_id": "network-business-text--s0--20261120T123847Z",
+      "exp": "network-business-text",
+      "seed": 0,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T12:38:47+00:00",
+      "seconds": 383.87,
+      "git_commit": "d884780"
+    },
+    {
+      "run_id": "estimation-sample--s0--20261120T124515Z",
+      "exp": "estimation-sample",
+      "seed": 0,
+      "status": "failed",
+      "smoke": false,
+      "started_at": "2026-11-20T12:45:15+00:00",
+      "seconds": 34.6,
+      "git_commit": "d884780"
+    },
+    {
+      "run_id": "estimation-sample--s0--20261120T124946Z",
+      "exp": "estimation-sample",
+      "seed": 0,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T12:49:46+00:00",
+      "seconds": 117.59,
+      "git_commit": "d884780"
+    },
+    {
+      "run_id": "estimation-sample--s0--20261120T125151Z",
+      "exp": "estimation-sample",
+      "seed": 0,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T12:51:51+00:00",
+      "seconds": 85.32,
+      "git_commit": "d884780"
+    },
+    {
+      "run_id": "network-business-text--s1--20261120T124511Z",
+      "exp": "network-business-text",
+      "seed": 1,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T12:45:11+00:00",
+      "seconds": 558.06,
+      "git_commit": "d884780"
+    },
+    {
+      "run_id": "network-business-text--s0--20261120T125316Z",
+      "exp": "network-business-text",
+      "seed": 0,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T12:53:16+00:00",
+      "seconds": 407.79,
+      "git_commit": "8b07701"
+    },
+    {
+      "run_id": "network-business-text--s2--20261120T125429Z",
+      "exp": "network-business-text",
+      "seed": 2,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T12:54:29+00:00",
+      "seconds": 408.6,
+      "git_commit": "8b07701"
+    },
+    {
+      "run_id": "network-business-text--s1--20261120T130004Z",
+      "exp": "network-business-text",
+      "seed": 1,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T13:00:04+00:00",
+      "seconds": 390.95,
+      "git_commit": "8b07701"
+    },
+    {
+      "run_id": "network-business-text--s3--20261120T130117Z",
+      "exp": "network-business-text",
+      "seed": 3,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T13:01:17+00:00",
+      "seconds": 386.0,
+      "git_commit": "8b07701"
+    },
+    {
+      "run_id": "network-business-text--s2--20261120T130635Z",
+      "exp": "network-business-text",
+      "seed": 2,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T13:06:35+00:00",
+      "seconds": 419.86,
+      "git_commit": "8b07701"
+    },
+    {
+      "run_id": "network-business-text--s4--20261120T130743Z",
+      "exp": "network-business-text",
+      "seed": 4,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T13:07:43+00:00",
+      "seconds": 425.71,
+      "git_commit": "8b07701"
+    },
+    {
+      "run_id": "network-business-text--s3--20261120T131335Z",
+      "exp": "network-business-text",
+      "seed": 3,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T13:13:35+00:00",
+      "seconds": 329.6,
+      "git_commit": "8b07701"
+    },
+    {
+      "run_id": "network-business-text--s4--20261120T131905Z",
+      "exp": "network-business-text",
+      "seed": 4,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T13:19:05+00:00",
+      "seconds": 322.28,
+      "git_commit": "8b07701"
+    },
+    {
+      "run_id": "network-mda-text--s0--20261120T131449Z",
+      "exp": "network-mda-text",
+      "seed": 0,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T13:14:49+00:00",
+      "seconds": 1545.53,
+      "git_commit": "8b07701"
+    },
+    {
+      "run_id": "network-mda-text--s0--20261120T132427Z",
+      "exp": "network-mda-text",
+      "seed": 0,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T13:24:27+00:00",
+      "seconds": 2079.32,
+      "git_commit": "8b07701"
+    },
+    {
+      "run_id": "fm-main-table--s0--20261120T140553Z",
+      "exp": "fm-main-table",
+      "seed": 0,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T14:05:53+00:00",
+      "seconds": 12.66,
+      "git_commit": "8b07701"
+    },
+    {
+      "run_id": "portfolio-sorts--s0--20261120T140621Z",
+      "exp": "portfolio-sorts",
+      "seed": 0,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T14:06:21+00:00",
+      "seconds": 4.33,
+      "git_commit": "8b07701"
+    },
+    {
+      "run_id": "portfolio-sorts--s0--20261120T140828Z",
+      "exp": "portfolio-sorts",
+      "seed": 0,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T14:08:28+00:00",
+      "seconds": 4.04,
+      "git_commit": "8b07701"
+    }
+  ]
 }

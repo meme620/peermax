@@ -168,7 +168,7 @@ def load_pc(pc_dir: Path = PC_DIR, years=PC_YEARS) -> pd.DataFrame:
     return pc
 
 def load_panel() -> pd.DataFrame:
-    cols = ['focal_id', 'month', 'network_version', 'R_next', 'next_R', 'R_next_postadj',
+    cols = ['focal_id', 'month', 'network_version', 'R_next', 'next_R', 'R_next_raw',
             'market_equity', 'size', 'bm', 'mom', 'rev', 'illiq', 'turnover',
             'pricing_in_fm_sample', 'pricing_exclusion_reason', 'me_below_q10', 'me_q10_market',
             'AnalystCoverage', 'ind_l2_ret_vw', 'ind_l1_ret_vw', 'st_flag_focal', 'recent_ipo']
@@ -881,7 +881,7 @@ def run_H7(m, S, fmonth, panel) -> dict:
     reg['R_ind'] = reg['R_next'] - reg['ind_l2_ret_vw']
     yvars = {'raw_winsorized': 'R_next', 'raw_unwinsorized_next_R': 'next_R',
              'excess_R_minus_RF': 'R_exc', 'market_adj_R_minus_MKT': 'R_mkt',
-             'industry_adj_R_minus_IND2vw': 'R_ind', 'postadj_后复权': 'R_next_postadj'}
+             'industry_adj_R_minus_IND2vw': 'R_ind', 'raw_未复权': 'R_next_raw'}
     res = {}
     for tag, yc in yvars.items():
         for wtag, wcol in (('EW', None), ('VW', 'market_equity')):

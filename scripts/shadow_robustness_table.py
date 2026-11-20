@@ -42,8 +42,8 @@ FAMILY_PREFIXES = (
 COLUMN_LABELS = ("ma_teacher", "mb_teacher", "ma", "mb")
 
 STRATUM_LABELS = {
-    "pricing_rob_raw": "基准（raw 主口径）",
-    "pricing_rob_postadj": "outcome 变体（后复权）",
+    "pricing_rob_main": "基准（后复权主口径）",
+    "pricing_rob_raw": "outcome 口径变体（未复权）",
     "pricing_rob_st": "ST 分层",
     "pricing_rob_non_st": "ST 分层",
     "pricing_rob_limit_all_limit": "limit-hit 分层",
@@ -452,7 +452,7 @@ def main() -> int:
             "iqr_pool_registered": iqr_pool,
             "main_column": robustness.get("main_column"),
             "outcome": robustness.get("outcome"),
-            "four_column_reporting": robustness.get("four_column_reporting"),
+            "two_column_reporting": robustness.get("two_column_reporting"),
             "registry_version": reg_info["registry_version"],
         },
         "thresholds": {

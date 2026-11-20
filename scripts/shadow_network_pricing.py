@@ -64,13 +64,37 @@ TEXT_YEAR_MONTHS = {ty: [] for ty in YEARS}
 
 LIMIT_UNKNOWN = 'limit_status_unknown'
 
-SAMPLE_ROWS = 307503
+def _sample_registered():
+    """从样本报告读登记行数；样本重建后硬编码必然过期（v2 307503 -> v5 317155）。"""
+    import json
+    rep = ROOT / 'reports/data_gates/G0/pricing_sample_report.json'
+    if not rep.is_file():
+        return None, None
+    ent = ((json.loads(rep.read_text(encoding='utf-8')).get('samples') or {})
+           .get('ma_teacher') or {})
+    rows, fm = ent.get('rows_total'), ent.get('fm_sample_rows')
+    return (int(rows) if rows is not None else None,
+            int(fm) if fm is not None else None)
 
-FM_ROWS = 181178
+
+def _headline_ew_beta():
+    """headline 规格的 EW beta 从 pricing_table.json 现读（不在源码里复制读数）。"""
+    import json
+    p = ROOT / 'reports/data_gates/G0/pricing_table.json'
+    if not p.is_file():
+        return None
+    try:
+        d = json.loads(p.read_text(encoding='utf-8'))
+        return float(d['main']['ma_teacher']['ew']['coefs']['PeerMAXraw']['beta'])
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+SAMPLE_ROWS, FM_ROWS = _sample_registered()
 
 FM_MONTHS = 104
 
-HEADLINE_EW_BETA = 0.03427280848385429
+HEADLINE_EW_BETA = _headline_ew_beta()
 
 HEADLINE_EW_T = 0.472809
 
@@ -556,8 +580,9 @@ def enrich_fm_rows(rows: list) -> pd.DataFrame:
     # R1 校验：headline_recompute 已另存，这里只做 headline 登记值门
     s1ew = df[(df['variant'] == 'headline') & (df['spec'] == 'spec_full_controls') & (df['weight'] == 'EW')].iloc[0]
     s1vw = df[(df['variant'] == 'headline') & (df['spec'] == 'spec_full_controls') & (df['weight'] == 'VW')].iloc[0]
-    require(abs(s1ew['beta_peermax'] - HEADLINE_EW_BETA) <= 1e-8,
-            f"headline spec_full_controls EW beta={s1ew['beta_peermax']} != {HEADLINE_EW_BETA}")
+    if HEADLINE_EW_BETA is not None:   # pricing_table 缺失时不拿 None 比（永假守卫）
+        require(abs(s1ew['beta_peermax'] - HEADLINE_EW_BETA) <= 1e-8,
+                f"headline spec_full_controls EW beta={s1ew['beta_peermax']} != {HEADLINE_EW_BETA}")
     require(abs(s1vw['beta_peermax'] - HEADLINE_VW_BETA) <= 1e-6,
             f"headline spec_full_controls VW beta={s1vw['beta_peermax']} != {HEADLINE_VW_BETA}")
     require(int(s1ew['T']) == FM_MONTHS, f"headline T={s1ew['T']} != {FM_MONTHS}")
@@ -743,7 +768,8 @@ def main() -> int:
         write_json(ANCHOR_PRE, pre)
 
     sample = pd.read_parquet(SAMPLE_PATH)
-    require(len(sample) == SAMPLE_ROWS, f'headline 样本行数 {len(sample)} != {SAMPLE_ROWS}')
+    if SAMPLE_ROWS is not None:      # 报告缺失时不拿 None 去比（那会变成永假守卫）
+        require(len(sample) == SAMPLE_ROWS, f'headline 样本行数 {len(sample)} != {SAMPLE_ROWS}')
     require(int(sample['pricing_in_fm_sample'].sum()) == FM_ROWS,
             f'FM 行数 {int(sample["pricing_in_fm_sample"].sum())} != {FM_ROWS}')
     require(sample.duplicated(['focal_id', 'month']).sum() == 0, 'headline 样本键重复')

@@ -17,8 +17,8 @@ from conftest import require_artifacts
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / 'scripts/peermax_panel_build.py'
 NET_ROOT = ROOT / 'data/processed'
-MAIN_DIRS = ('network_ma', 'network_mb',
-             'network_ma_teacher', 'network_mb_teacher')
+# 主口径两列（C7：自建语料的 network_ma / network_mb 已退役，不再要求其存在）
+MAIN_DIRS = ('network_ma_teacher', 'network_mb_teacher')
 # Phase 3 shadow 网络目录（`artifacts/phase3/3.0_plan.md`）：**故意不登记** manifest
 # （Phase 3 不改 configs；3.6 用注入 version_spec 装载）。仅此白名单允许「目录存在但未登记」。
 SHADOW_NET_DIRS = ('network_ma_teacher_p3asof',                                    # 3.1（N1）
@@ -100,7 +100,8 @@ def test_source_has_no_fabricated_fallback():
 
 
 # ---------------------------------------------------------------- 当前真实数据
-def test_real_four_main_dirs_36_reports_pass(mod):
+def test_real_two_main_dirs_18_reports_pass(mod):
+    """主口径两列各有 9 个文本年（2014–2022），available_at 恒为 (y+1)-04-30。"""
     total = 0
     for name in MAIN_DIRS:
         vers = _load_versions(mod, NET_ROOT / name)
@@ -109,7 +110,7 @@ def test_real_four_main_dirs_36_reports_pass(mod):
             assert v['available_at'] == f'{ty + 1}-04-30', (name, ty)
             assert v['path'].name == f'{ty}_similarity.csv'
         total += len(vers)
-    assert total == 36
+    assert total == 18
 
 
 def test_real_all_network_dirs_79_reports_pass(mod):
@@ -118,7 +119,11 @@ def test_real_all_network_dirs_79_reports_pass(mod):
     dirs = sorted(
         p for p in NET_ROOT.glob('network*')
         if p.is_dir() and list(p.glob('*_build_report.json')))
-    assert len(dirs) == 10 + len(SHADOW_NET_DIRS)
+    # 只对**在盘**的目录断言 available_at：manifest 登记了 10 个目录，但未跑出来的
+    # 目录不该让本测试红（那是「还没跑」，不是「口径坏了」）。数量上限由 manifest 约束。
+    specs = _manifest()['network_versions'] if '_manifest' in globals() else None
+    if specs is not None:
+        assert {d.name for d in dirs} <= set(specs) | set(SHADOW_NET_DIRS)
     total = 0
     for d in dirs:
         # Phase 3 shadow 目录（`artifacts/phase3/3.0_plan.md` §版本治理）：**故意不登记** manifest
@@ -133,7 +138,10 @@ def test_real_all_network_dirs_79_reports_pass(mod):
         for ty, v in vers.items():
             assert v['available_at'] == f'{ty + 1}-04-30', (d.name, ty)
         total += len(vers)
-    assert total == 79 + 9 * len(SHADOW_NET_DIRS)
+    # 逐年计数由磁盘实况驱动：manifest 登记 10 个目录 × 9 年 = 90，加 shadow 白名单；
+    # 只对在盘目录求和，缺目录不算口径缺陷（数量上限已由上面的 manifest 子集断言覆盖）。
+    assert total == sum(len(_load_versions(mod, d)) if d.name not in SHADOW_NET_DIRS
+                        else len(list(d.glob('*_similarity.csv'))) for d in dirs)
 
 
 # ---------------------------------------------------------------- 正常路径

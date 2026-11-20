@@ -13,11 +13,10 @@
      < 3 次（>= 3 次判为页眉，不计）。字段：`stop_heading_hits` / `out_of_scope`。
   ② 截断 flag：旧 `len >= 29900` 阈值来自**v1 提取器的 MAX_LEN=3e4**，
      v2 提取器已提到 3e5 → flag 失效。改为**读当前提取器的 MAX_LEN**：
-       self 语料：M-A = `text_business_extract.SAFE_MAX`（3e4）、M-B = `text_mda_extract.MAX_LEN`（3e5）；
        teacher 语料：老师导出面板无本仓库提取器 → 实测存在 **Excel 单元格上限 32767**
        （107 篇长度恰好 = 32767），按数据源上限登记（`cell_max_hit`），**不等价于本仓库截断**。
      字段：`len` / `at_max_len` / `max_len_used` / `max_len_source`。
-  ③ 新增 `--corpus {self,teacher}` / `--years` / `--net-dir` / `--lexicon` / `--out-prefix` /
+  ③ 新增 `--corpus teacher` / `--years` / `--net-dir` / `--lexicon` / `--out-prefix` /
      `--n-per-stratum`；默认输出改为 `*_v2` 文件名，**不覆盖 2026-09-15 旧产物**（其两列 flag 已失效）。
   ④ 语料按需分块读取（只保留抽样年份的 ok 行），避免整表载入；语料质量统计范围 = 抽样年份。
 
@@ -47,37 +46,32 @@ OUT_DIR = ROOT / 'reports/data_gates/G0'
 # 老师导出面板的 Excel 单元格上限（实测 107 篇长度恰好 = 32767）
 TEACHER_CELL_MAX = 32767
 
+# 语料只有老师导出面板（自建 CNINFO 语料链已按 CO-2026-11-20-teacher-only 退役）。
 CORPUS_SPEC = {
-    ('self', 'ma'): {'file': 'data/processed/business_texts.csv', 'id_col': 'code',
-                     'lexicon': 'data/processed/product_lexicon_v2.csv',
-                     'extractor': ('text_business_extract', 'SAFE_MAX')},
-    ('self', 'mb'): {'file': 'data/processed/mda_texts.csv', 'id_col': 'code',
-                     'lexicon': None, 'extractor': ('text_mda_extract', 'MAX_LEN')},
     ('teacher', 'ma'): {'file': 'data/processed/teacher_mda_panel.csv', 'id_col': 'firm_id',
                         'lexicon': 'data/processed/product_lexicon_v2_teacher.csv',
-                        'extractor': None, 'cell_max': TEACHER_CELL_MAX},
+                        'cell_max': TEACHER_CELL_MAX},
     ('teacher', 'mb'): {'file': 'data/processed/teacher_mda_panel.csv', 'id_col': 'firm_id',
-                        'lexicon': None, 'extractor': None, 'cell_max': TEACHER_CELL_MAX},
+                        'lexicon': None, 'cell_max': TEACHER_CELL_MAX},
 }
 
 
 # --------------------------------------------------------------------------- #
 # 结构判据 / MAX_LEN 解析
 # --------------------------------------------------------------------------- #
+# §8.10.5 的 STOP_NAMES（独占行判据用）。自建语料链退役后本仓不再有提取器模块，
+# 名字集合就地固定；teacher 语料审计用它做章节边界判据。
+STOP_NAMES = {"公司治理", "重要事项", "监事会报告", "监事报告",
+              "董事、监事、高级管理人员和员工情况", "公司治理及内部控制",
+              "财务报告", "备查文件", "环境和社会责任", "社会责任报告",
+              "股份变动及股东情况", "审计报告", "独立董事述职报告",
+              "内部控制评价报告", "内部控制自我评价报告",
+              "募集资金存放与使用情况", "优先股相关情况", "债券相关情况",
+              "董事会报告"}
+
+
 def _load_stop_names() -> tuple[set, str]:
-    """§8.10.5 的 STOP_NAMES（独占行判据用）。优先从当前提取器模块读取。"""
-    try:
-        from text_mda_extract import STOP_NAMES
-        return set(STOP_NAMES), 'text_mda_extract.STOP_NAMES'
-    except Exception as exc:      # pragma: no cover - 兜底，保持脚本可复跑
-        fallback = {"公司治理", "重要事项", "监事会报告", "监事报告",
-                    "董事、监事、高级管理人员和员工情况", "公司治理及内部控制",
-                    "财务报告", "备查文件", "环境和社会责任", "社会责任报告",
-                    "股份变动及股东情况", "审计报告", "独立董事述职报告",
-                    "内部控制评价报告", "内部控制自我评价报告",
-                    "募集资金存放与使用情况", "优先股相关情况", "债券相关情况",
-                    "董事会报告"}
-        return fallback, f'fallback({type(exc).__name__})'
+    return set(STOP_NAMES), 'network_edge_precision_audit.STOP_NAMES'
 
 
 STOP_NAMES, STOP_NAMES_SOURCE = _load_stop_names()
@@ -99,17 +93,8 @@ def stop_heading_hits(text: str) -> dict:
 
 
 def resolve_max_len(corpus: str, net: str) -> tuple[int | None, str]:
-    """返回 (max_len, 来源说明)。读**当前提取器**常量；teacher 语料登记 Excel 单元格上限。"""
+    """返回 (max_len, 来源说明)。teacher 语料登记导出端的 Excel 单元格上限。"""
     spec = CORPUS_SPEC[(corpus, net)]
-    if spec.get('extractor'):
-        mod_name, const = spec['extractor']
-        try:
-            mod = __import__(mod_name)
-            val = int(getattr(mod, const))
-            return val, f'{mod_name}.{const}'
-        except Exception as exc:      # pragma: no cover - 兜底
-            fallback = 30000 if net == 'ma' else 300000
-            return fallback, f'fallback({type(exc).__name__}; documented {fallback})'
     if spec.get('cell_max'):
         return int(spec['cell_max']), 'teacher export Excel cell limit (empirical: 107 docs == 32767)'
     return None, 'n/a'
@@ -190,7 +175,7 @@ def load_year_texts(corpus: str, which: str, year: int) -> list:
 
 
 def load_lexicon_terms(path: Path, df_max: float = 0.25) -> list:
-    """teacher/self 词库：取 df_ratio <= df_max 的词条，按 df_ratio 升序（稀有优先）。"""
+    """teacher 词库：取 df_ratio <= df_max 的词条，按 df_ratio 升序（稀有优先）。"""
     d = pd.read_csv(path, usecols=['term', 'df_ratio'])
     d['term'] = d['term'].astype(str)
     d['df_ratio'] = pd.to_numeric(d['df_ratio'], errors='coerce').fillna(0.0)
@@ -300,8 +285,8 @@ def sample_edges(net: str, year: int, net_dir: Path, n_per_stratum: int) -> pd.D
 
 def main() -> int:
     ap = argparse.ArgumentParser(description='network 边级语义审计 v2（代理指标；两处失效 flag 已修）')
-    ap.add_argument('--corpus', choices=['self', 'teacher'], default='self',
-                    help='self = 自建语料（business_texts / mda_texts）；teacher = 老师导出 MD&A 面板')
+    ap.add_argument('--corpus', choices=['teacher'], default='teacher',
+                    help='老师导出 MD&A 面板（自建 CNINFO 语料链已退役）')
     ap.add_argument('--years', default=','.join(str(y) for y in YEARS))
     ap.add_argument('--n-per-stratum', type=int, default=N_PER_STRATUM)
     ap.add_argument('--net-dir', default=None,

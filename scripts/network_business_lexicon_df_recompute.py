@@ -11,13 +11,15 @@
   - 逐年（9 个文本年**各自独立**）统计 `doc_count_t`，`df_ratio_t = doc_count_t / N_docs_t`；
   - 阈值：`ma_lexicon_df_max = 0.25`（冻结值，取自 registry）。
 
-单列聚合（本次显式决策，`df_ratio` 列的语义）：
-  `load_lexicon(path, df_max)` 在存在 `df_ratio` 列时按**单列**过滤，故须给单列值；
-  本脚本取 **`df_ratio = max_t df_ratio_t`（年度上确界，argmax 年的 doc_count 配对）**：
-  ① 与"逐年独立"一致且是唯一不需要改匹配器/构网算法的聚合；
-  ② 保守方向（只有全年都不超标的词条才保留），不会用某年的低 df 把通用词留在词表里；
-  ③ 逐词可复算（`df_ratio * N_docs(argmax 年) = doc_count`）。
-  同时落盘 `df_ratio_pooled`（九年池化，对照原业务描述口径的算法）供审计比对。
+单列聚合（`df_ratio` 列的语义）：
+  `load_lexicon(path, df_max)` 在存在 `df_ratio` 列时按**单列**过滤，故文件里必须给单列值；
+  本脚本取 `df_ratio = max_t df_ratio_t`（年度上确界），**仅供人读与审计**。
+
+  **构网不得用这一列做 PIT 过滤**：上确界含未公布年份的词频，用它剔词等于把未来信息
+  带进早年网络（spec/design.yaml 的 available_at 严格小于规则）。构网的 df 掩码按文本年
+  逐年在 `network_business_cluster_grid._lexicon_keep_mask_year` 里用 `doc_count_{y}/n_docs_{y}`
+  现算；本文件同时落盘的 `product_lexicon_v2_teacher_df_by_year.csv` 就是该口径的数据源。
+  同时落盘 `df_ratio_pooled`（九年池化）供审计比对。
 
 产物：
   data/processed/product_lexicon_v2_teacher.csv          （原列 + 新 df/keep 列）

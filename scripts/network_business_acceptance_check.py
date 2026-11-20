@@ -115,10 +115,13 @@ def main():
         freeze_med = float(fz['peer_median']) if fz and fz.get('peer_median') is not None else None
         matches_freeze = (None if freeze_med is None else bool(median_peer == freeze_med))
 
+        # status 取值域：被写坏的支持列（如整列变成邻接表字符串）必须判 fail
+        bad_status_vals = sorted(set(sup['network_support_status'].astype(str))
+                                 - {'support', 'no-network-support'})
         ok = (dup == 0 and self_loop == 0 and bad_sum == 0 and avail == [expect_avail]
               and versions == [expect_ver] and set(edges['focal_id']) == sup_nodes
               and zero_w == 0 and cluster_consistency == 1.0 and n_missing_label == 0
-              and ns_with_edges == 0
+              and ns_with_edges == 0 and not bad_status_vals
               and node_total == rep['n_nodes'] and (max_rel is None or max_rel < 1e-5)
               and (matches_freeze is None or matches_freeze))
         overall_ok &= ok
@@ -129,6 +132,7 @@ def main():
             'n_edges': int(len(edges)), 'dup_keys': dup, 'self_loops': self_loop,
             'bad_row_sum': bad_sum, 'max_weight_recompute_rel_err': max_rel,
             'zero_weight_rows': zero_w, 'ns_nodes_with_edges': ns_with_edges,
+            'bad_support_status_values': bad_status_vals,
             'cluster_consistency': round(cluster_consistency, 6),
             'median_peer': median_peer,
             'median_peer_edges_only': median_peer_edges_only,

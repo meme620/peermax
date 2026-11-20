@@ -101,6 +101,9 @@ CORPORA = {
         'net_dir': ROOT / 'data/processed/network_ma_teacher',
         'src_version': 'teacher_mda_panel+product_lexicon_v2_teacher',
         'lexicon': ROOT / 'data/processed/product_lexicon_v2_teacher.csv',
+        # 逐年 df 表（doc_count_{y} / n_docs_{y}）：词表 df 掩码按**该文本年**取，避免跨年上确界
+        # 把未来年份的词频带进早年构网（PIT）。
+        'idf_by_year': ROOT / 'data/processed/product_lexicon_v2_teacher_df_by_year.csv',
         'years': list(range(2014, 2023)),
         'grid_years': [2016, 2018, 2020, 2022],
         'report': REPD / 'network_business_cluster_grid_teacher.json',
@@ -273,6 +276,32 @@ def _lexicon_keep_mask(lex_path, df_max):
     return _LEX_KEEP_CACHE[key]
 
 
+def _lexicon_keep_mask_year(lex_path, df_max, year, df_by_year_path):
+    """按**该文本年**的 df 返回 (terms, keep_mask)——PIT 正确版本。
+
+    df_y = doc_count_{y} / n_docs_{y}：只用该年及更早的语料计算，不含未来年份。
+    词表按行序对齐 df_by_year 的 term 列；任一侧缺失即 KeyError（不静默丢弃）。
+    """
+    key = (str(lex_path), float(df_max), int(year), str(df_by_year_path))
+    if key in _LEX_KEEP_CACHE:
+        return _LEX_KEEP_CACHE[key]
+    terms, _ = _lexicon_keep_mask(lex_path, df_max)
+    d = pd.read_csv(df_by_year_path, usecols=[
+        'term', f'doc_count_{year}', f'n_docs_{year}'])
+    # 逐年表只收该语料里**命中过**的词条；未出现的词条 doc_count=0 → df=0 → 保留。
+    dc = d.set_index(d['term'].astype(str))[f'doc_count_{year}']
+    n_docs = float(d[f'n_docs_{year}'].iloc[0])
+    df_y = pd.to_numeric(pd.Series(terms).map(dc), errors='coerce').fillna(0.0) / n_docs
+    keep = (df_y <= float(df_max)).to_numpy()
+    _LEX_KEEP_CACHE[key] = (terms, keep)
+    return _LEX_KEEP_CACHE[key]
+
+
+def _year_df_path(corpus):
+    """该语料的逐年 df 表路径；未登记的语料返回 None（退回跨年上确界并留痕）。"""
+    return CORPORA.get(corpus, {}).get('idf_by_year')
+
+
 def build_vectors_from_hits(year, A, uni, corpus, df_max=None):
     """由命中缓存重建产品词向量（**与 build_vectors 现场匹配路径语义等价**）。
 
@@ -367,6 +396,15 @@ def build_vectors(year, A, uni, corpus='self', df_max=None):
     pos = idf = None
     if weighting == 'idf':
         pos, idf = idf_vector(spec['idf_by_year'], year)
+    # PIT：词表 df 掩码必须用**该文本年**的 df_y，不得用跨年上确界（后者把未来年份的词频
+    # 带进早年构网）。逐年 df 表未登记的语料退回既有行为并在报告里留痕。
+    year_lex = None
+    ydf_path = spec.get('idf_by_year')
+    if ydf_path is not None and Path(ydf_path).is_file():
+        _terms_y, _keep_y = _lexicon_keep_mask_year(
+            spec['lexicon'], DF_MAX_DEFAULT if df_max is None else float(df_max), year, ydf_path)
+        year_lex = (set(t for t, k in zip(_terms_y, _keep_y) if k), _keep_y,
+                    _terms_y, int(sum(_keep_y)), len(_terms_y))
     d = pd.read_csv(spec['path'], usecols=[spec['id_col'], 'year', 'text', 'status'])
     if spec['id_col'] != 'code':
         d = d.rename(columns={spec['id_col']: 'code'})
@@ -385,6 +423,8 @@ def build_vectors(year, A, uni, corpus='self', df_max=None):
                 stats['drop_ipo'] += 1
                 continue
         hits = {v for _, v in A.iter(norm_text(text))}
+        if year_lex is not None:
+            hits = {t for t in hits if t in year_lex[0]}
         if len(hits) < MIN_TERMS:
             stats['drop_min'] += 1
             continue
@@ -403,6 +443,12 @@ def build_vectors(year, A, uni, corpus='self', df_max=None):
     stats['firms_kept'] = len(firms)
     stats['active_vocab'] = len(vocab)
     stats['mean_terms'] = round(float(X.getnnz(axis=1).mean()), 1)
+    if year_lex is not None:
+        stats['lexicon_df_rule'] = f'df_{year} <= {DF_MAX_DEFAULT if df_max is None else df_max}'
+        stats['lexicon_terms_kept_year'] = year_lex[3]
+        stats['lexicon_terms_total'] = year_lex[4]
+    else:
+        stats['lexicon_df_rule'] = 'pooled_max_over_years（该语料未登记逐年 df 表）'
     return firms, X, stats
 
 

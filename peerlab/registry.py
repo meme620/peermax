@@ -14,7 +14,8 @@ from pathlib import Path
 SEEDS: tuple[int, ...] = (0, 1, 2, 3, 4)
 
 _LABELS = {'pricing_sample_v1_2015_2023': 'v1', 'pricing_sample_v2_2015_2023': 'v2',
-           'pricing_sample_v3_20261115': 'v3', 'pricing_sample_v4_20261116': 'v4'}
+           'pricing_sample_v3_20261115': 'v3', 'pricing_sample_v4_20261116': 'v4',
+           'pricing_sample_v5_teacher_only_20261120': 'v5'}
 
 
 def headline_sample_label(root=None) -> str:
@@ -48,10 +49,11 @@ REGISTRY_CONFIG = 'configs/parameter_registry.yaml'
 
 @dataclass(frozen=True)
 class Step:
-    """一次子进程调用。"""
+    """一次子进程调用。args_smoke 给定时整块替换 args（-smoke 的缩小规模口径）。"""
 
     script: str
     args: tuple[str, ...] = ()
+    args_smoke: tuple[str, ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -71,17 +73,34 @@ class Experiment:
     requires: tuple[str, ...] = ()
     outputs: tuple[str, ...] = ()
     metrics: tuple[MetricSpec, ...] = ()
-    smoke_args: tuple[str, ...] = ()
     accepts_seed: bool = False
     suffix_arg: str | None = None
     scope: str = 'per_seed'  # prepare | per_seed
     runtime_hint: str = ''
 
-    def missing_inputs(self, root) -> list[str]:
+    def expanded(self, seed: int) -> 'Experiment':
+        """把 args / requires / outputs 里的 {sfx} 按 seed 展开（suffix_for 同口径）。"""
+        sfx = f'_s{seed}' if (self.suffix_arg and self.scope == 'per_seed') else ''
+
+        def sub(text: str) -> str:
+            return text.replace('{sfx}', sfx).replace('{seed}', str(seed))
+
+        return Experiment(
+            id=self.id, title=self.title,
+            steps=tuple(Step(s.script, tuple(sub(a) for a in s.args),
+                             None if s.args_smoke is None else tuple(s.args_smoke))
+                        for s in self.steps),
+            requires=tuple(sub(p) for p in self.requires),
+            outputs=tuple(sub(p) for p in self.outputs),
+            metrics=self.metrics, accepts_seed=self.accepts_seed,
+            suffix_arg=self.suffix_arg, scope=self.scope,
+            runtime_hint=self.runtime_hint)
+
+    def missing_inputs(self, root, seed: int = 0) -> list[str]:
         from pathlib import Path
 
         base = Path(root)
-        return [p for p in self.requires if not (base / p).exists()]
+        return [p for p in self.expanded(seed).requires if not (base / p).exists()]
 
 
 EXPERIMENTS: tuple[Experiment, ...] = (
@@ -89,7 +108,11 @@ EXPERIMENTS: tuple[Experiment, ...] = (
         id='estimation-sample',
         title='pricing_gate 样本构建（run-all 只跑一次）',
         steps=(Step('scripts/pricing_sample_build.py'),),
-        requires=(REGISTRY_CONFIG, 'data/processed/monthly_pricing_panel_ma_teacher.csv'),
+        # check_panel_contracts 读 pricing_lib.PANELS 全部四项（pricing_sample_build:312-316），
+        # requires 必须与之一致，否则 status 报 ready 而 run 在第一个缺失面板上 FileNotFoundError。
+        requires=(REGISTRY_CONFIG,
+                  'data/processed/monthly_pricing_panel_ma_teacher.csv',
+                  'data/processed/monthly_pricing_panel_mb_teacher.csv'),
         outputs=(
             'reports/data_gates/G0/pricing_sample_report*.json',
             'data/processed/pricing_sample_*.parquet',
@@ -110,9 +133,13 @@ EXPERIMENTS: tuple[Experiment, ...] = (
         id='network-mda-text',
         title='M-B 文本竞争网络：全期矩阵 → τ 校准 → 构边',
         steps=(
-            Step('scripts/network_mda_full_matrix.py', ('--years', '2017-2025')),
-            Step('scripts/network_tau_calibrate.py'),
-            Step('scripts/network_mda_edges_build.py', ('--year', '2021')),
+            Step('scripts/network_mda_full_matrix.py',
+                 ('--years', '2014-2022', '--corpus', 'teacher'),
+                 args_smoke=('--years', '2021-2021', '--corpus', 'teacher')),
+            Step('scripts/network_tau_calibrate.py', ('--corpus', 'teacher'),
+                 args_smoke=('--years', '2021', '--corpus', 'teacher')),
+            Step('scripts/network_mda_edges_build.py', ('--year', '2021', '--corpus', 'teacher'),
+                 args_smoke=('--year', '2021', '--corpus', 'teacher')),
         ),
         requires=(REGISTRY_CONFIG, 'data/raw/teacher/mda_data_2023.csv',
                   'data/processed/teacher_mda_panel.csv'),
@@ -120,7 +147,6 @@ EXPERIMENTS: tuple[Experiment, ...] = (
             'data/processed/network_mb_teacher/**',
             'reports/data_gates/G0/network_tau_calibration*.json',
         ),
-        smoke_args=('--years', '2021'),
         runtime_hint='分钟级',
     ),
     Experiment(
@@ -138,9 +164,12 @@ EXPERIMENTS: tuple[Experiment, ...] = (
             ),
         ),
         requires=(REGISTRY_CONFIG, 'data/processed/network_ma_teacher', 'data/processed/daily_panel'),
+        # 默认输出名（peermax_panel_build.resolve_outputs 未给 --out 时）：网络目录 network_ma_teacher
+        # 的 NET_DIR_SUFFIX 是 _teacher，use-case 是 ma。v4 是显式 --out 才写的新文件名，
+        # 下游 pricing_lib.PANELS（v3 主口径）读的是这两个非 v4 文件。
         outputs=(
-            'data/processed/monthly_pricing_panel_*_v4.csv',
-            'reports/data_gates/G0/peermax_panel_build_*_v4_report.json',
+            'data/processed/monthly_pricing_panel_ma_teacher.csv',
+            'reports/data_gates/G0/peermax_panel_build_ma_teacher_report.json',
         ),
         runtime_hint='分钟级',
     ),
@@ -157,9 +186,9 @@ EXPERIMENTS: tuple[Experiment, ...] = (
         ),
         metrics=(
             MetricSpec('beta_peer', 'reports/data_gates/G0/pricing_table{sfx}.json',
-                       'main.ma_teacher.coefs.PeerMAXraw.beta'),
+                       'main.ma_teacher.ew.coefs.PeerMAXraw.beta'),
             MetricSpec('t_peer', 'reports/data_gates/G0/pricing_table{sfx}.json',
-                       'main.ma_teacher.coefs.PeerMAXraw.t'),
+                       'main.ma_teacher.ew.coefs.PeerMAXraw.t_nw'),
         ),
         suffix_arg='--out-suffix',
         runtime_hint='分钟级',
@@ -180,25 +209,30 @@ EXPERIMENTS: tuple[Experiment, ...] = (
     Experiment(
         id='robustness-checks',
         title='pricing_gate 稳健性：placebo 与长度/行业控制',
+        # placebo 的置换网络随 seed 变化：--seed 与 --out-suffix 必须成对传，
+        # 否则 5 个 seed 互相覆盖同一份产物，seed 协议等于没有。
         steps=(
-            Step('scripts/pricing_robustness_placebo.py'),
+            Step('scripts/pricing_robustness_placebo.py', ('--seed', '{seed}')),
             Step('scripts/pricing_length_industry_control.py'),
         ),
         requires=(REGISTRY_CONFIG, headline_sample_path()),
         outputs=(
-            'reports/data_gates/G0/pricing_robustness_placebo.json',
+            'reports/data_gates/G0/pricing_robustness_placebo{sfx}.json',
             'reports/data_gates/G0/pricing_length_control.json',
             'reports/data_gates/G0/pricing_industry_absorb.json',
         ),
+        suffix_arg='--out-suffix',
         runtime_hint='分钟级',
     ),
     Experiment(
         id='gate-report',
         title='pricing_gate 数据门报告',
-        steps=(Step('scripts/pricing_gate_report.py'),),
+        steps=(Step('scripts/pricing_gate_report.py', ('--input-suffix', '{sfx}')),),
+        # requires 与 --input-suffix 必须同口径：命令按 _s{seed} 读，就绪判定也得看带后缀的上游，
+        # 否则 status 报 ready 而 run 读不到文件（或反过来挡掉真实就绪）。
         requires=(REGISTRY_CONFIG,
-                  'reports/data_gates/G0/pricing_table.json',
-                  'reports/data_gates/G0/pricing_portfolio_deciles.json'),
+                  'reports/data_gates/G0/pricing_table{sfx}.json',
+                  'reports/data_gates/G0/pricing_portfolio_deciles{sfx}.json'),
         outputs=(
             'reports/data_gates/G0/pricing_gate_report*.json',
             'reports/data_gates/G0/pricing_gate_report*.md',
@@ -220,7 +254,7 @@ EXPERIMENTS: tuple[Experiment, ...] = (
         title='网络密度零模型（随机重连，随 seed 变化）',
         steps=(Step('scripts/network_density_null.py'),),
         requires=(REGISTRY_CONFIG, 'data/processed/network_ma_teacher'),
-        outputs=('reports/data_gates/G0/network_density_null.json',),
+        outputs=('reports/data_gates/G0/network_density_null_s{seed}.json',),
         accepts_seed=True,
         runtime_hint='分钟级到小时级（R=1000 重连）',
     ),
@@ -246,10 +280,10 @@ EXPERIMENT_NOTES: dict[str, dict] = {
         ),
     },
     'network-business-text': {
-        'purpose': 'M-A 产品市场网络构边（--corpus teacher 为主口径）',
+        'purpose': 'M-A 产品市场网络构边（--corpus teacher 是唯一口径）',
         'notes': (
-            '上游：text_business_extract -> network_business_cluster_grid -> cluster_freeze',
-            '产物：data/processed/network_ma_teacher/，不覆盖 network_ma/',
+            '上游：network_business_cluster_grid -> network_business_cluster_freeze（teacher 语料）',
+            '产物：data/processed/network_ma_teacher/',
             '坑：本实验 steps 只做构边，聚类冻结要先跑；缺聚类目录会 blocked',
         ),
     },
@@ -257,7 +291,7 @@ EXPERIMENT_NOTES: dict[str, dict] = {
         'purpose': 'M-B 老师 MD&A 语料的 TF-IDF 文本网络',
         'notes': (
             '链路：network_mda_full_matrix -> network_tau_calibrate -> network_mda_edges_build',
-            '产物：data/processed/network_mb_teacher/；network_mb_stub/ 只是占位产物',
+            '产物：data/processed/network_mb_teacher/（--corpus teacher 是唯一口径）',
             '坑：不给 --tau 走占位模式，产物不入分析',
         ),
     },

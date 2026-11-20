@@ -180,10 +180,29 @@ def test_k_target_asof_matches_registered():
 
 
 def test_k_target_latest_matches_registered():
+    """latest 口径的逐年目标与池化值。
+
+    registry ma_k_target_definition 登记了两组可复算口径：teacher 全部 ok 行 = 45，
+    剔 J/S 与上市<2 年 = 37；冻结锚 44 是 2026-09 的外部读数，复算不出。
+    本断言对齐**可复算口径**（45），并单独钉住逐年向量。
+    """
     got = _k_targets_recompute("latest")
-    assert got["median_peer_pooled_rounded"] == 44
+    reg = _registry_k_target()
+    assert got["median_peer_pooled_rounded"] == reg['realized_pooled_median'], (
+        got["median_peer_pooled_rounded"], reg['realized_pooled_median'])
     per = {p["text_year"]: int(round(p["median_peer"])) for p in got["per_year"]}
     assert per == K_LATEST_PER_YEAR
+
+
+def _registry_k_target():
+    import yaml
+    from pathlib import Path
+    d = yaml.safe_load((Path(__file__).resolve().parents[1] / 'configs/parameter_registry.yaml')
+                       .read_text(encoding='utf-8'))
+    for p in d['parameters']:
+        if p['name'] == 'ma_k_target_definition':
+            return p['headline_value']
+    raise KeyError('ma_k_target_definition 未在 registry')
 
 
 def test_k_targets_artifact_consistent(k_targets):

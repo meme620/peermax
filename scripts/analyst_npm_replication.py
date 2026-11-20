@@ -32,7 +32,7 @@ def main():
         if sys.argv[2] not in {'coverage_win12_fy12_v3', 'coverage_win12_nofy_v4'}:
             raise ValueError('network must be coverage_win12_fy12_v3 or coverage_win12_nofy_v4')
         NET_VER = sys.argv[2]
-    # 2026-09-10 Gate 4.7（9F）：收益口径显式变体（raw 主口径 / adj 后复权敏感性）
+    # 2026-09-10 Gate 4.7（9F）：收益口径显式变体（本模块独立取数，邻接主链主口径=后复权）
     returns_mode = sys.argv[3] if len(sys.argv) > 3 else 'raw'
     if returns_mode not in {'raw', 'adj'}:
         raise ValueError('returns must be raw or adj')

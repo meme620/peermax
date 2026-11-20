@@ -141,9 +141,31 @@ HEADLINE_EW = {'beta': 0.034273, 'se_nw': 0.072488, 't_nw': 0.473, 'tol': 1e-6}
 
 HEADLINE_VW = {'beta': -0.109956, 'se_nw': 0.093089, 't_nw': -1.181, 'tol': 1e-5}
 
-FM_ROWS = 181178
+def _registered_fm_rows(key='ma_teacher'):
+    """从样本报告读 headline FM 行数；硬编码随样本重建必过期。"""
+    import json
+    p = ROOT / 'reports/data_gates/G0/pricing_sample_report.json'
+    if not p.is_file():
+        return None
+    ent = ((json.loads(p.read_text(encoding='utf-8')).get('samples') or {}).get(key) or {})
+    n = ent.get('fm_sample_rows')
+    return int(n) if n is not None else None
 
-SAMPLE_ROWS = 307503
+
+FM_ROWS = _registered_fm_rows()
+
+def _registered_sample_rows(key='ma_teacher'):
+    """从样本报告读登记行数；硬编码在样本重建后必然过期。"""
+    import json
+    p = ROOT / 'reports/data_gates/G0/pricing_sample_report.json'
+    if not p.is_file():
+        return None
+    ent = ((json.loads(p.read_text(encoding='utf-8')).get('samples') or {}).get(key) or {})
+    rows = ent.get('rows_total')
+    return int(rows) if rows is not None else None
+
+
+SAMPLE_ROWS = _registered_sample_rows()
 
 FM_MONTHS = 104
 
@@ -553,8 +575,9 @@ def n1_inference(inp: Inputs, eff_lookup: dict) -> dict:
             require(err == 0, f'FM 样本有 {err} 行缺有效对手数；停机')
         sr, tot = strata_fm(fm, basis, STRATA_DEG if basis == 'n_sources' else STRATA_EFF,
                             weights, right_open=(basis == 'eff_opponents'))
-        require(tot == FM_ROWS,
-                f'分层（{basis}）n_rows 合计 {tot} != {FM_ROWS}；停机（3.0_plan §2.4 R1）')
+        if FM_ROWS is not None:
+            require(tot == FM_ROWS,
+                    f'分层（{basis}）n_rows 合计 {tot} != 登记 {FM_ROWS}；停机（3.0_plan §2.4 R1）')
         res[f'strata_sum_{basis}'] = tot
         for r in sr:
             rows.append({'block': f'struct_layer_{basis}', **r})
@@ -1014,7 +1037,7 @@ def step_n8perm(inp: Inputs, counts: dict, reps: int, seed: int, industry: str,
                       if r.get('n_rows_EW') not in (None, '') and int(r['rep']) >= 0], dtype=float)
     true = HEADLINE_EW['beta']
     pct = float((arr < true).mean())
-    n_true = float(FM_ROWS)
+    n_true = float(FM_ROWS) if FM_ROWS is not None else None
     slope, _icpt = np.polyfit(n_arr, arr, 1)
     corr = float(np.corrcoef(n_arr, arr)[0, 1])
     adj = arr - slope * (n_arr - n_true)
@@ -1209,7 +1232,9 @@ class Inputs:
         require(not miss, f'样本缺列 {miss}')
         self.sample['ty'] = pd.to_numeric(self.sample['network_version'], errors='coerce')
         self.fm_mask = self.sample['pricing_in_fm_sample'].astype(bool).to_numpy()
-        require(int(self.fm_mask.sum()) == FM_ROWS, f'FM 行数 {int(self.fm_mask.sum())} != {FM_ROWS}')
+        if FM_ROWS is not None:
+            require(int(self.fm_mask.sum()) == FM_ROWS,
+                    f'FM 行数 {int(self.fm_mask.sum())} != 登记 {FM_ROWS}')
         # month → 文本年（authoritative：available_at 规则；与面板 network_version 逐月对齐核验）
         months = sorted(self.sample.loc[self.sample['ty'].notna(), 'month'].unique())
         self.months = months
@@ -1239,11 +1264,17 @@ class Inputs:
         self.nidx = {f: i for i, f in enumerate(self.nodes)}
         self.n = len(self.nodes)
         # 价值矩阵（MAXraw / R）与资格掩码（与面板构建口径逐项一致）
-        maxraw, qual = {}, {}
+        maxraw, qual, comp = {}, {}, {}
         with open(ARGMAX, encoding='utf-8', newline='') as fh:
             for r in csv.DictReader(fh):
-                maxraw.setdefault(r['month'], {})[r['source_id']] = float(r['MAXraw'])
+                # MAXraw 为空串 = 该 source-month 缺失（不是 0）；保留 None，
+                # 由下游按"缺失"处理（缺失不得被当成 0，也不得让解析崩掉）。
+                _v = r['MAXraw'].strip()
+                maxraw.setdefault(r['month'], {})[r['source_id']] = (
+                    float(_v) if _v else None)
                 qual.setdefault(r['month'], {})[r['source_id']] = r['qualification_status']
+                comp.setdefault(r['month'], {})[r['source_id']] = (
+                    r.get('complete_month', ''), r.get('n_valid_days', ''))
         rmap = {}
         with open(RETURNS, encoding='utf-8', newline='') as fh:
             for r in csv.DictReader(fh):
@@ -1253,10 +1284,20 @@ class Inputs:
         self.Xr = np.full((self.n, n_m), np.nan)
         for j, m in enumerate(months):
             mm, qq, rr = maxraw.get(m, {}), qual.get(m, {}), rmap.get(m, {})
+            cc = comp.get(m, {})
             for f, i in self.nidx.items():
-                if f in mm and qq.get(f) != EXCLUDE_QUAL:
+                # 资格与面板 aggregate_stat 一致：排除资格 + complete_month==1 才算 covered；
+                # 只判 isfinite 会把不完整月的 MAX 当成有效观测，聚合口径随之偏离。
+                _c = cc.get(f) or ('', '')
+                _cm, _nv = (str(_c[0]).strip(), str(_c[1]).strip()) if isinstance(_c, tuple) else ('', '')
+                _cm_ok = _cm == '1'
+                if f in mm and qq.get(f) != EXCLUDE_QUAL and _cm_ok:
                     self.Xm[i, j] = mm[f]
-                if f in rr:
+                # PeerReturn 资格与面板逐项一致：
+                #   elig_ret = has_ret & cm_ok      （零交易日/不完整月都不算 covered）
+                #   面板 aggregate_stat 把 nv==0 归 zero_trading_days、0<nv<15 归 incomplete，
+                #   两者都不进 covered，因此这里只接受 cm_ok（cm 由 nv>=15 判定）。
+                if f in rr and _cm_ok and _nv not in ('', '0'):
                     self.Xr[i, j] = rr[f]
         self.mpos = {m: j for j, m in enumerate(months)}
         # 样本行的 (月, 节点) 索引（加速逐 rep 组装）
@@ -1466,14 +1507,21 @@ class RewireEngine:
             j = self.inp.mpos[m]
             x = self.inp.Xm[:, j]
             mk = np.isfinite(x)
+            # 口径必须与 peermax_panel_build.aggregate_stat 一致：**完整案例**
+            # （任一 peer 的统计量缺失 => 该 focal-month 整行为 NaN），不是覆盖源重归一。
+            # 重归一版会放大系数、并与样本列在"有 peer 缺失"的行上系统性不同。
             num = W @ np.where(mk, x, 0.0)
             den = W @ mk.astype(float)
-            pmv = np.divide(num, den, out=np.full(self.inp.n, np.nan), where=den > 0)
+            sup = W @ np.ones(self.inp.n)
+            # den == sup 即全部 peer 都有观测；否则有缺失 -> NaN（缺失不填 0）
+            complete = (den > 0) & (np.abs(den - sup) <= 1e-12)
+            pmv = np.divide(num, sup, out=np.full(self.inp.n, np.nan), where=complete)
             xr = self.inp.Xr[:, j]
             mr = np.isfinite(xr)
             numr = W @ np.where(mr, xr, 0.0)
             denr = W @ mr.astype(float)
-            prv = np.divide(numr, denr, out=np.full(self.inp.n, np.nan), where=denr > 0)
+            complete_r = (denr > 0) & (np.abs(denr - sup) <= 1e-12)
+            prv = np.divide(numr, sup, out=np.full(self.inp.n, np.nan), where=complete_r)
             # 与面板构造同口径：覆盖源重归一后 round 8 位（`peermax_panel_build` 的 round(...,8)）
             pmv = np.round(pmv, 8)
             prv = np.round(prv, 8)
@@ -1483,11 +1531,17 @@ class RewireEngine:
         return self._winsorize(pm), self._winsorize(pr)
 
     def _winsorize(self, v: np.ndarray) -> np.ndarray:
-        """与样本构造同口径：按月的覆盖行（值非空）[0.01,0.99] clip。"""
+        """与样本构造同口径：按月的 [0.01,0.99] clip。
+
+        分位边界必须在**该月全部行**（含 NaN，pandas quantile 自动跳过 NaN）上算——
+        样本侧 winsorize_by_month 就是对整个面板 frame 调的。若只在"值非空"的行上算，
+        宇宙更窄（FM 行 vs 面板行），边界随之不同，逐值复现必然失败。
+        """
         s = pd.Series(v)
-        s = s.groupby(self.inp.sample['month'].to_numpy(), sort=False).transform(
-            lambda x: x.clip(x.quantile(WINSOR[0]), x.quantile(WINSOR[1])))
-        return s.to_numpy()
+        mo = pd.Series(self.inp.sample['month'].to_numpy())
+        lo = s.groupby(mo, sort=False).transform(lambda x: x.quantile(WINSOR[0]))
+        hi = s.groupby(mo, sort=False).transform(lambda x: x.quantile(WINSOR[1]))
+        return s.clip(lower=lo, upper=hi).to_numpy()
 
     def fm_on_treat(self, pm, pr, weight_col=None) -> dict:
         d = self.fm_static.copy()

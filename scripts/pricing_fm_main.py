@@ -9,16 +9,16 @@ horse race（economic_magnitude.3）：OwnMAX / OwnMAX+IndustryMAX(L1,L2) / +M-A
 2026-10-10 复核修复：
   I3  headline 样本 = pricing_sample_v2_2015_2023（microcap + 次新股筛除已施加）；v1（未施加 microcap 筛除）
       作敏感性并报
-  I4  经济量级统一用 treatment-only 池化登记值 IQR_POOL_REGISTERED = 0.02341287（全规格共用）
+  I4  经济量级统一用 treatment-only 池化登记值 IQR_POOL_REGISTERED（registry iqr_pool_value；全规格共用）
   I5  VIF/condition number 作用域标注 + 跨规格最大值并报（成因：pricing_cf_npm 的 NPM_lin=PeerReturn−own_R_t
       与 PeerReturn/rev 机械共线）
 产出：reports/data_gates/G0/pricing_table.{json,md}、pricing_horse_race.json
-用法：python scripts/pricing_fm_main.py [--sample-version {v1,v2}] [--out-suffix _v2]
+用法：python scripts/pricing_fm_main.py [--sample-version v5] [--out-suffix _s0]
 
 2026-10-11 F-2（v2 样本重跑批）：
-  - 新增 `--sample-version`（默认 v2，headline；另一版本自动作敏感性并报）与 `--out-suffix`
+  - `--sample-version`（当前只有 v5）与 `--out-suffix`
     （如 `--out-suffix _v2` 产出 pricing_table_v2.{json,md} / pricing_horse_race_v2.json，不覆盖 v1 基线名）。
-  - 四列并报表加**窗口列 + 窗口说明**（主口径 2015-05..2023-12；ma/mb 2018-05..2023-12，防误读为同窗口）。
+  - 并报表加**窗口列 + 窗口说明**（两列同为 2015-05..2023-12）。
   - horse race 说明句的 γ/t 读数一律以产物 JSON 为准，不在源码里复制数字（2026-11-19 审核收口）。
 """
 from __future__ import annotations
@@ -30,7 +30,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from pricing_lib import IQR_POOL_REGISTERED, SAMPLE_VERSION_V1, SAMPLE_VERSION_V2, SAMPLE_VERSION_V3, SAMPLE_VERSION_V4, OUT_DIR, ROOT, SAMPLE_VERSION_LABEL, assert_pricing_contract, demean_by, fm_cluster_se, fm_regression, param_value, progress, sample_path, vif_table, write_json
+from pricing_lib import IQR_POOL_REGISTERED, SAMPLE_VERSION_V5, OUT_DIR, ROOT, SAMPLE_VERSION_LABEL, assert_pricing_contract, demean_by, fm_cluster_se, fm_regression, param_value, progress, sample_path, vif_table, write_json
 
 P = param_value('sample_and_spec_registry')
 NW_LAG = int(param_value('nw_lag'))
@@ -39,17 +39,15 @@ MIN_N = P['min_focal_count_per_month']
 MIN_MONTHS = P['min_effective_month_count']
 CONTROLS = list(param_value('pricing_main_controls_v1')['list'])
 MAIN = ['PeerMAXraw', 'OwnMAXraw', 'PeerReturn'] + CONTROLS
-COLUMNS = ['ma_teacher', 'mb_teacher', 'ma', 'mb']
+COLUMNS = ['ma_teacher', 'mb_teacher']
 COL_ROLE = {
     'ma_teacher': '主口径（中文法 × 老师 MD&A；主表列）',
     'mb_teacher': '方法稳健性列（TF-IDF × 同语料）',
-    'ma': '文本稳健性列（中文法 × 自建业务描述语料）',
-    'mb': '语料对照列（TF-IDF × 自建语料；仅历史对照）',
 }
 
 
-def load_sample(key: str, version: str = 'v3') -> pd.DataFrame:
-    return pd.read_parquet(sample_path(key, version))
+def load_sample(key: str) -> pd.DataFrame:
+    return pd.read_parquet(sample_path(key))
 
 
 def sample_report_path(version: str) -> Path:
@@ -63,22 +61,16 @@ def sample_report_path(version: str) -> Path:
     return OUT_DIR / 'pricing_sample_report.json'
 
 
-def expected_sample_rows(sample_report: dict, key: str, version: str) -> int:
-    """登记样本行数：v4/v3 取 samples，v2 取 samples_v2_superseded，v1 取 samples_v1_superseded。"""
-    if version in ('v4', 'v3'):
-        return int(sample_report['samples'][key]['rows_total'])
-    if version == 'v2':
-        if 'samples_v2_superseded' in sample_report:
-            return int(sample_report['samples_v2_superseded'][key]['rows_total'])
-        return int(sample_report['samples'][key]['rows_total'])
-    return int(sample_report['samples_v1_superseded'][key]['rows_total'])
+def expected_sample_rows(sample_report: dict, key: str) -> int:
+    """登记样本行数（build report 的 samples 块是唯一来源）。"""
+    return int(sample_report['samples'][key]['rows_total'])
 
 
-def load_checked_sample(key: str, version: str, sample_report: dict) -> pd.DataFrame:
+def load_checked_sample(key: str, sample_report: dict) -> pd.DataFrame:
     """读样本 parquet 后立即核验四条硬门（行数/键/PIT/缺失不填 0），失败 SystemExit(2)。"""
-    df = load_sample(key, version)
-    assert_pricing_contract(df, expected_rows=expected_sample_rows(sample_report, key, version),
-                       kind='sample', where=f'pricing_fm_main:{key}:{version}')
+    df = load_sample(key)
+    assert_pricing_contract(df, expected_rows=expected_sample_rows(sample_report, key),
+                            kind='sample', where=f'pricing_fm_main:{key}')
     return df
 
 
@@ -93,6 +85,22 @@ def summarise(res, xcols, iqr=None, extra=None):
     if extra:
         out.update(extra)
     return out
+
+
+def fm_numeric_status(pm) -> dict:
+    """逐月数值条件的汇总。空集不得判 True：没有已用月份时三项一律 False。
+
+    rank 亏 / df<=0 / 协方差非有限的月份会被 _ols 拒掉、根本不进 used，因此
+    「all(... for d in pm if d.get('used'))」在全部月份都被拒时退化为 vacuous True。
+    """
+    used = [d for d in pm if d.get('used')]
+    return {
+        'all_months_full_rank': bool(used) and all(d.get('rank_status') == 'FULL' for d in used),
+        'all_months_residual_df_positive': bool(used) and all(d.get('residual_df', 0) > 0 for d in used),
+        'all_months_covariance_finite': bool(used) and all(d.get('covariance_status') == 'finite' for d in used),
+        'n_used_months': len(used),
+        'n_rejected_months': len(pm) - len(used),
+    }
 
 
 def spec_block(df: pd.DataFrame, key: str, iqr: float) -> dict:
@@ -122,18 +130,16 @@ def spec_block(df: pd.DataFrame, key: str, iqr: float) -> dict:
                                           and d.get('reason') == 'below_min_n')),
             'note': 'min/median/max_used 只统计实际进入估计的月份；'
                     'months_below_min_n 为因单月样本 <min_focal_count_per_month 被跳过的月数'},
-        'all_months_full_rank': bool(all(d.get('rank_status') == 'FULL' for d in pm_ew if d.get('used'))),
-        'all_months_residual_df_positive': bool(all(d.get('residual_df', 0) > 0 for d in pm_ew if d.get('used'))),
-        'all_months_covariance_finite': bool(all(d.get('covariance_status') == 'finite' for d in pm_ew if d.get('used'))),
+        **fm_numeric_status(pm_ew),
         'vif': vif_table(sub, MAIN),
     }
-    sub_post = sub[sub['R_next_postadj'].notna()]
-    res_post, _ = fm_regression(sub_post, 'R_next_postadj', MAIN, weight_col=None,
-                                min_n=MIN_N, nw_lag=NW_LAG, direction=DIRECTION)
-    blk['post_adjusted'] = {
-        'role': 'sensitivity_only（raw 为主口径）', 'n_rows': int(len(sub_post)),
-        'formula_id': 'R_NEXT_POST_ADJ_v1',
-        'coefs': res_post['coefs'], 'n_months_used': res_post['n_months_used'],
+    sub_raw = sub[sub['R_next_raw'].notna()]
+    res_raw, _ = fm_regression(sub_raw, 'R_next_raw', MAIN, weight_col=None,
+                               min_n=MIN_N, nw_lag=NW_LAG, direction=DIRECTION)
+    blk['raw_outcome'] = {
+        'role': 'sensitivity_only（主口径为后复权）', 'n_rows': int(len(sub_raw)),
+        'formula_id': 'R_NEXT_MONTH_RAW_v1',
+        'coefs': res_raw['coefs'], 'n_months_used': res_raw['n_months_used'],
     }
     return blk, pm_ew, pm_vw
 
@@ -160,7 +166,7 @@ def vif_scan(entries) -> dict:
 
 def parse_args(argv=None):
     ap = argparse.ArgumentParser(description='A6+A7：pricing_gate 主规格 Fama-MacBeth 回归与 horse race')
-    ap.add_argument('--sample-version', choices=['v1', 'v2', 'v3', 'v4'], default=SAMPLE_VERSION_LABEL,
+    ap.add_argument('--sample-version', choices=[SAMPLE_VERSION_LABEL], default=SAMPLE_VERSION_LABEL,
                     help='headline 样本版本：v3（默认，pricing_sample_v3_20261115）/ v4（pricing_sample_v4_20261116，W2 创建）/ '
                          'v2（pricing_sample_v2_2015_2023，superseded）/ v1（pricing_sample_v1_2015_2023）；另一版本自动作敏感性并报')
     ap.add_argument('--out-suffix', default='',
@@ -172,18 +178,14 @@ def parse_args(argv=None):
 def main(argv=None):
     args = parse_args(argv)
     ver = args.sample_version
-    other = {'v4': 'v3', 'v3': 'v2', 'v2': 'v1', 'v1': 'v2'}[ver]
     sfx = args.out_suffix
-    ver_id = {'v1': SAMPLE_VERSION_V1, 'v2': SAMPLE_VERSION_V2,
-              'v3': SAMPLE_VERSION_V3, 'v4': SAMPLE_VERSION_V4}[ver]
-    other_id = {'v1': SAMPLE_VERSION_V1, 'v2': SAMPLE_VERSION_V2,
-                'v3': SAMPLE_VERSION_V3, 'v4': SAMPLE_VERSION_V4}[other]
+    ver_id = SAMPLE_VERSION_V5
     # Phase 1 I-2：启动即核验登记样本 build report 的四条硬门；失败退出，不写任何新结果。
     sample_report = json.loads(sample_report_path(ver).read_text(encoding='utf-8'))
     assert_pricing_contract(sample_report, where='pricing_fm_main:build_report')
-    progress(f'A6 开始：主规格 FM 回归（headline={ver_id} + {other} 敏感性 + 四列并报 + EW/VW + 后复权；'
+    progress(f'A6 开始：主规格 FM 回归（headline={ver_id} + 两列并报 + EW/VW + 后复权；'
              f'out_suffix={sfx or "(空)"}）')
-    samples = {k: load_checked_sample(k, ver, sample_report) for k in COLUMNS}
+    samples = {k: load_checked_sample(k, sample_report) for k in COLUMNS}
     main_df = samples['ma_teacher']
     fm_mask = main_df['pricing_in_fm_sample'].fillna(False).astype(bool)
     n_fm_headline = int(fm_mask.sum())
@@ -192,10 +194,6 @@ def main(argv=None):
     report = {
         'spec_id': 'pricing_main_v1', 'sample_version': ver_id,
         'headline_sample_version': ver_id,
-        'sample_version_v1_superseded': SAMPLE_VERSION_V1,
-        'sample_version_v2_superseded': SAMPLE_VERSION_V2,
-        'sample_version_v3': SAMPLE_VERSION_V3,
-        'sample_version_v4': SAMPLE_VERSION_V4,
         'out_suffix': sfx,
         'phase': 'sign-01（2026-11-15：complete_month/n_valid_days = volume>0 交易日 >=15）',
         'formula': 'R_{i,t+1} = alpha_t + beta*PeerMAXraw + theta*OwnMAXraw + phi*PeerReturn + Gamma*X + eps',
@@ -205,22 +203,35 @@ def main(argv=None):
         'iqr_rule': P['iqr_scale_rule'], 'iqr_scale_rule_id': P['iqr_scale_rule_id'],
         'iqr_pool_registered': IQR_POOL_REGISTERED,
         'iqr_pool_rule_note': ('IQR_pool 在 treatment-only 宇宙（PeerMAXraw/OwnMAXraw/PeerReturn/controls 可得，'
-                               '不含 outcome 条件）算一次、全规格共用；登记值 0.02341287（registry '
-                               'sample_and_spec_registry change_log 2026-10-10）。各规格自身样本 IQR 仅作诊断。'),
-        'column_roles': COL_ROLE, 'main': {}, 'post_adjusted': {},
+                               f'不含 outcome 条件）算一次、全规格共用；登记值 {IQR_POOL_REGISTERED:.8f}'
+                               '（registry iqr_pool_value）。各规格自身样本 IQR 仅作诊断。'),
+        'column_roles': COL_ROLE, 'main': {}, 'raw_outcome': {},
         'per_month': {},
     }
-    report[f'{other}_sensitivity'] = {}
     report['window_note'] = (
-        '四列 FM 窗口**不同**（防误读为同窗口）：ma_teacher / mb_teacher（主口径与方法稳健性列）= '
-        '2015-05..2023-12（104 月）；ma / mb（文本稳健性列与语料对照列）= 2018-05..2023-12（68 月，'
-        '自建业务描述语料自 2018 年起可得）。N / 系数 / 显著性不可按同窗口跨列解读，'
-        '跨列比较仅在重叠窗口 2018-05..2023-12 内成立。')
+        '两列 FM 窗口相同：ma_teacher（主口径）/ mb_teacher（方法稳健性列）均为 2015-05..2023-12。'
+        'N / 系数跨列可比，列间差异只解释为文本方法差异。')
     report['horse_race_note'] = (
         'A7 horse race 的 pricing_horse_own_ind_l1 / pricing_horse_own_ind_l2 规格**不含 PeerReturn**（也未含两网同入），'
         '故其对 PeerMAXraw 的吸收幅度被高估；判读以 pricing_industry_absorb 产物里**含 PeerReturn** 的 '
         'L1 规格 γ 为准（当次读数见该产物，本文不复制数值）。')
+    # ---------------- 主规格：四列 × EW/VW（headline 样本版本）
+    for key in COLUMNS:
+        df = samples[key]
+        blk, pm_ew, pm_vw = spec_block(df, key, IQR_POOL_REGISTERED)
+        report['main'][key] = blk
+        report['raw_outcome'][key] = blk['raw_outcome']   # 未复权口径敏感性块（与主口径不同源）
+        if key == 'ma_teacher':
+            report['per_month'][key] = {'ew': pm_ew, 'vw': pm_vw,
+                                        'beta_series_ew': [d['beta']['PeerMAXraw'] for d in pm_ew if d.get('used')],
+                                        'beta_series_vw': [d['beta']['PeerMAXraw'] for d in pm_vw if d.get('used')],
+                                        'months_ew': [d['month'] for d in pm_ew if d.get('used')],
+                                        'months_vw': [d['month'] for d in pm_vw if d.get('used')]}
+        progress(f'A6 {key}({ver}): EW beta_peer={_fmt(blk["ew"])} 月份={blk["ew"]["n_months_used"]} '
+                 f'窗口={blk["fm_window"]}')
+
     # Phase 0.3（2026-10-27）：V-sign-6 / N-7 口径注记（append-only；不改任何数值）
+    # 必须放在主规格块之后：sample_universe_note 读 report['main']['ma_teacher']['fm_window']。
     _n_panel = int(len(main_df))
     _cm = int((main_df['pricing_exclusion_reason'] == 'control_missing').sum()) \
         if 'pricing_exclusion_reason' in main_df.columns else None
@@ -245,48 +256,11 @@ def main(argv=None):
         + (f'；n_sources = {_q(_src)}' if _src is not None else '')
         + '。n_sources 仅作分布报告，不加入控制集。')
 
-    # ---------------- 主规格：四列 × EW/VW（headline 样本版本）
-    for key in COLUMNS:
-        df = samples[key]
-        blk, pm_ew, pm_vw = spec_block(df, key, IQR_POOL_REGISTERED)
-        report['main'][key] = blk
-        report['post_adjusted'][key] = blk['post_adjusted']   # F-2：填充后复权敏感性块（原为空表）
-        if key == 'ma_teacher':
-            report['per_month'][key] = {'ew': pm_ew, 'vw': pm_vw,
-                                        'beta_series_ew': [d['beta']['PeerMAXraw'] for d in pm_ew if d.get('used')],
-                                        'beta_series_vw': [d['beta']['PeerMAXraw'] for d in pm_vw if d.get('used')],
-                                        'months_ew': [d['month'] for d in pm_ew if d.get('used')],
-                                        'months_vw': [d['month'] for d in pm_vw if d.get('used')]}
-        progress(f'A6 {key}({ver}): EW beta_peer={_fmt(blk["ew"])} 月份={blk["ew"]["n_months_used"]} '
-                 f'窗口={blk["fm_window"]}')
-
-    # 四列窗口对照（F-2 ②：防误读为同窗口）
+    # 两列窗口对照（F-2 ②：防误读为同窗口）
     report['fm_window_by_column'] = {k: report['main'][k]['fm_window'] for k in COLUMNS}
     report['fm_window_note_by_column'] = {
         'ma_teacher': '2015-05..2023-12（104 月；主口径）',
-        'mb_teacher': '2015-05..2023-12（104 月）',
-        'ma': '2018-05..2023-12（68 月；自建业务描述语料自 2018 年起）',
-        'mb': '2018-05..2023-12（68 月；自建语料）'}
-
-    # ---------------- 另一版本敏感性（v1 = 未施加 microcap 筛除）
-    for key in COLUMNS:
-        df1 = load_checked_sample(key, other, sample_report)
-        blk1, pm1_ew, pm1_vw = spec_block(df1, key, IQR_POOL_REGISTERED)
-        blk1['sample_version'] = other_id
-        blk1['status'] = f'{other}_superseded_registered_deviation'
-        blk1['role_note'] = (
-            f'{other} = 未施加 microcap（与次新股）筛除的旧样本版本；ma/mb 列另含 2024-01 事件月'
-            '（未施加 sample 窗口过滤）' if other == 'v1' else
-            f'{other} = microcap/次新股筛除 + 统一事件月窗口的 headline 样本版本')
-        if key == 'ma_teacher':
-            blk1['per_month_series'] = {
-                'beta_series_ew': [d['beta']['PeerMAXraw'] for d in pm1_ew if d.get('used')],
-                'beta_series_vw': [d['beta']['PeerMAXraw'] for d in pm1_vw if d.get('used')],
-                'months_ew': [d['month'] for d in pm1_ew if d.get('used')]}
-        report[f'{other}_sensitivity'][key] = blk1
-        progress(f'A6 {key}({other} 敏感性): EW beta_peer={_fmt(blk1["ew"])} 月份={blk1["ew"]["n_months_used"]} '
-                 f'窗口={blk1["fm_window"]}')
-
+        'mb_teacher': '2015-05..2023-12（104 月）'}
 
     # ---------------- 治疗变量完整性口径（J05）：完整案例 vs 覆盖源内重新归一化
     # 主列要求「全部 peer 可得」，任一 peer 停牌即整行缺失；renorm 在覆盖源上归一，
@@ -311,8 +285,7 @@ def main(argv=None):
             'beta_completecase_ew': c_main['beta'], 't_nw_completecase_ew': c_main['t_nw'],
             'sign_same': (c_r['beta'] is not None and c_main['beta'] is not None
                           and np.sign(c_r['beta']) == np.sign(c_main['beta'])),
-            'all_months_full_rank': bool(all(d2.get('rank_status') == 'FULL'
-                                             for d2 in pm_r if d2.get('used'))),
+            **fm_numeric_status(pm_r),
             'reading': 'renorm 覆盖源上归一（缺失 peer 不改变条件均值）；主列为完整案例。'
                        '两版并报，不替换 headline',
         }
@@ -338,8 +311,7 @@ def main(argv=None):
             'p_one_sided_all_a_ew': c_a['p_one_sided'],
             'beta_headline_ew': report['main'][key]['ew']['coefs']['PeerMAXraw']['beta'],
             't_nw_headline_ew': report['main'][key]['ew']['coefs']['PeerMAXraw']['t_nw'],
-            'all_months_full_rank': bool(all(d2.get('rank_status') == 'FULL'
-                                             for d2 in pm_a if d2.get('used'))),
+            **fm_numeric_status(pm_a),
             'reading': '放回 control_missing 行并去掉两个分析师相关控制；不替换 headline，'
                        '只用于量化分析师覆盖宇宙的选择效应',
         }
@@ -368,8 +340,7 @@ def main(argv=None):
                 'n_rows': int(len(sub)), 'n_months_used': res['n_months_used'],
                 'beta_ew': c['beta'], 't_nw_ew': c['t_nw'],
                 'p_one_sided_ew': c['p_one_sided'],
-                'all_months_full_rank': bool(all(d2.get('rank_status') == 'FULL'
-                                                 for d2 in pm if d2.get('used'))),
+                **fm_numeric_status(pm),
             }
         entry['beta_headline_ew'] = report['main'][key]['ew']['coefs']['PeerMAXraw']['beta']
         micro_block[key] = entry
@@ -423,8 +394,7 @@ def main(argv=None):
         hr_report['specs'][sid] = {
             'x': xs, 'n_months_used': res['n_months_used'],
             'coefs': res['coefs'],
-            'all_months_full_rank': bool(all(d.get('rank_status') == 'FULL' for d in pm if d.get('used'))),
-            'all_months_covariance_finite': bool(all(d.get('covariance_status') == 'finite' for d in pm if d.get('used'))),
+            **fm_numeric_status(pm),
             'vif': vif_table(hr, xs),
         }
         progress(f'A7 {sid}: beta_peer={_fmt(res)}')
@@ -447,8 +417,7 @@ def main(argv=None):
         'beta_main_no_fe': b_main,
         'beta_with_fe': b_fe,
         'retention_delta': fe_delta,
-        'all_months_full_rank': bool(all(d.get('rank_status') == 'FULL'
-                                         for d in pm_fe if d.get('used'))),
+        **fm_numeric_status(pm_fe),
         'reading': ('retention_delta = 1 - |beta_FE| / |beta_main|；接近 0 表示 PeerMAX 的'
                     '预测力主要来自行业×月共同冲击，接近 1 表示行业内部仍有增量'),
     }
@@ -514,12 +483,9 @@ def _fmt(res):
 
 def _write_md(report, hr_report, sfx=''):
     ver = report['headline_sample_version']
-    other = 'v2' if ver == SAMPLE_VERSION_V3 else ('v1' if ver == SAMPLE_VERSION_V2 else 'v2')
     L = []
     L.append('# spec_no_turnover / pricing_gate 主定价表（Monthly PeerMAX Pricing；sign-01 v3 重建）\n')
     L.append(f"- spec_id: `{report['spec_id']}` | sample_version(headline) = `{report['sample_version']}` "
-             f"| v1(未施加 microcap 筛除, superseded) = `{report['sample_version_v1_superseded']}` "
-             f"| v2(旧 complete_month 口径, superseded) = `{report['sample_version_v2_superseded']}` "
              f"| NW lag = {report['nw_lag']}")
     L.append(f"- 主公式：`{report['formula']}`")
     L.append(f"- IQR 规则：{report['iqr_scale_rule_id']}；**登记池化值 IQR_pool = {report['iqr_pool_registered']:.8f}**"
@@ -528,7 +494,7 @@ def _write_md(report, hr_report, sfx=''):
     # Phase 0.3（2026-10-27）：V-sign-6 / N-7 头注（append-only）
     L.append(f"> 样本总体（V-sign-6）：{report['sample_universe_note']}")
     L.append(f"> 控制变量定义（N-7）：{report['control_definition_note']}\n")
-    L.append(f'## 四列并报（主规格，headline = `{ver}`，EW / VW）\n')
+    L.append(f'## 两列并报（主规格，headline = `{ver}`，EW / VW）\n')
     L.append('| 列 | 角色 | 窗口（FM 月） | N | 月份 | beta(EW) | NW t | 单侧 p | beta·IQR | beta(VW) | NW t(VW) |')
     L.append('|---|---|---|---|---|---|---|---|---|---|---|')
     for k, v in report['main'].items():
@@ -537,42 +503,8 @@ def _write_md(report, hr_report, sfx=''):
                  f"{v['ew']['n_months_used']} | "
                  f"{ew['beta']:+.5f} | {ew['t_nw']:+.2f} | {ew['p_one_sided']:.4f} | "
                  f"{v['ew']['economic_magnitude_beta_x_iqr']:+.5f} | {vw['beta']:+.5f} | {vw['t_nw']:+.2f} |")
-    L.append(f"\n> 窗口说明（防误读）：**四列窗口不同** —— ma_teacher / mb_teacher = 2015-05..2023-12（104 月）；"
-             f"ma / mb = 2018-05..2023-12（68 月）。N / 系数 / 显著性**不可按同窗口跨列解读**，"
-             f"跨列比较仅在重叠窗口 2018-05..2023-12 内成立。")
-    L.append(f'\n## {other} 敏感性（{"未施加 microcap/次新股筛除；ma/mb 另未施加窗口过滤" if other == "v1" else "旧 complete_month 口径（价格非空日数）；其余同主口径"}）\n')
-    L.append('| 列 | 窗口（FM 月） | N | 月份 | beta(EW) | NW t | beta(VW) | NW t(VW) |')
-    L.append('|---|---|---|---|---|---|---|---|')
-    for k, v in report[f'{other}_sensitivity'].items():
-        ew, vw = v['ew']['coefs']['PeerMAXraw'], v['vw']['coefs']['PeerMAXraw']
-        L.append(f"| {k} | {v['fm_window'][0]}..{v['fm_window'][1]} | {v['n_rows']:,} | "
-                 f"{v['ew']['n_months_used']} | {ew['beta']:+.5f} | {ew['t_nw']:+.2f} | "
-                 f"{vw['beta']:+.5f} | {vw['t_nw']:+.2f} |")
-    L.append('\n### v3 vs v2 对照（主口径 ma_teacher，EW / VW）\n')
-    L.append('| 版本 | 样本 | 窗口（FM 月） | N | 月份 | beta(EW) | NW t | beta(VW) | NW t(VW) | 结论方向 |')
-    L.append('|---|---|---|---|---|---|---|---|---|---|')
-    for tag, ver_id, key in [(f'v3(headline)', SAMPLE_VERSION_V3, 'main'),
-                             ('v2(旧口径敏感性)', SAMPLE_VERSION_V2, f'{other}_sensitivity')]:
-        blk = report['main']['ma_teacher'] if key == 'main' else report[f'{other}_sensitivity']['ma_teacher']
-        ew, vw = blk['ew']['coefs']['PeerMAXraw'], blk['vw']['coefs']['PeerMAXraw']
-        same_sign = ('同号' if (ew['beta'] > 0) == (vw['beta'] > 0)
-                     else f'符号不一致（EW {"正" if ew["beta"] > 0 else "负"} / '
-                          f'VW {"正" if vw["beta"] > 0 else "负"}）')
-        L.append(f"| {tag} | `{ver_id}` | {blk['fm_window'][0]}..{blk['fm_window'][1]} | {blk['n_rows']:,} | "
-                 f"{blk['ew']['n_months_used']} | {ew['beta']:+.5f} | {ew['t_nw']:+.2f} | "
-                 f"{vw['beta']:+.5f} | {vw['t_nw']:+.2f} | {same_sign} |")
-    _v3 = report['main']['ma_teacher']
-    _v2 = report[f'{other}_sensitivity']['ma_teacher']
-    _v3_same = ((_v3['ew']['coefs']['PeerMAXraw']['beta'] > 0)
-                == (_v3['vw']['coefs']['PeerMAXraw']['beta'] > 0))
-    _b3 = _v3['ew']['coefs']['PeerMAXraw']['beta']
-    _b2 = _v2['ew']['coefs']['PeerMAXraw']['beta']
-    _cross_same = (_b3 > 0) == (_b2 > 0)
-    L.append(f"\n> v3 vs v2 一致性：headline 列 EW/VW {'同号' if _v3_same else '**符号不一致**'}；"
-             f"跨版本（EW）{'同号' if _cross_same else '**符号翻转**'}"
-             f"（v3 {_b3:+.5f} / {other} {_b2:+.5f}）。"
-             f"v3 仅因 complete_month 改为有效交易日口径发生样本/量级变化。"
-             f"符号是否翻转以本表读数为准，翻转即停机。")
+    L.append(f"\n> 窗口说明：本表两列（ma_teacher / mb_teacher）同窗口，同为老师 MD&A 语料的两种"
+             f"文本方法；N / 系数跨列可比，但列间差异只解释为方法差异。")
     L.append(f'\n## 主口径全系数（EW，NW lag=6，{ver}）\n')
     L.append('| 变量 | beta | NW SE | NW t | 单侧 p | 双侧 p | 95% CI |')
     L.append('|---|---|---|---|---|---|---|')
@@ -580,10 +512,10 @@ def _write_md(report, hr_report, sfx=''):
         L.append(f"| {c} | {_n(s['beta'])} | {_n(s['se_nw'])} | {_n(s['t_nw'])} | "
                  f"{_n(s['p_one_sided'],4)} | {_n(s['p_two_sided'],4)} | "
                  f"[{_n(s.get('ci95_low'))}, {_n(s.get('ci95_high'))}] |")
-    L.append(f'\n## 后复权敏感性（raw 为主口径，{ver}）\n')
+    L.append(f'\n## 未复权口径敏感性（主口径为后复权，{ver}）\n')
     L.append('| 列 | N | 月份 | beta(EW) | NW t | 单侧 p |')
     L.append('|---|---|---|---|---|---|')
-    for k, v in report['post_adjusted'].items():
+    for k, v in report['raw_outcome'].items():
         c = v['coefs']['PeerMAXraw']
         L.append(f"| {k} | {v['n_rows']:,} | {v['n_months_used']} | {c['beta']:+.5f} | "
                  f"{c['t_nw']:+.2f} | {c['p_one_sided']:.4f} |")
@@ -603,8 +535,7 @@ def _write_md(report, hr_report, sfx=''):
              f"condition number max = {vs['scope_cross_spec_max']['cond_max']['value']:.2f}"
              f"（{vs['scope_cross_spec_max']['cond_max']['spec']}）")
     L.append(f"- 成因：{vs['cross_spec_cause']}")
-    L.append('\n> 四列角色：主口径（中文法 × 老师 MD&A，**主表**）／方法稳健性（TF-IDF × 同语料）／'
-             '文本稳健性（中文法 × 自建业务描述语料）／语料对照（TF-IDF × 自建语料）。')
+    L.append('\n> 两列角色：主口径（中文法 × 老师 MD&A，**主表**）／方法稳健性（TF-IDF × 同语料）。')
     L.append(f"> horse race 说明：{report['horse_race_note']}")
     L.append('\n> 逐月设计矩阵 rank/df/covariance 状态见 JSON 的 `per_month` 与各列 `all_months_*` 字段。')
     L.append('\n## 逐月设计矩阵验收（headline 四列，EW）\n')

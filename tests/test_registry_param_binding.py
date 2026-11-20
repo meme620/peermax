@@ -222,7 +222,7 @@ def test_ast_all_winsor_calls_pass_registry_bounds():
                for a in second_args), '面板列块未走 registry 边界'
     listed = {e.value for a in second_args if isinstance(a, ast.List)
               for e in a.elts if isinstance(e, ast.Constant)}
-    assert {'R_next', 'R_next_postadj'} <= listed, 'outcome 列块未走 registry 边界'
+    assert {'R_next', 'R_next_raw'} <= listed, 'outcome 列块未走 registry 边界'
 
 
 def test_ast_months_between_uses_registry_window():
@@ -243,7 +243,9 @@ def test_ast_months_between_uses_registry_window():
 def test_iqr_registry_rule_id_and_frozen_value_documented():
     rule_id = lib.param_value('sample_and_spec_registry')['iqr_scale_rule_id']
     assert rule_id == lib.IQR_POOL_RULE_ID == 'IQR_POOL_TREATMENT_ONLY_v1'
-    assert lib.IQR_POOL_REGISTERED == 0.02341287
+    # 不写死数值：IQR 随样本版本重登记（2026-11-20 由 0.02341287 → 0.01693548，
+    # CO-2026-11-20-teacher-only 回收 singleton 团后重算）；唯一来源是 registry 本身。
+    assert lib.IQR_POOL_REGISTERED > 0
     # 2026-11-19 参数口径核查：数值唯一来源改为 registry 的 iqr_pool_value，
     # pricing_lib 导入即核对（不一致 SystemExit(2)），不再要求 registry 里没有数值键。
     assert float(lib.param_value('iqr_pool_value')) == lib.IQR_POOL_REGISTERED

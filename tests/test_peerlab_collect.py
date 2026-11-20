@@ -5,18 +5,26 @@ from peerlab import collect, registry
 
 
 def test_dotted_get_nested_and_list():
-    doc = {'main': {'ma_teacher': {'coefs': {'PeerMAXraw': {'beta': 0.13}}}}, 'xs': [1, 2, 3]}
-    assert collect.dotted_get(doc, 'main.ma_teacher.coefs.PeerMAXraw.beta') == 0.13
+    doc = {'main': {'ma_teacher': {'ew': {'coefs': {'PeerMAXraw': {'beta': 0.13}}}}}, 'xs': [1, 2, 3]}
+    assert collect.dotted_get(doc, 'main.ma_teacher.ew.coefs.PeerMAXraw.beta') == 0.13
     assert collect.dotted_get(doc, 'xs.1') == 2
     assert collect.dotted_get(doc, 'missing.key') is collect.MISSING
 
 
 def _fake_run(result_dir: Path, exp_id: str, seed: int, value: float) -> None:
+    """合成 run 目录里的产物 JSON 必须与 pricing_fm_main 真实落盘结构一致：
+
+    main.<column>.ew.coefs.PeerMAXraw.{beta,t_nw}（spec_block 返回 ew/vw 两块，
+    t 统计量键名是 t_nw）。旧 fixture 写成 main.<column>.coefs.*，与真实产物不符，
+    反而让 registry 的错误指标路径在测试里通过。
+    """
     run_id = exp_id + '--s' + str(seed) + '--20260101T000000Z'
     run_dir = result_dir / 'runs' / run_id
     out = run_dir / 'outputs/reports/data_gates/G0'
     out.mkdir(parents=True)
-    doc = {'main': {'ma_teacher': {'coefs': {'PeerMAXraw': {'beta': value, 't': 6.0}}}}}
+    coef = {'beta': value, 't_nw': 6.0}
+    doc = {'main': {'ma_teacher': {'ew': {'coefs': {'PeerMAXraw': coef}},
+                                   'vw': {'coefs': {'PeerMAXraw': coef}}}}}
     (out / ('pricing_table_s' + str(seed) + '.json')).write_text(json.dumps(doc), encoding='utf-8')
     (run_dir / 'run.json').write_text('{}', encoding='utf-8')
     index = result_dir / 'index.json'

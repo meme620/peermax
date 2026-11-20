@@ -40,7 +40,7 @@ governance:
     sample_end: '2023-12-31'
     analyst_weight_rule: equal_weight_over_common_analysts
   manifest_version: 1.0.110
-  registry_version: 1.6.1-peermax-baseline
+  registry_version: 1.7.0-peermax-baseline
 provenance:
   input_hashes: {}
   input_collections: {}

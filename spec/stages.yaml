@@ -15,8 +15,8 @@ stages:
     scripts: [factor_build, factor_validate, build_rev_factor]
     outputs: [data/processed/factor_returns_daily.csv, data/processed/rev_factor_monthly.csv]
   - id: network-business
-    title: 产品市场网络 M-A（业务章节，--corpus teacher 为主口径）
-    scripts: [text_business_extract, network_business_cluster_grid, network_business_cluster_freeze, network_business_edges_build]
+    title: 产品市场网络 M-A（老师 MD&A 语料，--corpus teacher 是唯一口径）
+    scripts: [network_business_cluster_grid, network_business_cluster_freeze, network_business_edges_build]
     outputs: [data/processed/network_ma_teacher]
   - id: network-mda
     title: 产品市场网络 M-B（老师 MD&A 语料 TF-IDF）
@@ -29,7 +29,7 @@ stages:
   - id: panel
     title: MAX/PeerMAX 定价面板
     scripts: [peermax_max_build, peermax_panel_build, peermax_panel_acceptance]
-    outputs: [data/processed/monthly_pricing_panel_ma_teacher_v4.csv]
+    outputs: [data/processed/monthly_pricing_panel_ma_teacher.csv]
   - id: pricing
     title: 月度定价事实与门禁报告
     scripts: [pricing_sample_build, pricing_fm_main, pricing_portfolio_sorts, pricing_robustness_placebo, pricing_length_industry_control, pricing_gate_report]

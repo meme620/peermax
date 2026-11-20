@@ -182,9 +182,15 @@ def main():
     ap.add_argument('--df-max', type=float, default=None,
                     help='词库 df 阈值（按既有 df_ratio 列过滤：df_ratio ≤ df_max；缺省 = load_lexicon '
                          '默认 0.25 = 现状/主口径）。用于第一梯队 ⑤ / B″11-8 的 10%%/25%%/100%% 网格')
+    ap.add_argument('--version-prefix', default=None,
+                    help='网络版本串前缀（缺省按语料）。df 网格等同一语料多档位变体必须显式传，'
+                         '否则不同档位写出相同 network_version，版本串失去身份')
     args = ap.parse_args()
 
     spec = CORPORA[args.corpus]
+    ver_prefix = args.version_prefix or spec['ver_prefix']
+    if args.version_prefix and args.version_prefix == spec['ver_prefix']:
+        raise SystemExit('--version-prefix 与语料默认前缀相同：多档位产物会互相覆盖版本身份')
     sim_adjust = args.sim_adjust if args.sim_adjust is not None else spec.get('sim_adjust', 'none')
     years = args.years if args.years else list(spec['years'])
     outd = Path(args.net_dir) if args.net_dir else spec['net_dir']
@@ -214,7 +220,7 @@ def main():
             mvec = row_median_excl_self(Mfull)
             del Mfull
         avail = f'{y + 1}-04-30'
-        ver = f'{spec["ver_prefix"]}_{y}'
+        ver = f'{ver_prefix}_{y}'
         n_edges = 0
         n_pairs_pos = 0          # 同团对中 sim_adj > 0（入边集）
         n_pairs_nonpos = 0       # 同团对中 sim_adj ≤ 0（按既有正相似规则剔除；聚类层未裁剪）

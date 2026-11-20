@@ -19,11 +19,13 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 REPD = ROOT / 'data/gates' if False else ROOT / 'reports/data_gates/G0'
-MA = ROOT / 'data/processed/network_ma'
-MB = ROOT / 'data/processed/network_mb'
+# 主口径 = 老师 MD&A 语料（teacher）两列；自建语料的 network_ma/network_mb 不在库，
+# 指向它们会让本审计直接 FileNotFoundError。文本年 2014–2022 对应网络年 2015–2023。
+MA = ROOT / 'data/processed/network_ma_teacher'
+MB = ROOT / 'data/processed/network_mb_teacher'
 SW2L = ROOT / 'data/processed/sw2_industry_latest.csv'
-RET = ROOT / 'data/processed/monthly_returns_clean.csv'
-YEARS = list(range(2017, 2026))
+RET = ROOT / 'data/processed/monthly_returns_clean_v2.csv'
+YEARS = list(range(2014, 2023))
 
 
 def net_stats(edges, l2, base):

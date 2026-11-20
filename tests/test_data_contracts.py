@@ -108,13 +108,42 @@ def test_a5_cliffs_pass_and_fail(tmp_path: Path) -> None:
     _write_monthly(tmp_path, 'data/processed/monthly_returns_clean.csv',
                    [['sz000001', '2020-02', '0.1']])
     contract = {'id': 'a5_cliffs', 'cliff_threshold': -0.215,
-                'post_adjusted': {'path': 'data/raw/drive/post.pkl', 'max_cells': 0},
+                'post_adjusted': {'path': 'data/raw/drive/post.pkl', 'max_adjusted_only': 0},
                 'monthly': {'path': 'data/processed/monthly_returns_clean.csv',
                             'tolerance': 1e-9}}
     _expect(_run(dc.check_a5_cliffs, tmp_path, contract), 'pass')
     _write_monthly(tmp_path, 'data/processed/monthly_returns_clean.csv',
                    [['sz000001', '2020-02', '0.5']])
     _expect(_run(dc.check_a5_cliffs, tmp_path, contract), 'fail', 'max|diff|')
+
+
+def test_a5_cliffs_separate_adjustment_defect_from_genuine_crash(tmp_path: Path, monkeypatch) -> None:
+    """真实行情不算缺陷；只有复权**引入**的断崖才计入（旧 max_cells 容差会把真实跌幅放行）。"""
+    idx = pd.to_datetime(['2020-01-31', '2020-02-03', '2020-02-04'])
+    # 第 1 列（600000.SH）：post 10 → 5（-50%），raw 同为 10 → 5 —— 真实行情
+    # 第 2 列（000001.SZ）：post 10 → 5（-50%），raw 保持 10 → 10 —— 复权引入的缺陷
+    post = np.array([[10.0, 10.0], [5.0, 5.0], [5.0, 5.0]])
+    raw = np.array([[10.0, 10.0], [5.0, 10.0], [5.0, 10.0]])
+    _matrix(tmp_path, 'data/raw/drive/post.pkl', post, index=idx)
+    _matrix(tmp_path, 'data/raw/drive/raw.pkl', raw, index=idx)
+    contract = {'id': 'a5_cliffs', 'cliff_threshold': -0.215,
+                'post_adjusted': {'path': 'data/raw/drive/post.pkl', 'max_adjusted_only': 0},
+                'raw': {'path': 'data/raw/drive/raw.pkl'}}
+    # 复权引入 1 条 → 失败（旧口径下 2 条 <= 250 会 pass）
+    _expect(_run(dc.check_a5_cliffs, tmp_path, contract), 'fail', '复权引入的断崖')
+    # 容差放到 1 则放行复权缺陷，但真实行情仍不计入
+    contract['post_adjusted']['max_adjusted_only'] = 1
+    _expect(_run(dc.check_a5_cliffs, tmp_path, contract), 'pass')
+
+
+def test_a5_cliffs_requires_raw_to_classify(tmp_path: Path) -> None:
+    """缺未复权序列时无法分类，必须按缺陷处理而不是静默放行。"""
+    idx = pd.to_datetime(['2020-01-31', '2020-02-03'])
+    post = np.array([[10.0, 10.0], [5.0, 5.0]])
+    _matrix(tmp_path, 'data/raw/drive/post.pkl', post, index=idx)
+    contract = {'id': 'a5_cliffs', 'cliff_threshold': -0.215,
+                'post_adjusted': {'path': 'data/raw/drive/post.pkl', 'max_adjusted_only': 0}}
+    _expect(_run(dc.check_a5_cliffs, tmp_path, contract), 'fail', '无法区分')
 
 
 def test_a6_limit_flags_pass_and_fail(tmp_path: Path) -> None:

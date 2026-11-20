@@ -18,7 +18,7 @@ import argparse
 import numpy as np
 import pandas as pd
 
-from pricing_lib import IQR_POOL_REGISTERED, SAMPLE_VERSION_LABEL, SAMPLE_VERSION_V1, SAMPLE_VERSION_V2, SAMPLE_VERSION_V3, SAMPLE_VERSION_V4, MDA_PANEL, OUT_DIR, fm_regression, param_value, progress, sample_path, write_json
+from pricing_lib import HEADLINE_SAMPLE_VERSION, IQR_POOL_REGISTERED, MDA_PANEL, OUT_DIR, SAMPLE_VERSION_LABEL, fm_regression, param_value, progress, sample_path, write_json
 
 P = param_value('sample_and_spec_registry')
 NW_LAG = int(param_value('nw_lag'))
@@ -44,7 +44,7 @@ def load_mda_length() -> pd.DataFrame:
 
 def parse_args(argv=None):
     ap = argparse.ArgumentParser(description='A11+A12：MD&A 篇幅控制与行业吸收')
-    ap.add_argument('--sample-version', choices=['v1', 'v2', 'v3', 'v4'],
+    ap.add_argument('--sample-version', choices=[SAMPLE_VERSION_LABEL],
                     default=SAMPLE_VERSION_LABEL,
                     help='样本版本，默认取 registry 的 headline 指针')
     return ap.parse_args(argv)
@@ -53,8 +53,7 @@ def parse_args(argv=None):
 def main(argv=None):
     args = parse_args(argv)
     ver = args.sample_version
-    ver_id = {'v1': SAMPLE_VERSION_V1, 'v2': SAMPLE_VERSION_V2,
-              'v3': SAMPLE_VERSION_V3, 'v4': SAMPLE_VERSION_V4}[ver]
+    ver_id = HEADLINE_SAMPLE_VERSION
     progress(f'A11 开始：MD&A 篇幅控制（headline={ver_id}）')
     base = pd.read_parquet(sample_path('ma_teacher', ver))
     fm = base[base['pricing_in_fm_sample'].astype(bool)].copy()
@@ -87,7 +86,6 @@ def main(argv=None):
     rep = {
         'specification_id': 'pricing_length_control', 'formula_id': 'MDA_LN_LENGTH_YMINUS1_v1',
         'sample_version': ver_id,
-        'sample_version_v1_superseded': SAMPLE_VERSION_V1,
         'x_without': MAIN, 'x_with': MAIN + ['ln_mda_length'],
         'n_rows_without': int(len(fm)), 'n_rows_with': int(len(sub)),
         'beta_without': {'beta': b_wo['beta'], 't_nw': b_wo['t_nw'], 'p_one_sided': b_wo['p_one_sided'],
@@ -96,7 +94,7 @@ def main(argv=None):
                       'economic_magnitude': None if b_w['beta'] is None else b_w['beta'] * iqr},
         'length_coefficient': len_c,
         'iqr_pool': iqr,
-        'iqr_pool_rule': 'IQR_POOL_TREATMENT_ONLY_v1（登记值 0.02341287，全规格共用）',
+        'iqr_pool_rule': f'IQR_POOL_TREATMENT_ONLY_v1（登记值 {IQR_POOL_REGISTERED:.8f}，全规格共用）',
         'iqr_pool_sample_diagnostic': iqr_sample,
         'diagnostics': {'corr': corr,
                         'monthly_corr_median': float(by_month.median()),
@@ -144,7 +142,6 @@ def main(argv=None):
     rows = ['ind_l1_max_ew', 'ind_l2_max_ew']
     out = {'specification_id': 'pricing_industry_absorb', 'formula_id': 'PRICING_INDUSTRY_ABSORB_v1',
            'sample_version': ver_id,
-           'sample_version_v1_superseded': SAMPLE_VERSION_V1,
            'industry_version': 'sw2_industry_latest.csv (SwClass2021, is_current_version)',
            'formula': 'R = a + beta*PeerMAXraw + gamma*IndustryMAX + phi*PeerReturn + theta*OwnMAXraw + GammaX + eps',
            'beta_without': {'beta': b_wo['beta'], 't_nw': b_wo['t_nw'], 'p_one_sided': b_wo['p_one_sided']},

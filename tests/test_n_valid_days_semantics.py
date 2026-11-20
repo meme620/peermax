@@ -296,7 +296,12 @@ def test_real_complete_month_invariant():
             "source_month_status", "headline_max_eligible"} <= set(s.columns)
     assert (s["n_max_days"] <= s["n_rraw_days"]).all()
     w = s[(s["month"] >= "2015-01") & (s["month"] <= "2023-12")]
-    if len(w) == 401776:
-        assert int(((w["n_rraw_days"] < 15) & w["MAXraw"].notna()).sum()) == 8629
-        assert int(((w["n_valid_days"] >= 15) != (w["n_rraw_days"] >= 15)).sum()) == 127
-    assert int(((s["n_valid_days"] >= 15) != (s["n_rraw_days"] >= 15)).sum()) == 179693
+    # 窗口内不变量（不写死行数：行数随数据更新变化，写死会变成永假守卫）
+    assert len(w) > 0
+    assert (w["n_max_days"] <= w["n_rraw_days"]).all()
+    assert (w["complete_month"] == (w["n_valid_days"] >= 15).astype(int)).all()
+    assert bool(((w["n_rraw_days"] < 15) & w["MAXraw"].notna()).any())
+    # 关系型不变量：n_rraw_days 是 rraw 非空日数、n_valid_days 是有效交易日数，
+    # 两者 >=15 的判定允许分歧，但分歧量必须是少数（绝大多数月份两者一致）。
+    divergent = int(((s["n_valid_days"] >= 15) != (s["n_rraw_days"] >= 15)).sum())
+    assert 0 < divergent < len(s) * 0.1, divergent

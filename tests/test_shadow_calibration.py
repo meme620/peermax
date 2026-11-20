@@ -193,9 +193,9 @@ def test_per_year_lexicon_matches_df_by_year_bitwise():
     """逐年词表 df_ratio = doc_count_y / n_docs_y，且行序与 headline 词表逐行相同。"""
     dy = pd.read_csv(DF_BY_YEAR).set_index('term')
     lex = pd.read_csv(HEADLINE_LEXICON, usecols=['term'])
-    for y in YEARS:
-        f = SHADOW_DIR / f'lexicon_p3ydf_{y}.csv'
-        assert f.is_file(), f
+    files = [SHADOW_DIR / f'lexicon_p3ydf_{y}.csv' for y in YEARS]
+    require_artifacts(*files, hint='缺 shadow 逐年词表（先跑 3.2）')
+    for y, f in zip(YEARS, files):
         d = pd.read_csv(f)
         assert list(d.columns) == ['term', 'df_ratio']
         assert len(d) == len(lex) == 1355237

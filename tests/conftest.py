@@ -63,7 +63,9 @@ def assert_input_anchors(keys=None) -> None:
         assert int(rows) == actual, f'{key}: 行数合同={rows} 实测={actual}'
 
 
-_MISSING_PAT = re.compile(r'缺少|缺锚|缺 |No such file or directory|不存在|未发现|文件缺失|清单年份缺|校验失败')
+# 只认「产物不存在」的措辞。校验失败 / 不一致 / 重叠 / 符号翻转等是 fail-closed 的
+# 业务拒绝，必须保持 fail——把它们当缺产物会静默吞掉真实的网络与定价守卫。
+_MISSING_PAT = re.compile(r'缺少|缺锚|缺 |No such file or directory|不存在|未发现|文件缺失')
 
 
 def _missing_artifact_path(exc_value) -> str | None:
@@ -94,7 +96,7 @@ def _missing_artifact_path(exc_value) -> str | None:
     m = re.search(r"PosixPath\('([^']+)'\)", text)
     if m:
         return m.group(1)
-    if re.search(r'缺少|缺锚|缺 |不存在|未发现|文件缺失|清单年份缺|校验失败|重叠|不一致', text):
+    if re.search(r'缺少|缺锚|缺 |不存在|未发现|文件缺失', text):
         m = re.search(r'net_dir=([^\s]+)', text)
         if m:
             return m.group(1)

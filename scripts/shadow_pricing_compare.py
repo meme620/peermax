@@ -40,6 +40,28 @@ from pricing_lib import (
 from peermax_panel_build import load_versions, select_version
 
 
+def _registered_fm_rows(key='ma_teacher'):
+    """从样本报告读 headline FM 行数（硬编码随样本重建必过期）。"""
+    import json
+    p = ROOT / 'reports/data_gates/G0/pricing_sample_report.json'
+    if not p.is_file():
+        return None
+    ent = ((json.loads(p.read_text(encoding='utf-8')).get('samples') or {}).get(key) or {})
+    n = ent.get('fm_sample_rows')
+    return int(n) if n is not None else None
+
+
+def _registered_sample_rows(key='ma_teacher'):
+    """从样本报告读登记行数；硬编码在样本重建后必然过期。"""
+    import json
+    p = ROOT / 'reports/data_gates/G0/pricing_sample_report.json'
+    if not p.is_file():
+        return None
+    ent = ((json.loads(p.read_text(encoding='utf-8')).get('samples') or {}).get(key) or {})
+    rows = ent.get('rows_total')
+    return int(rows) if rows is not None else None
+
+
 SHADOW_DIR = ROOT / 'data/processed/phase2_shadow'
 
 SHADOW_MONTHLY = SHADOW_DIR / 'monthly_returns_status_p2shadow.csv'
@@ -72,9 +94,11 @@ NET_DIRS = {
 
 PRICING_TABLE_V2 = ROOT / 'reports/data_gates/G0/pricing_table_v2.json'
 
-SAMPLE_REGISTERED = {'ma_teacher': 307503, 'mb_teacher': 384303}
+SAMPLE_REGISTERED = {'ma_teacher': _registered_sample_rows('ma_teacher'),
+                     'mb_teacher': _registered_sample_rows('mb_teacher')}
 
-FM_REGISTERED = {'ma_teacher': 181178, 'mb_teacher': 225264}
+FM_REGISTERED = {'ma_teacher': _registered_fm_rows('ma_teacher'),
+                 'mb_teacher': _registered_fm_rows('mb_teacher')}
 
 MATRIX_24 = ROOT / 'artifacts/phase2/2.4_control_matrix.csv'
 

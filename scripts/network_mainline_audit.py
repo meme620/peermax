@@ -29,7 +29,19 @@ import numpy as np
 import pandas as pd
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-NET = ROOT / "data/processed/network_mb_teacher"
+# 两个主口径列：M-A（等权 0/1 余弦 + 同团规则，无 τ）与 M-B（TF-IDF + 固定 τ）。
+# 旧版本只审 M-B，headline 主口径（M-A）没有等价主线审计。
+NET_SPECS = {
+    'ma_teacher': {'dir': ROOT / 'data/processed/network_ma_teacher',
+                   'version_prefix': 'pm_ma_ewcos_teacher_v1',
+                   'source_version': 'teacher_mda_panel+product_lexicon_v2_teacher',
+                   'uses_tau': False, 'filter_years': True, 'years': list(range(2014, 2023))},
+    'mb_teacher': {'dir': ROOT / 'data/processed/network_mb_teacher',
+                   'version_prefix': 'pm_mb_tfidf_teacher_v1',
+                   'source_version': 'teacher_mda_2023',
+                   'uses_tau': True, 'years': list(range(2014, 2023))},
+}
+NET = NET_SPECS['mb_teacher']['dir']
 PANEL = ROOT / "data/processed/teacher_mda_panel.csv"
 SW2 = ROOT / "data/processed/sw2_industry_latest.csv"
 REG = ROOT / "configs/parameter_registry.yaml"
@@ -47,22 +59,18 @@ def registry_tau() -> float:
     raise KeyError("m_b_tau_fixed 未在 registry")
 
 
-def main() -> None:
-    tau_reg = registry_tau()
-    sw = pd.read_csv(SW2, dtype={"code6": str})
-    sw["code6"] = sw["code6"].str.zfill(6)
-    l2 = dict(zip(sw["code6"], sw["l2_code"].astype(str)))
-    panel = pd.read_csv(PANEL, usecols=["firm_id", "year", "status"])
-    panel_ok = panel[panel["status"] == "ok"]
-
+def audit_column(key: str, tau_reg: float, l2: dict, panel_ok) -> dict:
+    """对一列网络做逐年核验（τ 只对 M-B 是判据；M-A 的边集规则是「同团 ∧ sim>0」）。"""
+    spec = NET_SPECS[key]
+    net_dir, uses_tau = spec['dir'], spec['uses_tau']
     per_year, problems = [], []
-    for y in YEARS:
-        rep = json.loads((NET / f"{y}_build_report.json").read_text(encoding="utf-8"))
-        e = pd.read_csv(NET / f"{y}_similarity.csv",
+    for y in spec['years']:
+        rep = json.loads((net_dir / f"{y}_build_report.json").read_text(encoding="utf-8"))
+        e = pd.read_csv(net_dir / f"{y}_similarity.csv",
                         usecols=["focal_id", "source_id", "similarity", "weight",
                                  "available_at", "network_version", "source_version"])
         # 节点总数 = 有边 focal（support）+ 无支持 focal（no-network-support），与验收脚本口径一致
-        sup = pd.read_csv(NET / f"{y}_support.csv", usecols=["focal_id", "network_support_status"])
+        sup = pd.read_csv(net_dir / f"{y}_support.csv", usecols=["focal_id", "network_support_status"])
         n_support = int((sup.network_support_status == "support").sum())
         n_nosup = int((sup.network_support_status == "no-network-support").sum())
         nodes = n_support + n_nosup
@@ -88,21 +96,31 @@ def main() -> None:
 
         row = {
             "text_year": y, "network_year": y + 1,
-            "tau_in_report": rep.get("tau"), "tau_registry": tau_reg,
-            "tau_match": rep.get("tau") == tau_reg,
-            "min_similarity": round(min_sim, 10), "all_edges_above_tau": min_sim > tau_reg,
+            "tau_in_report": rep.get("tau") if uses_tau else None,
+            "tau_registry": tau_reg if uses_tau else None,
+            "tau_match": (rep.get("tau") == tau_reg) if uses_tau else None,
+            "min_similarity": round(min_sim, 10),
+            "all_edges_above_tau": (min_sim > tau_reg) if uses_tau else None,
+            "all_edges_positive_sim": bool(min_sim > 0),
             "available_at": sorted(set(e.available_at.astype(str))),
             "version": sorted(set(e.network_version.astype(str))),
             "source_version": sorted(set(e.source_version.astype(str))),
             "nodes": nodes, "nodes_support": n_support, "nodes_no_support": n_nosup,
-            "nodes_panel_ok": n_expect, "nodes_match_panel": nodes == n_expect,
+            "nodes_panel_ok": n_expect,
+            # M-B 不剔 J/S 与次新股（仅按 status=ok 入网），故节点数必须等于面板 ok 行数；
+            # M-A 先剔 J/S + 上市<2 年 + 词数不足，节点数只能等于 build_report.filter_stats.firms_kept。
+            "nodes_expected": (int((rep.get('filter_stats') or {}).get('firms_kept', nodes))
+                               if spec.get('filter_years') else n_expect),
+            "nodes_match_panel": (nodes == int((rep.get('filter_stats') or {}).get('firms_kept', nodes))
+                                  if spec.get('filter_years') else nodes == n_expect),
             "same_sw2_by_layer": layers,
         }
-        row["ok"] = (row["tau_match"] and row["all_edges_above_tau"]
-                     and row["available_at"] == [f"{y+1}-04-30"]
-                     and row["version"] == [f"pm_mb_tfidf_teacher_v1_{y}"]
-                     and row["source_version"] == ["teacher_mda_2023"]
-                     and row["nodes_match_panel"])
+        row["ok"] = (row["available_at"] == [f"{y+1}-04-30"]
+                     and row["version"] == [f"{spec['version_prefix']}_{y}"]
+                     and row["source_version"] == [spec['source_version']]
+                     and row["nodes_match_panel"]
+                     and (row["tau_match"] and row["all_edges_above_tau"] if uses_tau
+                          else row["all_edges_positive_sim"]))
         if not row["ok"]:
             problems.append(y)
         per_year.append(row)
@@ -110,35 +128,56 @@ def main() -> None:
               f"min_sim={row['min_similarity']:.6f} nodes={nodes}/{n_expect} "
               f"layer same_sw2={layers} ok={row['ok']}", flush=True)
 
-    out = {
-        "step": "network Phase B′ 主口径专项核验",
-        "run_at": datetime.now(timezone.utc).isoformat(),
-        "network_dir": str(NET.relative_to(ROOT)),
-        "tau_registry": tau_reg,
-        "per_year": per_year,
-        "summary": {
-            "years_ok": sum(1 for r in per_year if r["ok"]),
-            "years_total": len(per_year),
-            "problems": problems,
-            "layer_monotonic_evidence": {
-                "top1_median": float(np.median([r["same_sw2_by_layer"]["top1"] for r in per_year])),
-                "random_median": float(np.median([r["same_sw2_by_layer"]["random"] for r in per_year])),
+    return {"network_dir": str(net_dir.relative_to(ROOT)),
+            "uses_tau": uses_tau, "tau_registry": tau_reg if uses_tau else None,
+            "per_year": per_year,
+            "summary": {
+                "years_ok": sum(1 for r in per_year if r["ok"]),
+                "years_total": len(per_year),
+                "problems": problems,
+                "layer_monotonic_evidence": {
+                    "top1_median": float(np.median([r["same_sw2_by_layer"]["top1"] for r in per_year])),
+                    "random_median": float(np.median([r["same_sw2_by_layer"]["random"] for r in per_year])),
+                },
             },
-        },
+            "status": "PASS" if not problems else "CHECK"}
+
+
+def main() -> None:
+    tau_reg = registry_tau()
+    sw = pd.read_csv(SW2, dtype={"code6": str})
+    sw["code6"] = sw["code6"].str.zfill(6)
+    l2 = dict(zip(sw["code6"], sw["l2_code"].astype(str)))
+    panel = pd.read_csv(PANEL, usecols=["firm_id", "year", "status"])
+    panel_ok = panel[panel["status"] == "ok"]
+
+    columns = {}
+    for key in NET_SPECS:
+        if not (NET_SPECS[key]['dir'] / f"{NET_SPECS[key]['years'][0]}_similarity.csv").is_file():
+            columns[key] = {"status": "NOT_AVAILABLE",
+                            "reason": f"缺 {NET_SPECS[key]['dir'].name} 边表", "per_year": []}
+            continue
+        print(f"=== {key} ===", flush=True)
+        columns[key] = audit_column(key, tau_reg, l2, panel_ok)
+
+    out = {
+        "step": "network Phase B′ 主口径专项核验（M-A 与 M-B 两列）",
+        "run_at": datetime.now(timezone.utc).isoformat(),
+        "tau_registry": tau_reg,
+        "columns": columns,
+        "status": ("PASS" if all(c["status"] == "PASS" for c in columns.values())
+                   else "CHECK"),
         "legacy_audits_status": {
-            "note": "自建链的三个审计脚本（data_integrity_audit / code_design_audit / "
-                    "network_edge_precision_audit）与两个交叉审计脚本仍指向 network_ma / network_mb；"
-                    "本脚本对新主口径做等价核验，旧脚本重定向列为 Phase B′ 后续项。",
-            "scripts": ["data_integrity_audit.py", "code_design_audit.py",
-                        "network_edge_precision_audit.py", "network_cross_audit.py",
-                        "network_cross_audit_attribution.py"],
+            "note": "自建语料的 network_ma / network_mb 不在库；network_cross_audit 与 "
+                    "network_cross_audit_attribution 已改指 teacher 两列，可运行。",
+            "scripts": ["network_cross_audit.py", "network_cross_audit_attribution.py"],
         },
-        "status": "PASS" if not problems else "CHECK",
     }
     REPD.mkdir(parents=True, exist_ok=True)
     (REPD / "network_mainline_audit.json").write_text(
         json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
-    print("\nstatus =", out["status"], "|", out["summary"])
+    print("\nstatus =", out["status"], "|",
+          {k: v["summary"]["years_ok"] for k, v in columns.items() if v.get("summary")})
 
 
 if __name__ == "__main__":

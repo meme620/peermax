@@ -8,6 +8,7 @@ import collections
 import pathlib
 import re
 import subprocess
+import sys
 
 from . import registry
 
@@ -231,6 +232,66 @@ def check_artifact_names(root: pathlib.Path, paths=None) -> list:
     return problems
 
 
+SELF_CORPUS_PANEL_KEYS = ('ma', 'mb')
+
+SELF_CORPUS_PATHS = ('monthly_pricing_panel_ma.csv', 'monthly_pricing_panel_mb.csv',
+                     'monthly_pricing_panel_ma_v4.csv', 'monthly_pricing_panel_mb_v4.csv',
+                     'network_ma/', 'network_mb/')
+
+
+def check_teacher_only_panels(root: pathlib.Path) -> list:
+    """样本只许老师语料两列（spec/design.yaml C7）：自建 CNINFO 语料键与路径不得回流。
+
+    自建链的语料产物与网络目录都不在本仓计算链内；键位一回来，check_panel_contracts
+    就会遍历到不存在的文件抛 FileNotFoundError，把 estimation-sample 卡在就绪判定。
+    """
+    problems = []
+    targets = [root / 'scripts/pricing_lib.py', root / 'scripts/pricing_sample_build.py',
+               root / 'configs/pricing_inputs.yaml', root / 'configs/version_manifest.yaml']
+    for path in targets:
+        if not path.is_file():
+            problems.append(f'{path.relative_to(root).as_posix()}: 文件缺失')
+            continue
+        rel = path.relative_to(root).as_posix()
+        text = path.read_text(encoding='utf-8', errors='ignore')
+        for token in SELF_CORPUS_PATHS:
+            if token in text:
+                problems.append(f'{rel}: 出现自建语料产物路径 {token!r}（C7 只许老师语料两列）')
+    return problems + _check_panel_key_sets(root)
+
+
+def _check_panel_key_sets(root: pathlib.Path) -> list:
+    """用 AST 读三个面板键映射的键集合，核对恰好是老师语料两列。
+
+    不 import pricing_lib：导入即校验整个 registry 与输入合同，lint 会因数据缺失而假红。
+    """
+    expected = {'ma_teacher', 'mb_teacher'}
+    problems = []
+    path = root / 'scripts/pricing_lib.py'
+    if not path.is_file():
+        return ['scripts/pricing_lib.py: 文件缺失']
+    tree = ast.parse(path.read_text(encoding='utf-8'))
+    found = {}
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and len(node.targets) == 1:
+            target = node.targets[0]
+            if isinstance(target, ast.Name) and target.id in ('PANELS', 'PANEL_PATHS_V4', 'NET_DIRS'):
+                keys = set()
+                if isinstance(node.value, ast.Dict):
+                    for k in node.value.keys:
+                        if isinstance(k, ast.Constant) and isinstance(k.value, str):
+                            keys.add(k.value)
+                found[target.id] = keys
+    for name in ('PANELS', 'PANEL_PATHS_V4', 'NET_DIRS'):
+        keys = found.get(name)
+        if keys is None:
+            problems.append(f'scripts/pricing_lib.py: 找不到 {name} 的字面量定义')
+        elif keys != expected:
+            problems.append(f'scripts/pricing_lib.py: {name} 键集合 {sorted(keys)} != '
+                            f'老师语料两列 {sorted(expected)}（C7）')
+    return problems
+
+
 def check_script_sources(root: pathlib.Path) -> list:
     """scripts/ 已拍平到一层：再出现两层相对回退或 parents[2] 就是把仓库根算错。"""
     problems = []
@@ -306,5 +367,6 @@ def run(root: pathlib.Path = ROOT, experiments=None) -> tuple:
                 + check_text_io_encoding(root)
                 + check_hygiene(root)
                 + check_undefined_names(root)
-                + check_script_literals(root))
+                + check_script_literals(root)
+                + check_teacher_only_panels(root))
     return (0 if not problems else 1), problems

@@ -134,19 +134,55 @@ def _listingadj_block(price, rob, pf):
     }
 
 
+def _cluster_block(price):
+    """registry pricing_cluster_dim 的执行面：月内聚类 SE 只并报，不进 pricing_gate 判据。
+
+    读 pricing_table.json 的 industry_cluster_se 块；缺失即 NOT_AVAILABLE（不填 0）。
+    """
+    blk = (price or {}).get('industry_cluster_se') or {}
+    by_col = blk.get('by_column') or {}
+    out = {'cluster_col': blk.get('cluster_col'),
+           'formula': blk.get('formula'),
+           'gate_usage': 'reported_only_not_in_gate（registry pricing_cluster_dim）',
+           'rows': []}
+    for k, v in sorted(by_col.items()):
+        if not isinstance(v, dict):
+            continue
+        out['rows'].append({'column': k, 'status': v.get('status'),
+                            'beta': v.get('beta'), 'se_nw': v.get('se_nw'),
+                            't_nw': v.get('t_nw'), 'se_hybrid': v.get('se_hybrid'),
+                            't_hybrid': v.get('t_hybrid'),
+                            'deff_within_month': v.get('deff_within_month'),
+                            'p_one_sided_hybrid': v.get('p_one_sided_hybrid'),
+                            'ratio_hybrid_vs_nw': v.get('ratio_hybrid_vs_nw')})
+    if not out['rows']:
+        out['status'] = 'NOT_AVAILABLE'
+    else:
+        out['status'] = 'REPORTED'
+    return out
+
+
+BH_PLACEBO_EXCLUDED = ('pricing_placebo_random', 'pricing_placebo_timeshift')
+
+
+def _bh_p_two_sided(rec, xcol='PeerMAXraw'):
+    """robustness 记录的 treatment 双侧 p。生产端只写 coefs_peer_own_ind。"""
+    blk = (rec.get('coefs_peer_own_ind') or {}).get(xcol) or {}
+    return blk.get('p_two_sided')
+
+
 def _bh_block(rob):
     """design.inference.multiplicity 的执行面：family=pricing_robustness 的 BH 校正。
 
-    m 取 robustness JSON 里实际并报的规格数；与 design 登记的 m=19 不一致时报错，
-    因为 design 的 19 是族定义的一部分，漂移会让 q 值不可比。
+    族成员 = robustness JSON 里 out['specs'] 的全部规格，**剔除两个安慰剂零模型**
+    （pricing_placebo_random / pricing_placebo_timeshift）：它们是零模型对照，不是
+    替代规格，并入族会污染 q 值。剔除后族大小与 design 登记的 m=19 对齐；
+    ex-grace 伴生规格缺面板时不入族，此时 m=18 并照实报不一致。
     """
     specs = (rob or {}).get('specs') or {}
-    names = sorted(specs)
-    m = len(names)
-    raw = []
-    for nm in names:
-        p = ((specs[nm].get('coefs') or {}).get('PeerMAXraw') or {}).get('p_two_sided')
-        raw.append((nm, p))
+    members = sorted(nm for nm in specs if nm not in BH_PLACEBO_EXCLUDED)
+    m = len(members)
+    raw = [(nm, _bh_p_two_sided(specs[nm])) for nm in members]
     usable = [(nm, float(p)) for nm, p in raw if p is not None]
     order = sorted(usable, key=lambda x: x[1])
     mm = len(order)
@@ -160,13 +196,20 @@ def _bh_block(rob):
     q.reverse()
     out = {'method': MULT_METHOD, 'family': 'pricing_robustness', 'm': m, 'm_registered': 19,
            'm_matches_design': m == 19, 'alpha': ALPHA,
+           'family_members': members,
+           'excluded_from_family': [nm for nm in sorted(specs) if nm in BH_PLACEBO_EXCLUDED],
+           'n_specs_with_p': mm,
            'n_reject_q': sum(1 for _, _, _, v in q if v <= ALPHA),
            'rows': [{'spec': nm, 'p_two_sided': p, 'rank': r, 'q': v,
                      'reject': v <= ALPHA} for nm, p, r, v in q],
            'bonferroni_threshold': ALPHA / mm if mm else None}
     if not out['m_matches_design']:
-        out['warning'] = (f'robustness 规格数 {m} 与 design 登记的 m=19 不一致；'
+        out['warning'] = (f'族成员数 {m} 与 design 登记的 m=19 不一致；'
                           'BH 的 q 值跨版本不可比，需先对齐族定义')
+    if mm != m:
+        out['p_missing'] = sorted(nm for nm, p in raw if p is None)
+        out['p_missing_note'] = (f'{m - mm} 个族成员无可用 p（规格未计算或未报 coefs_peer_own_ind）；'
+                                 'q 值按实际可用数 mm 计算，缺项单列')
     return out
 
 
@@ -244,13 +287,40 @@ def _tost_scale(tost):
     }
 
 
+def aligned_beta_diff(series) -> tuple:
+    """按**月份**对齐 EW/VW 系数序列后求差，返回 (diff_list, pairing_info)。
+
+    两侧月份集合可以不同（VW 有额外权重过滤）。只保留两侧都有的月份，按月份升序；
+    不按位置配对——位置配对会把不同月份的系数相减。
+    """
+    ew_b = series.get('beta_series_ew') or []
+    vw_b = series.get('beta_series_vw') or []
+    ew_m = series.get('months_ew') or []
+    vw_m = series.get('months_vw') or []
+    if not (len(ew_m) == len(ew_b) and len(vw_m) == len(vw_b)):
+        raise SystemExit('[STOP] EW/VW 系数序列与月份序列长度不一致，无法对齐月份')
+    ew_map = dict(zip(ew_m, ew_b))
+    vw_map = dict(zip(vw_m, vw_b))
+    common = sorted(set(ew_map) & set(vw_map))
+    diff = [ew_map[m] - vw_map[m] for m in common]
+    info = {'n_months_ew': len(ew_b), 'n_months_vw': len(vw_b),
+            'n_common_months': len(common),
+            'ew_only': sorted(set(ew_map) - set(vw_map)),
+            'vw_only': sorted(set(vw_map) - set(ew_map)),
+            'rule': 'month-aligned（只保留两侧共有的月份，按月份升序求差）'}
+    return diff, info
+
+
 def judge(block, spread_block, series, cols_status):
     """对给定样本版本重算 五项判定（同一定义、同一阈值、同一 IQR 登记值）。"""
     ew, vw = block['ew']['coefs']['PeerMAXraw'], block['vw']['coefs']['PeerMAXraw']
     b_ew, b_vw = ew['beta'], vw['beta']
     econ = None if b_ew is None else b_ew * IQR_POOL_REGISTERED
-    d_series = [a - b for a, b in zip(series['beta_series_ew'], series['beta_series_vw'])]
+    # EW/VW 的可估计月份集合可以不同（VW 额外要求 market_equity>0）：必须按月份对齐后求差，
+    # 按位置 zip 会把不同月份的系数配成一对，TOST 的均值与 SE 都会失真。
+    d_series, pair_info = aligned_beta_diff(series)
     tost = tost_equivalence(d_series, bound=K_CONSIST, alpha=ALPHA, lag=NW_LAG)
+    tost['pairing'] = pair_info
     sign_same = (b_ew is not None and b_vw is not None and np.sign(b_ew) == np.sign(b_vw))
     both_sig = ((ew['p_one_sided'] is not None and ew['p_one_sided'] < ALPHA)
                 and (vw['p_one_sided'] is not None and vw['p_one_sided'] < ALPHA))
@@ -408,7 +478,7 @@ def main(argv=None):
            'v2_sensitivity': {},
            'per_month_diagnostics_ref': None,
            'main_column': 'ma_teacher（主口径，主表列）',
-           'outcome': 'raw（R_NEXT_MONTH_COMPLETE_v1）为主；后复权（R_NEXT_POST_ADJ_v1）为敏感性',
+           'outcome': '后复权（R_NEXT_MONTH_COMPLETE_v1）为主；未复权（R_NEXT_MONTH_RAW_v1）为口径敏感性',
            'fix_batch': {
                'I1': 'winsorization 口径对称：权重变体/placebo 的 treatment 与 PeerReturn 施加同规则月度 '
                      '[0.01,0.99] clip（修正前未 winsorize：weight_linear +0.04363 → 修正后 ≈ 主规格；'
@@ -416,20 +486,20 @@ def main(argv=None):
                'I2': 'sample 窗口统一：四列事件月裁剪到 2015-01..2023-12（旧 ma/mb 含 2024-01 → superseded）',
                'I3': 'microcap 筛除已实现（形成月全市场横截面 q10，总市值口径=登记偏离）+ 次新股 <6 月筛除；'
                      '新样本版本 pricing_sample_v2_2015_2023（v1 = superseded_registered_deviation 敏感性）',
-               'I4': 'IQR_pool 统一为 treatment-only 宇宙登记池化值 0.02341287（全规格共用；'
-                     '原实现用终样本/各列 IQR）',
+               'I4': f'IQR_pool 统一为 treatment-only 宇宙登记池化值 {IQR_POOL_REGISTERED:.8f}'
+                     '（全规格共用；原实现用终样本/各列 IQR）',
                'I5': 'VIF/condition number 作用域注明并并报跨规格最大值（见 vif_scope）',
                'I6': '退化行写 spec_status=NOT_COMPUTABLE + reason；样本报告补新股/停牌状态字段；'
                      'ST 分层代码格式映射缺陷修复（st_flag_focal 原恒为 False）',
            },
-           'four_column_roles': {'ma_teacher': '主口径（主表列）', 'mb_teacher': '方法稳健性列',
-                                 'ma': '文本稳健性列', 'mb': '语料对照列（仅历史对照）'},
+           'column_roles': {'ma_teacher': '主口径（主表列）', 'mb_teacher': '方法稳健性列'},
           # design.inference 的四条预注册条款，各有一个执行面（CO-2026-11-19-parameters）
           'listingadj': _listingadj_block(price, rob, pf),
           'inference_blocks': {
               'nw_lag_sensitivity': _nw_lag_block(price),
               'vif': _vif_block(price),
               'multiplicity': _bh_block(rob),
+              'cluster_se': _cluster_block(price),
               'placebo': {'draws': PLACEBO_DRAWS, 'draws_registered': PLACEBO_DRAWS,
                           'results': (rob or {}).get('placebo_distribution')},
           }}
@@ -745,6 +815,15 @@ def _write_md(rep, lc, ia, rob, out_path):
     # CO-2026-11-19-parameters：预注册推断条款 + MAX 定义伴生判定
     L.append(chr(10) + '## 预注册推断条款的执行面（CO-2026-11-19-parameters）' + chr(10))
     _if = rep.get('inference_blocks') or {}
+    _cl = _if.get('cluster_se') or {}
+    if _cl.get('status') == 'REPORTED':
+        L.append(f"- 月内聚类 SE（registry pricing_cluster_dim，{_cl.get('cluster_col')}）："
+                 + '；'.join(f"{r['column']}: deff={_f(r.get('deff_within_month'),3)}, "
+                             f"t_nw={_f(r.get('t_nw'),2)} → t_hybrid={_f(r.get('t_hybrid'),2)}"
+                             for r in _cl['rows'][:4])
+                 + f"。用途：{_cl.get('gate_usage')}")
+    elif _cl:
+        L.append(f"- 月内聚类 SE：{_cl.get('status')}（{_cl.get('gate_usage')}）")
     _nw = _if.get('nw_lag_sensitivity') or {}
     if _nw.get('rows'):
         L.append(f"- NW 滞后敏感性（registry nw_lag_sensitivity={_nw.get('grid')}）："
@@ -860,7 +939,7 @@ def _write_md(rep, lc, ia, rob, out_path):
         extra.append('- A12 γ 动量来源诊断（同一样本、只换 x 集）：' + '；'.join(parts))
     if rob is not None:
         pc = rob.get('placebo_comparison', {})
-        picks = ['pricing_rob_postadj', 'pricing_weight_equal', 'pricing_weight_linear', 'pricing_weight_logsim',
+        picks = ['pricing_rob_main', 'pricing_rob_raw', 'pricing_weight_equal', 'pricing_weight_linear', 'pricing_weight_logsim',
                  'pricing_placebo_random', 'pricing_placebo_timeshift']
         for p in picks:
             if p in rob['specs']:

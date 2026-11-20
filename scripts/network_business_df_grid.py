@@ -57,6 +57,14 @@ def file_size(p):
     return p.stat().st_size
 
 
+def _bytes_label(v):
+    """字节数的短展示（bytes 是 int，不能切片）；None/空 -> '-'。"""
+    if v is None or v == '':
+        return '-'
+    s = str(int(v))
+    return s[:16] + '…' if len(s) > 16 else s
+
+
 def level_paths(df_max: float, tag: str) -> dict:
     """档位 → 聚类目录 / 边表目录 / 冻结报告路径（0.25 档一律落临时目录，绝不碰主口径）。"""
     if tag == '25':
@@ -133,8 +141,12 @@ def main() -> None:
             p['clu'].mkdir(parents=True, exist_ok=True)
             run([sys.executable, str(FREEZE), '--corpus', 'teacher', '--df-max', str(df_max),
                  '--out-dir', str(p['clu']), '--out-report', str(p['freeze_report'])], log)
-            run([sys.executable, str(EDGES), '--corpus', 'teacher', '--df-max', str(df_max),
-                 '--net-dir', str(p['net']), '--cluster-dir', str(p['clu'])], log)
+            edges_cmd = [sys.executable, str(EDGES), '--corpus', 'teacher', '--df-max', str(df_max),
+                         '--net-dir', str(p['net']), '--cluster-dir', str(p['clu'])]
+            if not p['regression']:
+                # 同一语料的多档位变体必须写出可区分的 network_version（manifest 逐档登记前缀）
+                edges_cmd += ['--version-prefix', f'pm_ma_ewcos_teacher_df{tag}_v1']
+            run(edges_cmd, log)
         fr = json.loads(p['freeze_report'].read_text(encoding='utf-8')) if p['freeze_report'].exists() else {}
         levels.append({'df_max': df_max, 'tag': tag, **p, 'freeze': fr})
 
@@ -323,8 +335,8 @@ def main() -> None:
     md += ['', '## 回归门（0.25 档 vs 主口径，逐文件 bytes）', '',
            '| 网络年 | 文件 | 主口径 bytes | 回归档 bytes | 逐字节一致 |', '|---|---|---|---|---|']
     for r in reg_rows:
-        md.append(f"| {r['network_year']} | {r['file']} | `{(r['main_bytes'] or '')[:16]}…` | "
-                  f"`{(r['regr_bytes'] or '')[:16]}…` | {r['byte_identical']} |")
+        md.append(f"| {r['network_year']} | {r['file']} | `{_bytes_label(r['main_bytes'])}` | "
+                  f"`{_bytes_label(r['regr_bytes'])}` | {r['byte_identical']} |")
     md += ['', '## 结论', '', concl or '（未生成）', '',
            rep['scope_note'], '']
     outm = Path(args.out_md)

@@ -4,7 +4,8 @@ W1 bundle 口径（D-03=A / D-08=A+B / T-01）：
   1. **主列未归一化**（D-08 A）：`PeerMAXraw = Σ_j w_ij · MAXraw_jt`、`PeerReturn = Σ_j w_ij · R_jt`；
      仅当 `support_mass>0` 且对应 `missing_mass==0` 时写值；否则主列 missing，
      `PeerMAXraw_partial` / `PeerReturn_partial` 只进 coverage/敏感性诊断。
-  2. **再归一化独立登记**（D-08 B）：`PeerMAXraw_renorm = pm / w_max`（pm = Σ_observed w·x），
+  2. **再归一化独立登记**（D-08 B）：`PeerMAXraw_renorm = pm / w_observed`（pm = Σ_observed w·x，
+     w_observed = covered + incomplete 的权重和——分母与分子同质量），
      `formula_id_max_renorm=PEERMAX_RAW_RENORM_v1`，`allowed_use=robustness_only`、`gate_bearing=false`，
      不得覆盖写回主列。D-03=A 下**不产出** `PeerReturn_renorm` / `formula_id_ret_renorm`。
   3. **peer R 质量（面板侧）**：收益源切到 `monthly_returns_clean_v2.csv`；`nv==0` 的 peer R
@@ -48,19 +49,18 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 from pricing_lib import (aggregate_stat, assert_pricing_inputs, assert_named_pricing_input,
-                         param_value, sample_window_bounds, file_size)
+                         param_value, sample_window_bounds, file_size, NET_DIRS)
 
 ARGMAX = ROOT / 'data/processed/source_month_argmax_panel.csv'
 RETURNS = ROOT / 'data/processed/monthly_returns_clean_v2.csv'
 REGISTRY = ROOT / 'configs/parameter_registry.yaml'
 MANIFEST = ROOT / 'configs/version_manifest.yaml'
-NETS = {'ma': ROOT / 'data/processed/network_ma', 'mb': ROOT / 'data/processed/network_mb'}
-# 语料变体网络目录（--net-dir 指定时覆盖 NETS；输出文件名随之加后缀，避免覆盖主口径）
+# 语料变体网络目录（--net-dir 指定时覆盖 pricing_lib.NET_DIRS；输出文件名随之加后缀，避免覆盖主口径）
 NET_DIR_SUFFIX = {'network_mb_teacher': '_teacher', 'network_ma_teacher': '_teacher',
                   'network_ma_teacher_idf': '_teacher_idf',
                   'network_ma_teacher_medadj': '_teacher_medadj',
                   'network_ma_fulltext': '_fulltext'}
-KNOWN_NET_DIRS = set(NET_DIR_SUFFIX) | {'network_ma', 'network_mb'}
+KNOWN_NET_DIRS = set(NET_DIR_SUFFIX)
 OUTD = ROOT / 'data/processed'
 REPD = ROOT / 'reports/data_gates/G0'
 SAMPLE_DIR = ROOT / 'data/processed'
@@ -310,6 +310,7 @@ def select_version(vers, month):
 
 
 def load_net(path, cache, key):
+    key = ('edges',) + tuple(key)
     if key in cache:
         return cache[key]
     edges = defaultdict(list)
@@ -327,6 +328,7 @@ def load_support_status(similarity_path, cache, key):
     边表里。不读 support.csv 时这些 focal-month 会静默消失，样本损失无法审计；
     读进来后为它们补行并标 no-network-support。
     """
+    key = ('support',) + tuple(key)
     if key in cache:
         return cache[key]
     p = Path(similarity_path).with_name(Path(similarity_path).name.replace(
@@ -389,7 +391,7 @@ def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument('--use-case', choices=['ma', 'mb'], required=True)
     ap.add_argument('--net-dir', default=None,
-                    help='显式网络目录（语料变体用，如 data/processed/network_mb_teacher）；缺省按 use-case 取 NETS')
+                    help='显式网络目录（语料变体用，如 data/processed/network_mb_teacher）；缺省按 use-case 取 NET_DIRS')
     ap.add_argument('--corpus-id', default=None,
                     help='语料身份（缺省 = net_dir.name，如 ma_teacher）')
     ap.add_argument('--panel-version', default=None,
@@ -417,7 +419,7 @@ def main(argv=None):
         for e in pricing_ledger
     ]
 
-    netd = (ROOT / args.net_dir) if args.net_dir else NETS[args.use_case]
+    netd = (ROOT / args.net_dir) if args.net_dir else NET_DIRS[f'{args.use_case}_teacher']
     corpus_id = args.corpus_id or (netd.name if args.net_dir else args.use_case)
     panel_versions = load_registry_panel_versions(args.registry)
     if args.panel_version:
@@ -522,21 +524,23 @@ def main(argv=None):
         rrm = rmap[month]
         ml = maxraw_la[month]
         mall = maxraw_all[month]
+        # Series.map(dict) 走 pandas 的哈希映射路径，比 map(lambda d.get) 快一倍
+        # （实测 252 万次调用是这里最大的单点开销）；未命中一律 None，与 dict.get 同义。
         src = pd.DataFrame({
-            'source_id': sids,
-            'MAXraw': sids.map(lambda s: mm.get(s)),
-            'MAXraw_la': sids.map(lambda s: ml.get(s)),
-            'MAXraw_incl_all': sids.map(lambda s: mall.get(s)),
-            'R': sids.map(lambda s: rrm.get(s)),
-            'q': sids.map(lambda s: qq.get(s)),
-            'lim': sids.map(lambda s: ll.get(s)),
-            'cm': sids.map(lambda s: cm.get(s, 0)),
-            'has_ret': sids.map(lambda s: s in rrm),
+            'source_id': sids.to_numpy(),
+            'MAXraw': sids.map(mm).to_numpy(),
+            'MAXraw_la': sids.map(ml).to_numpy(),
+            'MAXraw_incl_all': sids.map(mall).to_numpy(),
+            'R': sids.map(rrm).to_numpy(),
+            'q': sids.map(qq).to_numpy(),
+            'lim': sids.map(ll).to_numpy(),
+            'cm': sids.map(cm).fillna(0).to_numpy(),
+            'has_ret': sids.isin(rrm.keys()).to_numpy(),
             'nv': [nvmap.get((s, month), 0) for s in sids],
         })
         q_known = src['q'].notna()
         is_excl = q_known & src['q'].eq(EXCLUDE_QUAL)
-        cm_ok = src['cm'].fillna(0).astype(int).eq(1)
+        cm_ok = src['cm'].astype(int).eq(1)
         elig_max = q_known & ~is_excl & cm_ok
         inc_max = q_known & ~is_excl & ~cm_ok
         nv = pd.to_numeric(src['nv'], errors='coerce').fillna(0).astype(int)
@@ -584,9 +588,12 @@ def main(argv=None):
                                      'partial', 'not_covered'))
         reason = _write_reason(ds, agg['missing_reason_max'], agg['missing_reason_ret'])
 
-        # D-08 B：pm/w_max（pm = Σ_observed w·x = covered + incomplete observed）
+        # D-08 B：pm / w_observed（pm = Σ_observed w·x = covered + incomplete observed）。
+        # 分母必须与分子同质量：分子含 incomplete 行的 w·x，分母只能是 covered+incomplete 的权重和，
+        # 用 covered_mass 单独作分母会系统性抬高 renorm（covered 越少偏得越多）。
         pm_all = np.where(np.isnan(v_max), p_max, v_max)
-        renorm = np.where(wmax > 0, pm_all / np.where(wmax > 0, wmax, 1.0), np.nan)
+        w_obs = wmax + agg['incomplete_mass_max'].to_numpy(float)
+        renorm = np.where(w_obs > 0, pm_all / np.where(w_obs > 0, w_obs, 1.0), np.nan)
         peer_max = np.where(np.isnan(v_max), '', np.round(v_max, 8))
         peer_ret = np.where(np.isnan(v_ret), '', np.round(v_ret, 8))
         peer_max_partial = np.where(np.isnan(v_max) & (wmax > 0), np.round(p_max, 8), '')

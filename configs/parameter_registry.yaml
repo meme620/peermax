@@ -1,4 +1,4 @@
-registry_version: 1.6.1-peermax-baseline
+registry_version: 1.7.0-peermax-baseline
 meta:
   baseline_date: '2026-11-19'
   source: 按代码与契约测试重建；非主仓库原文件
@@ -6,6 +6,17 @@ meta:
     主控制集、listing_grace_days、placebo_draws、VIF 阈值、NW 滞后网格、市值/ST/微盘缺失口径；修正
     network_cutoff_rule 与 limit_hit_source 的字面量。change_log 见文件头。'
 change_log:
+  - id: CO-2026-11-20-teacher-only
+    date: '2026-11-20'
+    scope: 样本口径定为老师语料两列（ma_teacher / mb_teacher）
+    rationale: 计算链只有老师 MD&A 语料网络；样本两列即这两条网络。面板重算补回
+      singleton 团的 focal-month 行后，treatment-only 池化 IQR 与 K_Consist 同步重登记。
+    params: [sample_and_spec_registry, iqr_pool_value, K_Consist_Pricing]
+    sample_version_from: pricing_sample_v3_20261115
+    sample_version_to: pricing_sample_v5_teacher_only_20261120
+    version_from: 1.6.1-peermax-baseline
+    version_to: 1.7.0-peermax-baseline
+    approval: 用户要求严格用老师语料口径（2026-11-20 本工作区会话）
   - id: CO-2026-11-19-naming
     date: '2026-11-19'
     scope: 命名规范化（参数名去阶段代号）
@@ -18,14 +29,14 @@ change_log:
     approval: 用户要求彻底修复命名（2026-11-19 本工作区会话）
   - id: CO-2026-11-19-parameters
     date: '2026-11-19'
-    scope: 参数与选择口径核查（reports/review/2026-11-19-parameters.md）
+    scope: 参数与选择口径核查（K_Consist 派生、控制集与样本指针登记、预注册条款执行面）
     rationale: 登记值与执行口径不一致、预注册条款无执行者、样本版本四层漂移
     params: [K_Consist_Pricing, max_day_policy, pricing_main_controls_v1, placebo_draws, vif_per_month_max,
       nw_lag_sensitivity, shadow_legacy_sample_version, market_value_basis, st_policy,
       microcap_missing_policy, network_cutoff_rule, limit_hit_source]
     version_from: 1.5.33-peermax-baseline
     version_to: 1.6.0-peermax-baseline
-    approval: 用户批准 reports/review/2026-11-19-fix-plan.md
+    approval: 用户批准彻底修复计划（2026-11-19 本工作区会话）
 parameters:
   - name: sample_start
     headline_value: '2015-01-01'
@@ -51,6 +62,14 @@ parameters:
   - name: min_valid_days
     headline_value: 15
     note: complete_month = volume>0 交易日 >= 15（月均 20.3 的 75%）
+  - name: outcome_return_convention
+    headline_value: post_adjusted
+    note: 'outcome（R_next）的复权口径，唯一来源。post_adjusted = 后复权收盘（含公司行为调整），
+      由 build_monthly_returns_drive --convention post_adjusted 产出 monthly_returns_clean.csv，
+      再经 build_monthly_returns_status 派生 monthly_returns_clean_v2.csv；与老师交付
+      monthly_returns_adj.csv 逐位一致。敏感性列 R_next_raw 走同一 builder 的 --convention raw
+      （monthly_returns_clean_raw.csv），是**另一条序列**，不是同一序列的筛选变体。
+      改本值须走 change order：spec/design.yaml 的 sample.outcome.convention_registry_key 指向这里。'
   - name: alpha_pricing
     headline_value: 0.05
     note: 单侧显著性门 one_sided_significance 与 TOST 等价的 alpha；spec/design.yaml pricing_gates 的 registry_key
@@ -61,12 +80,12 @@ parameters:
     headline_value: 0.003
     note: portfolio_spread 组合 spread 阈值（月收益单位）；spec/design.yaml pricing_gates 的 registry_key
   - name: K_Consist_Pricing
-    headline_value: 0.128135
+    headline_value: 0.177143
     derived_from: K_Econ_Pricing / iqr_pool_value
     sensitivity_grid:
       - 0.128135
       - 0.5
-    note: 'ew_vw_consistency EW/VW 等价界，β 单位；= K_Econ_Pricing / IQR_pool = 0.003 / 0.02341287 = 0.128135β ≈ 0.30%/月，
+    note: 'ew_vw_consistency EW/VW 等价界，β 单位；= K_Econ_Pricing / IQR_pool = 0.003 / 0.01693548 = 0.177143β ≈ 0.30%/月，
       与经济量级门同尺度。0.5（旧值，≈1.17%/月=3.9×K_Econ）保留为敏感性值。pricing_lib 导入即断言派生关系'
   - name: portfolio_breakpoints
     headline_value:
@@ -107,13 +126,43 @@ parameters:
     note: M-A 聚类 linkage；code_design_audit 读取
   - name: sw2_median_peer_target
     headline_value: 56
-    note: M-A 自建语料（self 列）的逐年 K 目标同伴数；主口径 teacher 用 ma_k_target_teacher，勿混用
+    note: 历史 K 目标登记项；当前主口径用 ma_k_target_teacher
   - name: ma_k_target_teacher
     headline_value: 44
-    note: M-A 主口径（老师 MD&A 语料）逐年 K 目标同伴数；network_business_cluster_freeze 读取
+    note: M-A 主口径（老师 MD&A 语料）逐年 K 目标同伴数；network_business_cluster_freeze 读取。
+      该值由**申万二级行业 peer 数**定义（network_tau_calibrate.sw2_target：组内 N−1 的公司层中位、
+      跨文本年池化），因此 K 把行业结构注入网络密度，这是已登记的口径选择，不是数据涌现结果。
+      池化样本口径必须与取值来源一致才能复算：sw2_target 用 teacher 面板全部 ok 行（不剔 J/S、
+      不剔上市<2 年、申万取 sw2_industry_latest 静态快照）得 45；构网样本池剔 J/S 与上市<2 年后
+      为 37。44 是 2026-09 冻结时的外部锚，两者都复算不出 44——引用本参数时必须同时引用本条口径差异
+  - name: edge_precision_manual_annotation
+    headline_value:
+      text_years: [2016, 2019, 2022]
+      n_per_stratum: 40
+      strata_order: [high, mid, same_sw2, cross_sw2, random]
+      labels: [direct_competitor, related_not_direct, spurious]
+      thresholds: {acceptable: 0.60, recheck: 0.40}
+      excerpt_target_chars: 300
+      ma_df_max: 0.25
+      seed_param: random_seed
+      protocol_file: reports/audits/network_edge_precision_protocol_20261013.md
+    note: network_edge_precision_sample 的冻结抽样口径（layer 定义 / 每层条数 / 判读标签 / 门槛 / seed）。
+      脚本启动即校验 TEXT_YEARS / N_PER_STRATUM / STRATUM_ORDER / LABELS / THRESHOLDS / EXCERPT_TARGET /
+      MA_DF_MAX 与本块逐字一致，否则 SystemExit(2)；抽前必须先有 protocol_file 且其冻结时间戳早于抽样时刻。
+      协议文件当前不在库（reports/ 整体被 .gitignore 覆盖）——重建协议后 --sample 才能运行；
+      本条只登记口径，不代表抽样已执行
+  - name: ma_k_target_definition
+    headline_value:
+      pooling: firm_level_median_peers_pooled_across_text_years
+      industry_source: sw2_industry_latest_static_snapshot_not_asof
+      sample_filter: none_teacher_panel_all_ok_rows
+      realized_pooled_median: 45
+      realized_after_network_filters: 37
+      frozen_value_note: 44 为 2026-09 外部锚冻结值；与上述两个可复算值的差异见 ma_k_target_teacher.note
+    note: K 目标的定义与可复算口径登记（2026-11-20 审查 P1-2）；改本块必须同步 sw2_target 实现
   - name: sample_and_spec_registry
     headline_value:
-      sample_version: pricing_sample_v3_20261115
+      sample_version: pricing_sample_v5_teacher_only_20261120
       min_focal_count_per_month: 100
       min_effective_month_count: 60
       iqr_scale_rule_id: IQR_POOL_TREATMENT_ONLY_v1
@@ -122,8 +171,8 @@ parameters:
       tost_rule_id: TOST_EW_VW_K_Consist_Pricing
     note: pricing 样本与规格登记块；sample_version 是 headline 唯一指针（pricing_* 与 peerlab 均读此值）
   - name: shadow_legacy_sample_version
-    headline_value: pricing_sample_v2_2015_2023
-    note: shadow_* 全套未重跑时读此值（非 headline）；退役条件 = shadow 全套重跑到 sample_and_spec_registry.sample_version 后删除本参数与读取点
+    headline_value: pricing_sample_v5_teacher_only_20261120
+    note: shadow_* 读的样本版本；与 sample_and_spec_registry.sample_version 同值，只读同一份两列样本
   - name: pricing_main_controls_v1
     headline_value:
       list: [size, bm, mom, rev, turnover, illiq, AnalystCoverage, NetworkDegree]
@@ -187,8 +236,9 @@ parameters:
     headline_value: deprecated
     note: ca_flag 由 SHAREBONUS 除权日表替代；仍写入面板仅作审计，消费方不得据此过滤。退役条件 = shadow_adjusted_max_build 的复权 MAX 升为登记口径后删除该列
   - name: iqr_pool_value
-    headline_value: 0.02341287
-    note: pricing 经济量级的 treatment-only 池化 IQR 登记值；pricing_lib.IQR_POOL_REGISTERED 导入即核对该值
+    headline_value: 0.01693548
+    note: pricing 经济量级的 treatment-only 池化 IQR 登记值（headline 列 ma_teacher）；
+      pricing_lib.IQR_POOL_REGISTERED 导入即核对该值，pricing_sample_build 用 iqr_drift_tolerance 查漂移
   - name: pc_coverage_years
     headline_value: 6
     note: PC 竞争强度可得年数（文本年 2017-2022）；营收年表仅 FY2016-2024，文本年 2014-2016 缺且不填 0
@@ -202,6 +252,16 @@ parameters:
       listing_grace_days: 5
     note: MAX/argmax 的日样本口径；剔除涨跌停日、停牌复牌首日、上市后前 N 个交易日（新股无涨跌幅限制期）。
       MAXraw 只剔前两项；listing_grace_days 用于并列列 MAXraw_la。MAXraw_incl_all 仍为全样本审计列
+  - name: pricing_cluster_dim
+    headline_value:
+      column: l1_code
+      level: 申万一级
+      se_estimator: hybrid_nw_x_within_month_cluster
+      gate_usage: reported_only_not_in_gate
+    note: 定价推断的月内聚类维度（spec/design.yaml R9 要求的冻结项）。se_hybrid =
+      sqrt(se_nw² + se_sampling_cluster² − se_sampling_iid²)；deff>1 表示同月同行业相关使同方差 SE 偏小。
+      gate_usage=reported_only_not_in_gate 明确登记「聚类 SE 只并报、不进 pricing_gate 判据」——
+      这是已登记的口径限制，不得在稿件里写成「聚类后仍显著」。改本块必须同步 pricing_lib.fm_cluster_se
   - name: vif_per_month_max
     headline_value: 10
     note: 逐月 VIF 上限；超过的月份标 non_interpretable（报数不删行），gate 报告汇总超阈月份

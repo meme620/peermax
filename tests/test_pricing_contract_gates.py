@@ -107,9 +107,10 @@ def test_unknown_source_fails():
 # ---------------------------------------------------------------- 当前真实产物（只读）
 def test_current_real_build_report_passes(real_report):
     summary = assert_pricing_contract(real_report, where='real:build_report')
-    assert summary['n_contracts'] == 4
+    # C7：样本只覆盖老师语料两列（ma/mb 自建语料列已退役）
+    assert summary['n_contracts'] == 2
     for key, c in summary['contracts'].items():
-        assert key in {'ma_teacher', 'mb_teacher', 'ma', 'mb'}
+        assert key in {'ma_teacher', 'mb_teacher'}
         assert c['rows_gate_enforced'] is True
         assert c['rows_match_registered'] is True
         assert c['pit_violations_strict_lt'] == 0
@@ -119,7 +120,7 @@ def test_current_real_build_report_passes(real_report):
 
 def test_current_real_build_report_path_passes():
     summary = assert_pricing_contract(SAMPLE_REPORT, where='real:build_report_path')
-    assert summary['n_contracts'] == 4
+    assert summary['n_contracts'] == 2
 
 
 def test_current_real_v2_sample_passes(real_v2):
@@ -182,12 +183,10 @@ def test_custom_panel_rows_gate_not_applicable():
 # ---------------------------------------------------------------- 下游脚本包装：截断样本必须失败
 def test_load_checked_sample_rejects_truncation(monkeypatch, real_v2):
     import pricing_fm_main as fm
-    report = {'samples': {'ma_teacher': {'rows_total': V2_MA_TEACHER_ROWS}},
-              'samples_v1_superseded': {'ma_teacher': {'rows_total': V2_MA_TEACHER_ROWS}}}
-    monkeypatch.setattr(fm, 'load_sample',
-                        lambda key, version='v2': real_v2.iloc[:-10].copy())
+    report = {'samples': {'ma_teacher': {'rows_total': V2_MA_TEACHER_ROWS}}}
+    monkeypatch.setattr(fm, 'load_sample', lambda key: real_v2.iloc[:-10].copy())
     with pytest.raises(SystemExit) as ei:
-        fm.load_checked_sample('ma_teacher', 'v2', report)
+        fm.load_checked_sample('ma_teacher', report)
     assert ei.value.code == 2
 
 
@@ -245,14 +244,13 @@ def test_four_panel_contracts_pass(panel_contracts):
         assert c['missing_filled_with_zero'] == 0
 
 
-@pytest.mark.parametrize('version', ['v2', 'v1'])
-@pytest.mark.parametrize('key', ['ma_teacher', 'mb_teacher', 'ma', 'mb'])
-def test_eight_sample_contracts_pass(real_report, key, version):
-    expected = (real_report['samples'] if version == 'v2'
-                else real_report['samples_v1_superseded'])[key]['rows_total']
-    df = pd.read_parquet(sample_path(key, version), columns=V2_READ_COLS)
+@pytest.mark.parametrize('key', ['ma_teacher', 'mb_teacher'])
+def test_sample_contracts_pass(real_report, key):
+    """headline 样本的契约（C7 后只有老师语料两列；v1/v2 及 ma/mb 列已退役）。"""
+    expected = real_report['samples'][key]['rows_total']
+    df = pd.read_parquet(sample_path(key), columns=V2_READ_COLS)
     summary = assert_pricing_contract(df, expected_rows=int(expected), kind='sample',
-                                 where=f'real:{key}:{version}')
+                                 where=f'real:{key}')
     c = summary['contracts']['<frame>']
     assert c['rows'] == int(expected)
     assert c['rows_match_registered'] is True

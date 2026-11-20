@@ -58,8 +58,11 @@ def _rel(root: Path, path: Path) -> str:
         return str(path)
 
 
-def _outcome(problems, checked, blocked=None) -> dict:
-    return {"problems": list(problems), "checked": int(checked), "blocked": blocked}
+def _outcome(problems, checked, blocked=None, observed=None) -> dict:
+    out = {"problems": list(problems), "checked": int(checked), "blocked": blocked}
+    if observed is not None:
+        out["observed"] = observed
+    return out
 
 
 def _read_pickle(path: Path) -> pd.DataFrame:
@@ -224,6 +227,40 @@ def check_a4_units(root, spec=None) -> dict:
     return _outcome(problems, checked)
 
 
+_CLIFF_QUEUE_COLS = ["date", "order_book_id", "ret", "raw_ret", "category"]
+
+
+def _cliff_rows(post_ret, raw_ret, thr) -> list:
+    """后复权日收益 < thr 的格，逐格分类：genuine / adjusted_only / unclassified。
+
+    全矩阵用 numpy 布尔索引一次取出，不逐格走 pandas 标签索引。旧实现用
+    where(mask).stack(future_stack=True) 取格：pandas 2.3 的 stack 默认保留 NaN，
+    漏 dropna 后会把 6178x5535 的整个网格（3419 万行）都堆出来写进队列，且分类把
+    「未复权缺值」错记成「复权缺陷」。raw_ret 为 None 或该格缺值时类别是 unclassified。
+    """
+    P = post_ret.to_numpy()
+    ii, jj = np.nonzero(P < thr)
+    if not len(ii):
+        return []
+    dates = [d.strftime("%Y-%m-%d") for d in post_ret.index]
+    names = post_ret.columns.to_numpy()
+    R = None if raw_ret is None else raw_ret.to_numpy()
+    rows = []
+    for a, b in zip(ii.tolist(), jj.tolist()):
+        v = float(P[a, b])
+        if R is None:
+            rv, cat = None, "unclassified"
+        else:
+            rv = float(R[a, b])
+            if rv != rv:
+                rv, cat = None, "unclassified"
+            else:
+                cat = "genuine" if rv < thr else "adjusted_only"
+        rows.append({"date": dates[a], "order_book_id": names[b], "ret": v,
+                     "raw_ret": rv, "category": cat})
+    return rows
+
+
 def check_a5_cliffs(root, spec=None) -> dict:
     cfg = _contract(_spec_for(root, spec), "a5_cliffs")
     thr = float(cfg["cliff_threshold"])
@@ -235,32 +272,67 @@ def check_a5_cliffs(root, spec=None) -> dict:
     cliff_mask = post_ret < thr
     n_post = int(cliff_mask.to_numpy().sum())
     queue_rel = cfg["post_adjusted"].get("review_queue")
-    if queue_rel:
-        stacked = post_ret.where(cliff_mask).stack(future_stack=True).dropna()
-        queue = stacked.rename("ret").reset_index()
-        queue.columns = ["date", "order_book_id", "ret"]
-        out_q = Path(root) / queue_rel
-        out_q.parent.mkdir(parents=True, exist_ok=True)
-        queue.to_csv(out_q, index=False)
     problems = []
     checked = 1
-    if n_post > int(cfg["post_adjusted"].get("max_cells", 0)):
-        problems.append(f"{cfg['post_adjusted']['path']}: 后复权序列仍有 {n_post} 个 < {thr} 的日收益")
     raw_rel = cfg.get("raw", {}).get("path")
+    raw = None
     if raw_rel:
         raw_path = _admit(root, raw_rel)
         if raw_path is not None:
             checked += 1
             raw = _read_pickle(raw_path)
-            n_raw = int((raw.pct_change(fill_method=None) < thr).to_numpy().sum())
-            if n_raw == 0:
-                problems.append(f"{raw_rel}: 原始序列无断崖（{thr} 判定失效或数据已复权）")
+
+    # 断崖判定的两个类别必须分开，否则真实行情会被当成复权缺陷：
+    #   1) adjusted_only —— 复权**造成**的断崖：后复权日收益 < thr 而未复权同格 >= thr。
+    #      这是复权链缺陷，任何一条都不放行。
+    #   2) genuine —— 后复权与未复权**同为** < thr：真实行情（退市整理期、注册制新股无涨跌幅
+    #      限制等），不是缺陷；只登记计数与清单，不参与 pass/fail。
+    adjusted_only = []
+    genuine = 0
+    if raw is not None:
+        raw_ret = raw.pct_change(fill_method=None)
+        common = post_ret.columns.intersection(raw_ret.columns)
+        common_idx = post_ret.index.intersection(raw_ret.index)
+        pr = post_ret.loc[common_idx, common]
+        rr = raw_ret.loc[common_idx, common]
+        # NaN 既不算越界也不算未越界：缺值格单独排除，不能被判成"复权引入的断崖"
+        both_present = pr.notna() & rr.notna()
+        pm = (pr < thr) & both_present
+        rm = (rr < thr) & both_present
+        adjusted_only_mask = pm & ~rm & both_present
+        genuine = int((pm & rm).to_numpy().sum())
+        if int(adjusted_only_mask.to_numpy().sum()):
+            stacked = pr.where(adjusted_only_mask).stack(future_stack=True).dropna()
+            adjusted_only = [f"{i[0]:%Y-%m-%d}/{i[1]}={v:.4f}" for i, v in stacked.items()]
+    else:
+        # 无未复权序列可比时无法分类，退回总计数（保守：按缺陷处理）
+        adjusted_only = [f"{i[0]:%Y-%m-%d}/{i[1]}={v:.4f}"
+                         for i, v in post_ret.where(cliff_mask).stack(future_stack=True).dropna().items()]
+        genuine = 0
+    n_adjusted_only = len(adjusted_only)
+    max_adjusted_only = int(cfg["post_adjusted"].get("max_adjusted_only", 0))
+    if n_adjusted_only > max_adjusted_only:
+        problems.append(
+            f"{cfg['post_adjusted']['path']}: 复权引入的断崖 {n_adjusted_only} 条 > 容差 "
+            f"{max_adjusted_only}（未复权同格不低于 {thr}）；样本：{adjusted_only[:5]}")
+    observed = {"cliff_cells": n_post, "adjusted_only_cliffs": n_adjusted_only,
+                "genuine_cliffs": genuine}
+    if queue_rel:
+        # 审查队列按类别落盘：adjusted_only 是要修的，genuine 是真实行情留痕
+        queued = (_cliff_rows(pr, rr, thr) if raw is not None
+                  else _cliff_rows(post_ret, None, thr))
+        out_q = Path(root) / queue_rel
+        out_q.parent.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame(queued, columns=_CLIFF_QUEUE_COLS).to_csv(out_q, index=False)
+    if raw is None and n_post:
+        problems.append(f"{cfg['post_adjusted']['path']}: 无法区分复权缺陷与真实行情（缺未复权序列），"
+                        f"按缺陷处理 {n_post} 条")
     monthly_cfg = cfg.get("monthly", {})
     monthly_rel = monthly_cfg.get("path")
     if monthly_rel:
         m_path = _admit(root, monthly_rel)
         if m_path is None:
-            return _outcome(problems, checked, "缺派生月收益: " + monthly_rel)
+            return _outcome(problems, checked, "缺派生月收益: " + monthly_rel, observed)
         tol = float(monthly_cfg.get("tolerance", 1e-9))
         m = pd.read_csv(m_path, dtype={"firm_id": str, "month": str})
         close = post.resample("ME").last()
@@ -277,7 +349,7 @@ def check_a5_cliffs(root, spec=None) -> dict:
             diff = (j["R"] - j["R_ref"]).abs()
             if float(diff.max()) > tol:
                 problems.append(f"{monthly_rel}: 与后复权复算 max|diff|={float(diff.max()):.3e} > {tol}")
-    return _outcome(problems, checked)
+    return _outcome(problems, checked, observed=observed)
 
 
 def check_a6_limit_flags(root, spec=None) -> dict:

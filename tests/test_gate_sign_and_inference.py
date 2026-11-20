@@ -45,13 +45,16 @@ def _spread(mean):
 
 
 def test_gate_economic_magnitude_and_spread_require_negative_direction():
-    # K_Econ=0.003、IQR=0.0234 → β=-0.15 时 beta*IQR=-0.0035，刚好越过经济阈值
-    gset, _ = g.judge(_block(-0.15, -0.148), _spread(-0.004), _series(), None)
+    # K_Econ 与 IQR 都取自 registry（IQR 会随样本版本变，不写死）；
+    # β 取 -1.5*K_Econ/IQR 的两倍，保证 beta*IQR 明确越过经济阈值。
+    k_econ = g.K_ECON
+    beta = -2.0 * k_econ / g.IQR_POOL_REGISTERED
+    gset, _ = g.judge(_block(beta, beta * 0.99), _spread(-2.0 * g.K_SPREAD), _series(), None)
     assert gset['economic_magnitude']['pass'] is True
     assert gset['portfolio_spread']['pass'] is True
 
     # 同量级正号：abs 过、有符号不过
-    gpos, _ = g.judge(_block(0.15, 0.148), _spread(0.004), _series(), None)
+    gpos, _ = g.judge(_block(-beta, -beta * 0.99), _spread(2.0 * g.K_SPREAD), _series(), None)
     assert gpos['economic_magnitude']['abs_pass'] is True
     assert gpos['economic_magnitude']['pass'] is False
     assert gpos['portfolio_spread']['abs_pass'] is True
@@ -96,14 +99,54 @@ def test_vif_block_pass_when_below_threshold():
     assert blk['n_exceed_vars'] == 0
 
 
+def _rob_rec(p):
+    """robustness 生产端的真实记录结构：treatment 系数在 coefs_peer_own_ind 下。"""
+    return {'coefs_peer_own_ind': {'PeerMAXraw': {'beta': -0.01, 'p_two_sided': p}}}
+
+
 def test_bh_block_flags_mismatch_with_design_m():
-    rob = {'specs': {f's{i}': {'coefs': {'PeerMAXraw': {'p_two_sided': 0.01 * (i + 1)}}}
-                     for i in range(5)}}
+    rob = {'specs': {f's{i}': _rob_rec(0.01 * (i + 1)) for i in range(5)}}
     blk = g._bh_block(rob)
     assert blk['m'] == 5 and blk['m_registered'] == 19
     assert blk['m_matches_design'] is False
     assert 'warning' in blk
     assert blk['rows'][0]['rank'] == 1
+
+
+def test_bh_block_reads_producer_key_and_yields_q_values():
+    """BH 必须读生产端的 coefs_peer_own_ind（曾读 coefs 导致恒空表）。"""
+    rob = {'specs': {f's{i}': _rob_rec(p) for i, p in enumerate(
+        [0.001, 0.01, 0.02, 0.04, 0.5] + [0.2 + 0.01 * i for i in range(14)])}}
+    blk = g._bh_block(rob)
+    assert blk['m'] == 19 and blk['m_matches_design'] is True
+    assert blk['n_specs_with_p'] == 19
+    assert len(blk['rows']) == 19
+    # 单调化：q_(i) = min_{j>=i} p_(j)*m/j → q 随 rank 递增，且 q <= p*m/rank（取前缀最小值）
+    qs = [r['q'] for r in blk['rows']]
+    assert qs == sorted(qs)
+    for r in blk['rows']:
+        assert r['q'] <= r['p_two_sided'] * blk['m'] / r['rank'] + 1e-12
+    assert blk['n_reject_q'] >= 1
+
+
+def test_bh_block_excludes_placebo_from_family():
+    """安慰剂零模型不是替代规格，不得并入 BH 族（否则污染 q 值）。"""
+    specs = {f's{i}': _rob_rec(0.01 * (i + 1)) for i in range(19)}
+    specs['pricing_placebo_random'] = _rob_rec(0.9)
+    specs['pricing_placebo_timeshift'] = _rob_rec(0.8)
+    blk = g._bh_block({'specs': specs})
+    assert blk['m'] == 19 and blk['m_matches_design'] is True
+    assert set(blk['excluded_from_family']) == {'pricing_placebo_random', 'pricing_placebo_timeshift'}
+    assert all(r['spec'].startswith('s') for r in blk['rows'])
+
+
+def test_bh_block_reports_missing_p_without_silent_drop():
+    specs = {f's{i}': _rob_rec(0.01 * (i + 1)) for i in range(18)}
+    specs['s_no_p'] = {'spec_status': 'NOT_COMPUTABLE'}
+    blk = g._bh_block({'specs': specs})
+    assert blk['m'] == 19 and blk['n_specs_with_p'] == 18
+    assert blk['p_missing'] == ['s_no_p']
+    assert 'p_missing_note' in blk
 
 
 def test_listingadj_block_absent_when_spec_missing():

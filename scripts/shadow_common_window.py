@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Phase 3B / N-6（B2）：四列并报统一到 2018-05..2023-12 共同窗口重跑 inventory。
+"""Phase 3B / N-6（B2）：两列并报统一到 2018-05..2023-12 共同窗口重跑 inventory。
 
 任务（N-6 处理项 ①）：
-  - 四列 v2 样本（ma_teacher / mb_teacher / ma / mb）统一过滤事件月
+  - 两列样本（ma_teacher / mb_teacher）统一过滤事件月
     2018-05..2023-12，重跑 inventory（登记全控制规格），报 n / T / PeerMAX / OwnMAX /
     PeerReturn 的 beta 与 NW t；同时报各列原窗口读数作对照。
   - 只写 `artifacts/phase3b/3b_n6_*`；不重跑 pricing_gate / PC / 网络；不改
@@ -53,12 +53,10 @@ G0_REFERENCE = ROOT / 'reports/data_gates/G0/pricing_table_v2.json'
 REGISTRY = ROOT / 'configs/parameter_registry.yaml'
 SCRIPT = Path(__file__).resolve()
 
-COLUMNS = ['ma_teacher', 'mb_teacher', 'ma', 'mb']
+COLUMNS = ['ma_teacher', 'mb_teacher']
 ROLE = {
     'ma_teacher': '主口径（中文法 × 老师 MD&A）',
     'mb_teacher': '方法稳健性列（TF-IDF × 同语料）',
-    'ma': '文本稳健性列（中文法 × 自建业务描述语料）',
-    'mb': '语料对照列（TF-IDF × 自建语料；仅历史对照）',
 }
 VARS = ['PeerMAXraw', 'OwnMAXraw', 'PeerReturn']
 CONTROLS = ['size', 'bm', 'mom', 'rev', 'turnover', 'illiq',
@@ -67,25 +65,21 @@ inventory = VARS + CONTROLS
 
 COMMON_START = '2018-05'
 COMMON_END = '2023-12'
-SAMPLE_VERSION = 'pricing_sample_v2_2015_2023'
+SAMPLE_VERSION = 'pricing_sample_v5_teacher_only_20261120'
 MIN_N = int(param_value('sample_and_spec_registry')['min_focal_count_per_month'])
 MIN_MONTHS = int(param_value('sample_and_spec_registry')['min_effective_month_count'])
 NW_LAG = int(param_value('nw_lag'))
 WINSOR = param_value('winsorization_pct')
 
 # 共同窗口之外的差异（N-6 证据链，报告用；不改任何数值）
-K_TARGET = {'ma_teacher': 44, 'mb_teacher': None, 'ma': 56, 'mb': None}
+K_TARGET = {'ma_teacher': 44, 'mb_teacher': None}
 CORPUS = {
     'ma_teacher': 'teacher_mda_panel（老师 MD&A）',
     'mb_teacher': 'teacher_mda_panel（老师 MD&A）',
-    'ma': 'business_texts（自建业务描述）',
-    'mb': 'business_texts（自建业务描述）',
 }
 METHOD = {
     'ma_teacher': '等权 0/1 词向量 × 余弦 × average，K 目标 44',
     'mb_teacher': 'TF-IDF 词向量 × 阈值 tau=0.0888212137',
-    'ma': '等权 0/1 词向量 × 余弦 × average，K 目标 56',
-    'mb': 'TF-IDF 词向量 × 阈值 tau=0.0709302910',
 }
 
 
@@ -359,7 +353,7 @@ def main():
         'report_id': '3b_n6_common_window',
         'phase': '3B',
         'audit_item': 'N-6',
-        'task': '四列并报统一到 2018-05..2023-12 共同窗口重跑 inventory（原窗口同报）',
+        'task': '两列并报统一到 2018-05..2023-12 共同窗口重跑 inventory（原窗口同报）',
         'generated_at_utc': datetime.now(timezone.utc).isoformat(timespec='seconds'),
         'script': {'path': _rel(SCRIPT), 'bytes': file_size(SCRIPT)},
         'spec': {
@@ -382,9 +376,9 @@ def main():
         'input_sha_ledger': sha_ledger,
         'outputs': {'csv': _rel(OUT_CSV), 'csv_bytes': csv_bytes},
         'scope_note': (
-            '共同窗口只消除 FM 窗口差异。K 目标（ma_teacher/mb_teacher 44；ma 56）、'
-            '语料（teacher_mda_panel vs business_texts）与由二者决定的 N 差异仍在；'
-            'mb_teacher/mb 为阈值网络（tau），无 K 目标。'),
+            '共同窗口只消除 FM 窗口差异。两列同为 teacher_mda_panel 语料；相差网络方法：'
+            'ma_teacher 是等权余弦聚类（K 目标 44），mb_teacher 是 TF-IDF 阈值网络（tau），'
+            '由方法决定的 N 差异仍在。'),
     }
     OUT_JSON.write_text(json.dumps(_json_ready(counts), ensure_ascii=False, indent=1),
                         encoding='utf-8')
@@ -395,10 +389,10 @@ def main():
         return readings[key]['common_window'][weight]['coefs'][var][stat]
 
     L = []
-    L.append('# Phase 3B / N-6（B2）：四列共同窗口 inventory 重跑\n')
+    L.append('# Phase 3B / N-6（B2）：两列共同窗口 inventory 重跑\n')
     L.append(f'- 生成时间（UTC）：{counts["generated_at_utc"]}')
     L.append(f'- 脚本：`{counts["script"]["path"]}`（bytes `{counts["script"]["bytes"]}`）')
-    L.append('- 样本版本：`pricing_sample_v2_2015_2023`（四列 v2 parquet，只读）')
+    L.append('- 样本版本：`pricing_sample_v5_teacher_only_20261120`（两列 parquet，只读）')
     L.append('- 规格：inventory = PeerMAXraw + OwnMAXraw + PeerReturn + 8 controls'
              '（size / bm / mom / rev / turnover / illiq / AnalystCoverage / NetworkDegree）')
     L.append(f'- 估计器：逐月 EW OLS / VW WLS（weight=market_equity）→ 系数序列 → 均值 + '
@@ -479,12 +473,11 @@ def main():
                  f'{readings[key]["common_window"]["ew"]["n_rows"]:,} |')
     L.append('\n- **N 差异**：共同窗口下 ma_teacher 120,370 / mb_teacher 153,166 / '
              'ma 118,620 / mb 151,702。N 随语料、K 目标/阈值和网络覆盖变化，'
-             '不是独立设计维度，但仍使四列不是同一行集。')
-    L.append('- **K 目标差异**：ma_teacher 44 vs ma 56（`network_business_cluster_freeze.py` '
-             '`K_TARGET_FALLBACK`；`network_business_edges_build.py` `k_rule`）；'
-             'mb_teacher / mb 为 TF-IDF 阈值网络（tau=0.0888212137 / 0.0709302910），无 K 目标。')
-    L.append('- **语料差异**：teacher 两列 = `teacher_mda_panel`（老师 MD&A）；'
-             'ma / mb = `business_texts`（自建业务描述）。语料章节、抽取文本与长度均不同。')
+             '不是独立设计维度，但仍使两列不是同一行集。')
+    L.append('- **方法差异**：ma_teacher = 等权 0/1 词向量余弦 + 聚类（K 目标 44，'
+             '`network_business_cluster_freeze.py` `K_TARGET_FALLBACK`）；'
+             'mb_teacher = TF-IDF 阈值网络（tau=0.0888212137），无 K 目标。')
+    L.append('- **语料**：两列同为 `teacher_mda_panel`（老师 MD&A）。')
     L.append('- 因此：共同窗口只让 **FM 月份集合**对齐；跨列比较仍是'
              '「语料 + 方法/K 目标 + N」的复合差异，不能解释为单维章节效应。'
              '唯一接近单维的对照仍是 ma_teacher vs mb_teacher（设计上同语料、同窗口，'
@@ -509,7 +502,7 @@ def main():
     max_peer_abs_t = max(abs(c['t_nw']) for _, _, c in peer_common if c['t_nw'] is not None)
     L.append('\n## 6. 结论\n')
     L.append(f'- 共同窗口 8 个 PeerMAX 读数：正号 {pos}/8，负号且单侧 p<0.05 的 {sig_neg}/8，'
-             f'|t| 最大 {max_peer_abs_t:.2f}。四列符号不一致（ma_teacher EW+ / VW−；'
+             f'|t| 最大 {max_peer_abs_t:.2f}。两列符号不一致（ma_teacher EW+ / VW−；'
              'mb_teacher 均+；ma 均−；mb EW+ / VW−），但全部不显著；'
              'PeerMAX 在共同窗口下仍未呈现稳定的负向定价。')
     L.append(f'- PeerReturn：8 个读数中双侧 p<0.05 的 {pr_sig}/8，方向均为正；'
@@ -521,7 +514,7 @@ def main():
              'mb_teacher EW +0.0348→+0.0849（t +0.43→+0.76）、VW +0.0346→+0.0399'
              '（t +0.36→+0.30）。变化不改变「PeerMAX 不显著」的判定；'
              'ma / mb 原窗口即共同窗口，delta=0。')
-    L.append('- **N-6 验收含义**：68 月四列并报读数已给出；「只在重叠窗口比较」从此有表可依。'
+    L.append('- **N-6 验收含义**：68 月两列并报读数已给出；「只在重叠窗口比较」从此有表可依。'
              '但共同窗口**不能**把 ma 列变成「只差章节」——K 目标 56 vs 44、语料抽取差异、'
              'N 118,620 vs 120,370 仍在。要得到单维语料对照，仍需 K=44 的 ma 版本（N-6 处理项 ②，'
              '本轮未执行、未改任何现有网络/系数）。')

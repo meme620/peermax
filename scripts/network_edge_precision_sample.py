@@ -132,6 +132,27 @@ PROVENANCE_NOTES = [
 # --------------------------------------------------------------------------- #
 # 冻结前置校验
 # --------------------------------------------------------------------------- #
+def check_registry_frozen_constants() -> None:
+    """冻结常量必须与 registry extract 逐字一致（抽前口径，漂移即停机）。"""
+    reg = param_value('edge_precision_manual_annotation')
+    checks = {
+        'text_years': (list(reg.get('text_years') or []), list(TEXT_YEARS)),
+        'n_per_stratum': (int(reg.get('n_per_stratum')), N_PER_STRATUM),
+        'strata_order': (list(reg.get('strata_order') or []), list(STRATUM_ORDER)),
+        'labels': (list(reg.get('labels') or []), list(LABELS)),
+        'thresholds': (dict(reg.get('thresholds') or {}), dict(THRESHOLDS)),
+        'excerpt_target_chars': (int(reg.get('excerpt_target_chars')), EXCERPT_TARGET),
+        'ma_df_max': (float(reg.get('ma_df_max')), MA_DF_MAX),
+        'protocol_file': (str(reg.get('protocol_file') or ''),
+                          str(PROTOCOL.relative_to(ROOT)).replace('\\', '/')),
+    }
+    bad = [f'{k}: registry={a!r} 脚本={b!r}' for k, (a, b) in checks.items() if a != b]
+    if bad:
+        raise SystemExit('[STOP] edge_precision_manual_annotation 与脚本冻结常量不一致：'
+                         + '；'.join(bad))
+    print('[V3] 冻结常量 ≡ registry edge_precision_manual_annotation')
+
+
 def check_freeze_precedes_now() -> str:
     """校验协议冻结时间戳早于当前时间（V6 停机条件③）。返回冻结时间戳字符串。"""
     if not PROTOCOL.exists():
@@ -830,6 +851,7 @@ def compute(annotated: Path, out_dir: Path, out_prefix: str, label_files=None) -
 # 抽样主流程
 # --------------------------------------------------------------------------- #
 def sample(args) -> int:
+    check_registry_frozen_constants()
     frozen = check_freeze_precedes_now()
     check_frames()
     ind, nam = load_industry(), load_names()

@@ -47,6 +47,17 @@ from pricing_lib import (
 from fileio import assert_path_allowed, read_pickle, atomic_write_text
 
 
+def _registered_sample_rows(key='ma_teacher'):
+    """从样本报告读登记行数；硬编码在样本重建后必然过期。"""
+    import json
+    p = ROOT / 'reports/data_gates/G0/pricing_sample_report.json'
+    if not p.is_file():
+        return None
+    ent = ((json.loads(p.read_text(encoding='utf-8')).get('samples') or {}).get(key) or {})
+    rows = ent.get('rows_total')
+    return int(rows) if rows is not None else None
+
+
 SHADOW_DIR = ROOT / 'data/processed/phase2_shadow'
 
 OUT_CSV = SHADOW_DIR / 'turnover_p2shadow.csv'
@@ -225,7 +236,9 @@ def build_control_frame(sample_path: Path = SAMPLE_PARQUET, shadow: pd.DataFrame
         shadow = build_shadow_frame()
     cols = ['focal_id', 'month', 'pricing_in_fm_sample', 'R_next', 'market_equity'] + TRIO + CONTROLS
     df = pd.read_parquet(sample_path, columns=cols)
-    require(len(df) == 307503, f'样本 parquet 行数 {len(df)} != 307503')
+    _n = _registered_sample_rows()
+    if _n is not None:
+        require(len(df) == _n, f'样本 parquet 行数 {len(df)} != 登记 {_n}')
     m = df.merge(shadow.rename(columns={'firm_id': 'focal_id'})[
         ['focal_id', 'month', 'turnover_last', 'turnover_mean', 'n_days']],
         on=['focal_id', 'month'], how='left')

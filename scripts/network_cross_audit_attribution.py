@@ -16,8 +16,9 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 REPD = ROOT / 'reports/data_gates/G0'
-MA = ROOT / 'data/processed/network_ma'
-MB = ROOT / 'data/processed/network_mb'
+# 主口径 = 老师 MD&A 语料两列（自建语料的 network_ma/network_mb 不在库）
+MA = ROOT / 'data/processed/network_ma_teacher'
+MB = ROOT / 'data/processed/network_mb_teacher'
 SW2L = ROOT / 'data/processed/sw2_industry_latest.csv'
 NAMES = ROOT / 'data/processed/sw2_l2_names.csv'
 CLU = MA / 'clusters'

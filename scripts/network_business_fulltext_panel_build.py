@@ -140,8 +140,8 @@ def _work(item):
                  'src_identity': '', 'content_code': '', 'dup_n': 0, 'year_signal': '',
                  'doc_type': '', 'md5_match_audit': False, 'md5_audit_present': False,
                  'n_hits': -1}, np.zeros(0, np.int32))
-    sha = file_size(b)
-    md5 = len(b)
+    sha = len(b)                      # 字节数（file_size 只接受路径，不能传 bytes）
+    md5 = hashlib.md5(b).hexdigest()  # 与审计表的 32 位 md5 同口径
     text = b.decode('utf-8', errors='replace')
     meta = _ID.get((code6, year), {})
     status, reason = classify(meta)

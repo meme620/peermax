@@ -44,11 +44,27 @@ from pricing_lib import (
     require, file_size, shadow_sample_path, winsorize_bounds_by_month, write_json,
 )
 
+def sample_registered_rows() -> tuple:
+    """从样本报告读 headline 样本的登记行数 (rows_total, fm_sample_rows)。
+
+    硬编码行数在样本重建后必然过期（v2 307503/181178 -> v5 317155/86736）；
+    用报告现算可让"行数不符"表现为可解释差异而不是永假守卫。
+    """
+    import json
+    rep = ROOT / 'reports/data_gates/G0/pricing_sample_report.json'
+    if not rep.is_file():
+        return None, None
+    ent = ((json.loads(rep.read_text(encoding='utf-8')).get('samples') or {})
+           .get('ma_teacher') or {})
+    rows, fm = ent.get('rows_total'), ent.get('fm_sample_rows')
+    return (int(rows) if rows is not None else None,
+            int(fm) if fm is not None else None)
+
+
 SAMPLE = shadow_sample_path('ma_teacher')
 OUT_DIR = ROOT / 'artifacts/phase3b'
-SAMPLE_ROWS_TOTAL = 307503          # v2 样本登记行数
-SAMPLE_ROWS_FM = 181178             # v2 FM 样本登记行数
-SAMPLE_MONTHS = 104                 # v2 FM 登记月数（2015-05..2023-12）
+SAMPLE_ROWS_TOTAL, SAMPLE_ROWS_FM = sample_registered_rows()
+SAMPLE_MONTHS = 104                 # FM 登记月数（2015-05..2023-12；窗口由 registry 决定）
 FM_FLAG = 'pricing_in_fm_sample'
 
 P = param_value('sample_and_spec_registry')

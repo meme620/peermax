@@ -40,28 +40,27 @@ MANIFEST = ROOT / 'configs/version_manifest.yaml'
 SPEC = ROOT / 'configs/analyst_spec.yaml'
 CONTRACTS = ROOT / 'configs/pricing_inputs.yaml'
 
+# 样本两列口径：只有老师 MD&A 语料（ma_teacher / mb_teacher）。自建 CNINFO 语料两列
+# （ma / mb）按 CO-2026-11-20-teacher-only 退役——网络目录、面板与语料提取链都不再属于本仓
+# 计算链；键位保留即会让 check_panel_contracts 遍历到不存在的文件而抛 FileNotFoundError。
 PANELS = {
     'ma_teacher': ROOT / 'data/processed/monthly_pricing_panel_ma_teacher.csv',
     'mb_teacher': ROOT / 'data/processed/monthly_pricing_panel_mb_teacher.csv',
-    'ma': ROOT / 'data/processed/monthly_pricing_panel_ma.csv',
-    'mb': ROOT / 'data/processed/monthly_pricing_panel_mb.csv',
 }
 
 PANEL_PATHS_V4 = {
     'ma_teacher': ROOT / 'data/processed/monthly_pricing_panel_ma_teacher_v4.csv',
     'mb_teacher': ROOT / 'data/processed/monthly_pricing_panel_mb_teacher_v4.csv',
-    'ma': ROOT / 'data/processed/monthly_pricing_panel_ma_v4.csv',
-    'mb': ROOT / 'data/processed/monthly_pricing_panel_mb_v4.csv',
 }
 
 NET_DIRS = {
     'ma_teacher': ROOT / 'data/processed/network_ma_teacher',
     'mb_teacher': ROOT / 'data/processed/network_mb_teacher',
-    'ma': ROOT / 'data/processed/network_ma',
-    'mb': ROOT / 'data/processed/network_mb',
 }
 
 RETURNS_V2 = ROOT / 'data/processed/monthly_returns_clean_v2.csv'
+
+RETURNS_RAW = ROOT / 'data/processed/monthly_returns_clean_raw.csv'
 
 RETURNS_POSTADJ = ROOT / 'data/processed/monthly_returns_adj_full_2006_2025.csv'
 
@@ -107,23 +106,21 @@ AMOUNT_CACHE_META_REQUIRED = (
     'script_path', 'script_bytes', 'created_at_utc',
 )
 
+# 样本版本一律不可变（spec/design.yaml:immutable_versions 登记 v1..v5）：v1–v4 保留为
+# 已落盘 parquet 的读取标识与 v1/v2 敏感性路径，v5 是当前 headline（只有老师 MD&A 两列）。
 SAMPLE_VERSION_V1 = 'pricing_sample_v1_2015_2023'
-
 SAMPLE_VERSION_V2 = 'pricing_sample_v2_2015_2023'
-
 SAMPLE_VERSION_V3 = 'pricing_sample_v3_20261115'
-
 SAMPLE_VERSION_V4 = 'pricing_sample_v4_20261116'
+SAMPLE_VERSION_V5 = 'pricing_sample_v5_teacher_only_20261120'
 
-SAMPLE_VERSION_V4_RENORM = 'pricing_sample_v4_renorm_20261116'
-
-SAMPLE_VERSION = SAMPLE_VERSION_V3
+SAMPLE_VERSION = SAMPLE_VERSION_V5
 
 _MONTH_RE = re.compile(r'^\d{4}-(0[1-9]|1[0-2])$')
 
 IQR_POOL_RULE_ID = 'IQR_POOL_TREATMENT_ONLY_v1'
 
-IQR_POOL_REGISTERED = 0.02341287
+IQR_POOL_REGISTERED = 0.01693548
 
 IQR_POOL_REGISTERED_SOURCE = ('configs/parameter_registry.yaml:'
                               'sample_and_spec_registry.iqr_scale_rule_id'
@@ -185,24 +182,20 @@ import os
 import pandas as pd
 import sys
 
-def sample_path(key: str, version: str | None = None):
-    """v1 = ..._{key}.parquet；v2 = ..._{key}_v2.parquet；v3 = ..._{key}_v3.parquet；
-    v4 = ..._{key}_v4.parquet（W2 才创建）；v4 renorm = ..._{key}_v4_renorm.parquet（仅 D-08 B）。
+# 可解析的样本版本：headline v5 + shadow 仍登记的 legacy v2
+# （退役条件见 registry 的 shadow_legacy_sample_version）。
+_SAMPLE_SUFFIX = {'v5': 'v5', SAMPLE_VERSION_V5: 'v5',
+                  'v2': 'v2', 'pricing_sample_v2_2015_2023': 'v2'}
 
-    version=None 读 registry sample_and_spec_registry.sample_version（headline 唯一指针，
-    2026-11-19 参数口径核查）。显式传 'v1'/'v2' 仍可读历史版本。
-    """
+
+def sample_path(key: str, version: str | None = None):
+    """样本件路径。缺省 = headline；显式版本只接受 headline 与 shadow legacy，越界即报错。"""
     if version is None:
-        version = HEADLINE_SAMPLE_VERSION
-    if version in ('v4', SAMPLE_VERSION_V4):
-        return SAMPLE_DIR / f'pricing_sample_{key}_v4.parquet'
-    if version in ('v4_renorm', SAMPLE_VERSION_V4_RENORM):
-        return SAMPLE_DIR / f'pricing_sample_{key}_v4_renorm.parquet'
-    if version in ('v3', 'pricing_sample_v3_20261115'):
-        return SAMPLE_DIR / f'pricing_sample_{key}_v3.parquet'
-    if version in ('v2', 'pricing_sample_v2_2015_2023'):
-        return SAMPLE_DIR / f'pricing_sample_{key}_v2.parquet'
-    return SAMPLE_DIR / f'pricing_sample_{key}.parquet'
+        version = str(param_value('sample_and_spec_registry')['sample_version'])
+    suffix = _SAMPLE_SUFFIX.get(version)
+    if suffix is None:
+        raise SystemExit(f'[STOP] 未知样本版本 {version!r}；可解析 {sorted(set(_SAMPLE_SUFFIX))}')
+    return SAMPLE_DIR / f'pricing_sample_{key}_{suffix}.parquet'
 
 def progress(msg: str) -> None:
     print(f'[A] {msg}', flush=True)
@@ -229,14 +222,18 @@ def code6(firm_id: str) -> str:
     return s[2:] if s[:2] in ('sz', 'sh') else s
 
 def load_returns_v2() -> pd.DataFrame:
+    """主口径月收益（后复权）+ 交易日月质量列；R 与 monthly_returns_clean.csv 逐值一致。"""
     d = pd.read_csv(RETURNS_V2, usecols=['firm_id', 'month', 'R', 'n_valid_days',
                                          'complete_month', 'return_status'],
                     dtype={'firm_id': str, 'month': str})
     return d
 
 def load_returns_raw() -> pd.DataFrame:
-    """面板同源的 source-month 原始月收益（与 monthly_returns_clean.csv R 逐值一致）。"""
-    d = pd.read_csv(RETURNS_V2, usecols=['firm_id', 'month', 'R'],
+    """未复权月收益（raw close 环比），仅作 outcome 口径敏感性。
+
+    与主口径 RETURNS_V2 不是同一条序列：主口径含公司行为调整，本序列除权日断崖保留。
+    """
+    d = pd.read_csv(RETURNS_RAW, usecols=['firm_id', 'month', 'R'],
                     dtype={'firm_id': str, 'month': str})
     return d.dropna(subset=['R'])
 
@@ -829,17 +826,68 @@ def file_shape(path):
     p = Path(path)
     ext = p.suffix.lower()
     if ext == '.csv':
-        import csv as _csv
-        with open(p, encoding='utf-8', newline='') as f:
-            reader = _csv.reader(f)
-            header = next(reader, [])
-            n = sum(1 for _ in reader)
-        return n, header
+        header = _csv_header(p)
+        return _csv_row_count(p), header
     if ext == '.parquet':
         import pyarrow.parquet as pq
         meta = pq.ParquetFile(p)
         return meta.metadata.num_rows, list(meta.schema.names)
     raise SystemExit(f'[STOP] 未登记的输入格式: {p}')
+
+def _csv_header(path) -> list:
+    """首行表头（只读一行，不扫全表）。"""
+    import csv as _csv
+    with open(path, encoding='utf-8', newline='') as f:
+        return next(_csv.reader(f), [])
+
+
+def _csv_row_count(path) -> int:
+    """数据行数：换行数即数据行数，仅当换行落在引号内时回退 csv.reader。
+
+    输入合同每次核对行数。换行计数在 763MB 面板上是 0.04s，csv.reader 逐行解析要 0.8s
+    且随文件线性增长。只有「引号内出现换行」（跨行字段）才会让换行计数失真，判据因此是
+    「是否存在被引号包住、且内含换行的字段」，不是「文件里出现过引号」。
+    """
+    import csv as _csv
+    n = 0
+    with open(path, 'rb') as f:
+        while True:
+            chunk = f.read(1 << 22)
+            if not chunk:
+                break
+            n += chunk.count(b'\n')
+    if n and not _has_multiline_field(path):
+        return n - 1 if _ends_with_newline(path) else n
+    with open(path, encoding='utf-8', newline='') as f:
+        reader = _csv.reader(f)
+        next(reader, [])
+        return sum(1 for _ in reader)
+
+
+def _has_multiline_field(path) -> bool:
+    """是否存在引号内换行（跨行字段）。mmap 里配对查找引号，只扫到第一个命中为止。
+
+    CSV 的引号内转义是双写（""），配对查找会把它当成「闭合 + 重开」两次，开合状态不变。
+    """
+    import mmap
+    with open(path, "rb") as f:
+        with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mm:
+            pos = mm.find(b'"')
+            while pos != -1:
+                nxt = mm.find(b'"', pos + 1)
+                if nxt == -1:
+                    return True
+                if mm.find(b'\n', pos, nxt) != -1:
+                    return True
+                pos = mm.find(b'"', nxt + 1)
+    return False
+
+
+def _ends_with_newline(path) -> bool:
+    with open(path, 'rb') as f:
+        f.seek(-1, 2)
+        return f.read(1) == b'\n'
+
 
 def check_input_contract(path, name=None, key=None, contracts_path=None) -> dict:
     p = Path(path)
@@ -1176,6 +1224,12 @@ def rcs_basis(x: np.ndarray, knots: np.ndarray) -> np.ndarray:
         out.append(term / (k[nk - 1] - k[1]) ** 2)
     return np.column_stack(out)
 
+# 设计矩阵条件数上限：超过即判该月不可估（不进入系数序列）。实测主规格条件数
+# p50≈11、p95≈19、max≈20（列归一化后）；阈值取 1e10 留 9 个数量级余量，
+# 只拦数值上已退化的月份（近共线噪声 <1e-9 量级）。
+COND_MAX = 1e10
+
+
 def _ols(X: np.ndarray, y: np.ndarray, w: np.ndarray | None):
     n, p = X.shape
     if w is None:
@@ -1185,9 +1239,24 @@ def _ols(X: np.ndarray, y: np.ndarray, w: np.ndarray | None):
         Xw = X * sw[:, None]
         yw = y * sw
     XtX = Xw.T @ Xw
-    rank = int(np.linalg.matrix_rank(XtX))
+    # 秩与条件数都必须在**列归一化**后判定：原始列量纲可差十几个数量级
+    # （市值 ~1e10、MAX ~0.04），未归一化的 matrix_rank 会把健康的满秩矩阵误判成秩 1。
+    cn = np.linalg.norm(Xw, axis=0)
+    zero_var = [int(j) for j in range(p) if cn[j] == 0.0]
+    if zero_var:
+        return {'status': 'ZERO_VARIANCE', 'columns': zero_var, 'n': n}
+    Xn = Xw / cn
+    rank = int(np.linalg.matrix_rank(Xn))
     if rank < p:
         return None
+    # 近共线：满秩但条件数爆表时伪逆给出数值爆炸的 β，仍会被计入 FM 均值。
+    # 条件数在**列归一化**后算（原始列量纲差几个数量级）。零方差列单独判退化，
+    # 不并进条件数：某些月在分层变量上恒为常数（如 limit_hit_weight_share 全 0），
+    # 那是该月无变异而不是共线。
+    sv_n = np.linalg.svd(Xn, compute_uv=False)
+    cond = float(sv_n[0] / sv_n[-1]) if sv_n[-1] > 0 else float('inf')
+    if cond > COND_MAX:
+        return {'status': 'ILL_CONDITIONED', 'cond': cond, 'rank': rank, 'n': n}
     XtXi = np.linalg.pinv(XtX)
     beta = XtXi @ (Xw.T @ yw)
     resid = yw - Xw @ beta
@@ -1221,7 +1290,16 @@ def fm_regression(df: pd.DataFrame, ycol: str, xcols, month_col: str = 'month',
                             + [np.ones(n)])
         w = sub[weight_col].to_numpy(dtype=float) if weight_col else None
         fit = _ols(X, y, w)
-        if fit is None or not fit['finite']:
+        if fit is None:
+            per_month.append({'month': m, 'n': n, 'used': False,
+                              'reason': 'rank_or_df_or_covariance_failure'})
+            continue
+        if fit.get('status') in ('ILL_CONDITIONED', 'ZERO_VARIANCE'):
+            per_month.append({'month': m, 'n': n, 'used': False,
+                              'reason': fit['status'].lower(),
+                              'condition_number': fit.get('cond')})
+            continue
+        if not fit.get('finite'):
             per_month.append({'month': m, 'n': n, 'used': False,
                               'reason': 'rank_or_df_or_covariance_failure'})
             continue
@@ -1275,7 +1353,8 @@ def fm_cluster_se(df: pd.DataFrame, ycol: str, xcols, cluster_col: str,
         y = sub[ycol].to_numpy(dtype=float)
         w = sub[weight_col].to_numpy(dtype=float) if weight_col else None
         fit = _ols(X, y, w)
-        if fit is None or not fit['finite']:
+        if (fit is None or not fit.get('finite')
+                or fit.get('status') in ('ILL_CONDITIONED', 'ZERO_VARIANCE')):
             continue
         sw = np.sqrt(w) if w is not None else np.ones(n)
         Xw, yw = X * sw[:, None], y * sw
@@ -1376,7 +1455,8 @@ def vif_table(df: pd.DataFrame, xcols, month_col: str = 'month') -> dict:
             others = [k for k in range(X.shape[1]) if k != j]
             Xo = Xs[:, others]
             fit = _ols(Xo, Xs[:, j], None)
-            if fit is None:
+            if (fit is None or not fit.get('finite')
+                    or fit.get('status') in ('ILL_CONDITIONED', 'ZERO_VARIANCE')):
                 vifs[c].append(np.nan)
                 continue
             resid = Xs[:, j] - Xo @ fit['beta']
@@ -1447,8 +1527,9 @@ IQR_POOL_REGISTERED = _IQR_REGISTRY
 # headline 样本指针与 ew_vw_consistency 等价界同样只认 registry，禁止各脚本再写字面量。
 _SAMPLE_REG = param_value('sample_and_spec_registry')
 HEADLINE_SAMPLE_VERSION = str(_SAMPLE_REG['sample_version'])
-_VERSION_LABELS = {SAMPLE_VERSION_V1: 'v1', SAMPLE_VERSION_V2: 'v2',
-                   SAMPLE_VERSION_V3: 'v3', SAMPLE_VERSION_V4: 'v4'}
+# headline 只许 v5；shadow 仍登记在 v2（退役条件见下），因此 label 表需同时容纳两者。
+# 只保留 headline（v5）与 shadow 登记的 legacy 版本（v2）；v1/v3/v4 已退役，不再解析。
+_VERSION_LABELS = {SAMPLE_VERSION_V5: 'v5'}
 if HEADLINE_SAMPLE_VERSION not in _VERSION_LABELS:
     raise SystemExit(f"[STOP] registry sample_version={HEADLINE_SAMPLE_VERSION!r} 不在已登记版本集")
 SAMPLE_VERSION_LABEL = _VERSION_LABELS[HEADLINE_SAMPLE_VERSION]

@@ -23,6 +23,13 @@ variables:
   - name: PeerMAXraw
     definition: 事前网络权重加权的 peer MAX，唯一 headline treatment
     implemented_by: [peermax_panel_build]
+  - name: R_next
+    definition: 紧邻下一自然月的 focal 月收益（outcome），口径 = registry outcome_return_convention 登记的 post_adjusted
+      （后复权，含公司行为调整；与老师交付 monthly_returns_adj.csv 逐位一致）
+    implemented_by: [pricing_sample_build]
+  - name: R_next_raw
+    definition: 同一 bridge 规则下的未复权口径 outcome，只作口径敏感性；与 R_next 来自两条不同序列
+    implemented_by: [pricing_sample_build]
   - name: w_ij
     definition: 事前相似度行归一权重；无支持标 no-network-support，不填 0
     implemented_by: [network_business_edges_build, network_mda_edges_build]
@@ -61,8 +68,17 @@ sample:
     filters: sample_filter_thresholds
     iqr_scale: iqr_pool_value
   pit_rule: available_at 严格小于 month；事件前控制只取 t-1 及更早
+  outcome:
+    main_column: R_next
+    convention_registry_key: outcome_return_convention
+    sensitivity_column: R_next_raw
+    sensitivity_convention: raw
+    distinct_sources: true
+    rule: 主口径与敏感性列必须来自两条不同序列（复权 / 未复权）；同源即视为口径登记失效
   missing_states: [missing, not_covered, not_matched, unknown_timing]
-  immutable_versions: [pricing_sample_v1_2015_2023, pricing_sample_v2_2015_2023, pricing_sample_v3_20261115, pricing_sample_v4_20261116]
+  immutable_versions: [pricing_sample_v5_teacher_only_20261120]
+  columns: [ma_teacher, mb_teacher]
+  columns_note: 两列都是老师 MD&A 语料网络（M-A 中文法 / M-B TF-IDF）；没有其它语料列。
 
 pricing_gates:
   - id: sign
@@ -145,6 +161,11 @@ constraints:
     rule: 命名禁阶段代号、final、版本号、序号与数字前缀；路径与脚本写下的产物名同规矩
     enforced_by: [lint:check_paths, lint:check_artifact_names]
     violation: 旧命名回流
+  - id: C7
+    rule: 样本键集合恰为 {ma_teacher, mb_teacher}；PANELS、PANEL_PATHS_V4、NET_DIRS
+      与面板键映射只许这两个键
+    enforced_by: [lint:check_teacher_only_panels, test:tests/test_teacher_only_panels.py]
+    violation: 缺面板键让 check_panel_contracts 抛 FileNotFoundError，estimation-sample 无法就绪
 
 red_lines:
   - id: R1
@@ -253,7 +274,9 @@ inference:
   enforced_by: [script:pricing_gate_report, script:pricing_robustness_placebo]
 
 iqr:
-  formula: pooled_treatment_only_v2
+  formula: IQR_POOL_TREATMENT_ONLY_v1
+  formula_note: 规则 ID 与 configs/parameter_registry.yaml 的 iqr_scale_rule_id 和
+    pricing_lib.IQR_POOL_RULE_ID 逐字一致；"v2" 后缀无对应实现，已废止
   registry_keys:
     value: iqr_pool_value
     drift_tolerance: iqr_drift_tolerance

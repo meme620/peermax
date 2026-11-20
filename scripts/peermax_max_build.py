@@ -232,6 +232,54 @@ def load_st_flags(path=ST_FLAG):
     return d, colmap
 
 
+class _FlagLookup:
+    """bool 面板 -> 常数时间 (code6, date) 查询。
+
+    原实现每次查一行都走 pandas 标签索引（.at）并重新解析日期串；source-month 展开后
+    日频行上要查 3 次/行，实测占单年运行一半以上。这里构造期折成 numpy 数组，
+    列键沿用 load_st_flags 的前缀规则（'000001.SZ' -> '000001'）。
+    """
+
+    __slots__ = ("_cols", "_row_of_date")
+
+    def __init__(self, cols, row_of_date):
+        self._cols = cols
+        self._row_of_date = row_of_date
+
+    @classmethod
+    def build(cls, df, colmap=None):
+        """df 缺失时返回恒查 None 的空实例（与原 _flag 的 df is None 分支同义）。
+
+        object 列（供应商 ST 面板混有 NaN）直接 to_numpy 会整表复制一份 Python 对象数组，
+        实测多吃 ~270MB；按列取值则 bool 列零拷贝、object 列只按列复制。
+        colmap（'000001.SZ' -> code6 的既有映射）只为接口一致保留。
+        """
+        if df is None:
+            return cls(None, {})
+        cols = {}
+        for c in df.columns:
+            vals = df[c].to_numpy()
+            if vals.dtype != object:
+                vals = vals.astype(bool, copy=False)
+            cols[c.split(".")[0]] = vals
+        return cls(cols, {str(k): i for i, k in enumerate(df.index)})
+
+    def get(self, code6, d):
+        """True/False；无覆盖或 NaN 返回 None。"""
+        if self._cols is None:
+            return None
+        vals = self._cols.get(code6)
+        if vals is None:
+            return None
+        row = self._row_of_date.get(d)
+        if row is None:
+            return None
+        v = vals[row]
+        if v != v:
+            return None
+        return bool(v)
+
+
 def board_of(code):
     if code.startswith("sh"):
         return "star" if code[2:].startswith(("688", "689")) else "main"
@@ -472,24 +520,18 @@ def run(panel_dir=PANEL, out=OUT, out_json=OUT_JSON, st_flag=ST_FLAG,
     lf_df, lf_cols = load_st_flags(LIMIT_HIT_FLAG)
     lf_dn, lf_dn_cols = load_st_flags(LIMIT_HIT_FLAG.parent / "daily_limit_down_flag_20260630.pkl")
 
-    def _flag(df, colmap, code6, d):
-        if df is None or code6 not in colmap or d not in df.index:
-            return None
-        v = df.at[d, colmap[code6]]
-        return None if v != v else bool(v)
+    up_lut = _FlagLookup.build(lf_df, lf_cols)
+    dn_lut = _FlagLookup.build(lf_dn, lf_dn_cols)
+    st_lut = _FlagLookup.build(st_df, st_cols)
 
     def _day_limit(code, d, rraw):
         """当天是否涨跌停：供应商 flag 优先；无覆盖时按 registry 阈值 |rraw| >= thr 回退。"""
         code6 = code[2:]
-        up = _flag(lf_df, lf_cols, code6, d)
-        dn = _flag(lf_dn, lf_dn_cols, code6, d)
+        up = up_lut.get(code6, d)
+        dn = dn_lut.get(code6, d)
         if up is not None or dn is not None:
             return bool(up) or bool(dn)
-        st_val = None
-        if st_df is not None and code6 in st_cols and d in st_df.index:
-            v = st_df.at[d, st_cols[code6]]
-            if v == v:
-                st_val = bool(v)
+        st_val = st_lut.get(code6, d)
         board = board_of(code)
         if board in ("chinext", "star"):
             thr = limits["chinext_star"]

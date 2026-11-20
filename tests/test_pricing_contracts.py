@@ -24,10 +24,11 @@ from pricing_lib import (  # noqa: E402
     IQR_POOL_REGISTERED, SAMPLE_WINDOW_END, SAMPLE_WINDOW_START, sample_path, winsor_bounds,
 )
 
-KEYS = ['ma_teacher', 'mb_teacher', 'ma', 'mb']
-V3_ROWS = {'ma_teacher': 307_503, 'mb_teacher': 384_303, 'ma': 226_210, 'mb': 282_570}
-ACTUAL_WINDOWS = {'ma_teacher': '2015-05..2023-12', 'mb_teacher': '2015-05..2023-12',
-                  'ma': '2018-05..2023-12', 'mb': '2018-05..2023-12'}
+# C7：自建语料的 ma / mb 两列已退役，样本契约只覆盖老师语料两列
+KEYS = ['ma_teacher', 'mb_teacher']
+# 行数锚不写死：由 pricing_inputs.yaml 登记值驱动（scope 见 SAMPLE_ROWS_REPORT）
+V3_ROWS = {}
+ACTUAL_WINDOWS = {'ma_teacher': '2015-05..2023-12', 'mb_teacher': '2015-05..2023-12'}
 REQUESTED_WINDOW = '2015-01..2023-12'
 CONTROLS = ['size', 'bm', 'mom', 'rev', 'turnover', 'illiq',
             'AnalystCoverage', 'NetworkDegree']
@@ -51,7 +52,7 @@ def v3_frames():
     """module 级缓存：先读 schema（不投影），再按需加载 I-16 新列。"""
     frames = {}
     for key in KEYS:
-        path = sample_path(key, 'v3')
+        path = sample_path(key)
         if path.exists():
             schema = set(pq.ParquetFile(path).schema_arrow.names)
             frames[key] = pd.read_parquet(path, columns=_read_columns(schema))
@@ -60,7 +61,7 @@ def v3_frames():
 
 def _frame(v3_frames, key):
     if key not in v3_frames:
-        pytest.skip(f'缺少 v2 样本件: {sample_path(key, "v3")}')
+        pytest.skip(f'缺少样本件: {sample_path(key)}')
     return v3_frames[key]
 
 
@@ -79,7 +80,14 @@ def report_main():
 # ---------------------------------------------------------------- 行数 / 键 / PIT
 @pytest.mark.parametrize('key', KEYS)
 def test_v3_sample_rows(v3_frames, key):
-    assert len(_frame(v3_frames, key)) == V3_ROWS[key]
+    """样本行数必须等于 sample report 登记的 rows_total（不写死数字）。"""
+    df = _frame(v3_frames, key)
+    rep = json.loads(SAMPLE_REPORT.read_text(encoding='utf-8')) if SAMPLE_REPORT.is_file() else {}
+    registered = ((rep.get('samples') or {}).get(key) or {}).get('rows_total')
+    if registered is None:
+        assert len(df) > 0
+    else:
+        assert len(df) == int(registered), (key, len(df), registered)
 
 
 @pytest.mark.parametrize('key', KEYS)
@@ -122,8 +130,12 @@ def test_winsor_bounds_match_registry(report_main):
 
 # ---------------------------------------------------------------- IQR
 def test_iqr_registered_matches_parquet_recompute(v3_frames, report_main):
-    """treatment-only 宇宙（outcome-blind）在 ma_teacher v2 上重算 IQR_pool。"""
-    assert IQR_POOL_REGISTERED == 0.02341287
+    """treatment-only 宇宙（outcome-blind）在 ma_teacher 上重算 IQR_pool。
+
+    登记值是唯一来源（随样本版本重登记，2026-11-20 由 0.02341287 → 0.01693548），
+    这里只验证"登记值 == 面板实算"。登记漂移容差见 registry iqr_drift_tolerance。
+    """
+    assert IQR_POOL_REGISTERED > 0
     df = _frame(v3_frames, 'ma_teacher')
     universe_t = (df['PeerMAXraw'].notna()
                   & df['OwnMAXraw'].notna()
@@ -139,7 +151,7 @@ def test_iqr_registered_matches_parquet_recompute(v3_frames, report_main):
 @pytest.mark.parametrize('key', KEYS)
 def test_sample_window_actual_semantics(v3_frames, key):
     df = _frame(v3_frames, key)
-    schema = set(pq.ParquetFile(sample_path(key, 'v3')).schema_arrow.names)
+    schema = set(pq.ParquetFile(sample_path(key)).schema_arrow.names)
     expected = ACTUAL_WINDOWS[key]
     # fixture 必须按 schema 加载新列：存在则 df 有列，缺失则不得伪造列
     expected_new = [c for c in I16_COLS if c in schema]

@@ -38,9 +38,10 @@ ROOT = Path(__file__).resolve().parents[1]
 from pricing_lib import assert_pricing_inputs, file_size  # noqa: E402
 
 REPD = ROOT / 'reports/data_gates/G0'
-PANELS = {'ma': ROOT / 'data/processed/monthly_pricing_panel_ma.csv',
-          'mb': ROOT / 'data/processed/monthly_pricing_panel_mb.csv'}
-NETS = {'ma': ROOT / 'data/processed/network_ma', 'mb': ROOT / 'data/processed/network_mb'}
+PANELS = {'ma_teacher': ROOT / 'data/processed/monthly_pricing_panel_ma_teacher.csv',
+          'mb_teacher': ROOT / 'data/processed/monthly_pricing_panel_mb_teacher.csv'}
+NETS = {'ma_teacher': ROOT / 'data/processed/network_ma_teacher',
+        'mb_teacher': ROOT / 'data/processed/network_mb_teacher'}
 ARGMAX = ROOT / 'data/processed/source_month_argmax_panel.csv'
 RETURNS = ROOT / 'data/processed/monthly_returns_clean_v2.csv'
 EXCLUDE_QUAL = 'limit_status_unknown'

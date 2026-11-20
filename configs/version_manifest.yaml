@@ -3,23 +3,6 @@ meta:
   baseline_date: '2026-11-18'
   note: 新基线重建：网络版本白名单与 pricing 输入登记；输入行数/列名合同在 configs/pricing_inputs.yaml
 network_versions:
-  network_ma:
-    version_prefix: pm_ma_ewcos_v1
-    years: &self_years
-      - 2017
-      - 2018
-      - 2019
-      - 2020
-      - 2021
-      - 2022
-      - 2023
-      - 2024
-      - 2025
-    available_at_rule: (y+1)-04-30
-  network_mb:
-    version_prefix: pm_mb_tfidf_v1
-    years: *self_years
-    available_at_rule: (y+1)-04-30
   network_ma_teacher:
     version_prefix: pm_ma_ewcos_teacher_v1
     years: &teacher_years
@@ -37,16 +20,6 @@ network_versions:
     version_prefix: pm_mb_tfidf_teacher_v1
     years: *teacher_years
     available_at_rule: (y+1)-04-30
-  network_ma_fulltext:
-    version_prefix: pm_ma_ewcos_fulltext_v1
-    years:
-      - 2017
-      - 2018
-      - 2019
-      - 2020
-      - 2021
-      - 2022
-    available_at_rule: (y+1)-04-30
   network_ma_teacher_idf:
     version_prefix: pm_ma_idf_teacher_v1
     years: *teacher_years
@@ -56,11 +29,11 @@ network_versions:
     years: *teacher_years
     available_at_rule: (y+1)-04-30
   network_ma_teacher_df10:
-    version_prefix: pm_ma_ewcos_teacher_v1
+    version_prefix: pm_ma_ewcos_teacher_df10_v1
     years: *teacher_years
     available_at_rule: (y+1)-04-30
   network_ma_teacher_df100:
-    version_prefix: pm_ma_ewcos_teacher_v1
+    version_prefix: pm_ma_ewcos_teacher_df100_v1
     years: *teacher_years
     available_at_rule: (y+1)-04-30
   network_mb_stub:

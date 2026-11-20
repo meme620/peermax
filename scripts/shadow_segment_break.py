@@ -61,7 +61,18 @@ CSV_PATH = ART / '3b_n4_segment.csv'
 JSON_PATH = ART / '3b_n4_counts.json'
 
 VERSION_TAG = 'corpus_break_segment_v1'
-EXPECTED_FM_ROWS = 181178
+def _registered_fm_rows(key='ma_teacher'):
+    """从样本报告读 headline FM 行数（硬编码随样本重建必过期）。"""
+    import json
+    p = ROOT / 'reports/data_gates/G0/pricing_sample_report.json'
+    if not p.is_file():
+        return None
+    ent = ((json.loads(p.read_text(encoding='utf-8')).get('samples') or {}).get(key) or {})
+    n = ent.get('fm_sample_rows')
+    return int(n) if n is not None else None
+
+
+EXPECTED_FM_ROWS = _registered_fm_rows()
 EXPECTED_FM_MONTHS = 104
 EXPECTED_FM_START = '2015-05'
 EXPECTED_FM_END = '2023-12'

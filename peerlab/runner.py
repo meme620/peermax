@@ -46,13 +46,14 @@ def suffix_for(exp: registry.Experiment, seed: int) -> str:
 
 def build_command(exp: registry.Experiment, step: registry.Step, seed: int,
                   smoke: bool = False) -> list[str]:
-    cmd = [sys.executable, '-m', 'peerlab.bootstrap', step.script, *step.args]
+    args = step.args_smoke if (smoke and step.args_smoke is not None) else step.args
+    sfx = suffix_for(exp, seed)
+    args = [a.replace('{sfx}', sfx).replace('{seed}', str(seed)) for a in args]
+    cmd = [sys.executable, '-m', 'peerlab.bootstrap', step.script, *args]
     if exp.accepts_seed:
         cmd += ['--seed', str(seed)]
     if exp.suffix_arg and exp.scope == 'per_seed':
         cmd += [exp.suffix_arg, suffix_for(exp, seed)]
-    if smoke and exp.smoke_args:
-        cmd += list(exp.smoke_args)
     return cmd
 
 
@@ -63,8 +64,8 @@ def env_for(seed: int) -> dict[str, str]:
     return env
 
 
-def readiness(exp: registry.Experiment, root: Path = ROOT) -> dict:
-    missing = exp.missing_inputs(root)
+def readiness(exp: registry.Experiment, root: Path = ROOT, seed: int = 0) -> dict:
+    missing = exp.missing_inputs(root, seed)
     return {'ready': not missing, 'missing': missing}
 
 
@@ -143,7 +144,7 @@ def run_experiment(exp: registry.Experiment, seed: int, *, dry_run: bool = False
                    result_dir: Path | None = None) -> dict:
     root = Path(root)
     result_dir = Path(result_dir) if result_dir else root / 'result'
-    check = readiness(exp, root)
+    check = readiness(exp, root, seed)
     commands = [build_command(exp, step, seed, smoke=smoke) for step in exp.steps]
     if not check['ready']:
         return {'status': 'blocked', 'exp': exp.id, 'seed': seed,
@@ -173,7 +174,7 @@ def run_experiment(exp: registry.Experiment, seed: int, *, dry_run: bool = False
             status = 'failed'
             break
     after = snapshot(root)
-    collected = collect(run_dir, changed_files(before, after), exp.outputs, root)
+    collected = collect(run_dir, changed_files(before, after), exp.expanded(seed).outputs, root)
     finished = datetime.now(timezone.utc)
 
     record = {

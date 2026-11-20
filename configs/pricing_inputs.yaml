@@ -74,3 +74,14 @@ pricing_inputs:
     file: data/processed/market_equity_panel.csv
     rows: 850487
     columns: null
+  # 2026-11-20 重登记：面板重算后补回 singleton 团（无同团成员）的 focal-month 行——
+  # network_support_status 写错成邻居权重列表的旧产物把这些行静默丢掉了。新行数 =
+  # support + no-network-support + no_available_network_version，三类互斥且覆盖全月。
+  pricing_panel_ma_teacher:
+    file: data/processed/monthly_pricing_panel_ma_teacher.csv
+    rows: 317155
+    columns: null
+  pricing_panel_mb_teacher:
+    file: data/processed/monthly_pricing_panel_mb_teacher.csv
+    rows: 386031
+    columns: null

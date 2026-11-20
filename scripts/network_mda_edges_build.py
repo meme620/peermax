@@ -31,14 +31,12 @@ from pathlib import Path
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
-V2 = ROOT / "data/processed/mda_texts.csv"                      # 自建语料（对照链）
 TEACHER = ROOT / "data/processed/teacher_mda_panel.csv"            # 老师导出（M-B 主输入，2026-09-22 起）
-OUT_DIR = ROOT / "data/processed/network_mb_stub"   # 骨架目录（正式为 network_mb/）
+OUT_DIR = ROOT / "data/processed/network_mb_teacher"
 NET_USE_CASE = "product_market_mb"
-SRC_VERSION = "mda_texts"
+SRC_VERSION = "teacher_mda_2023"
+# 语料只有老师 MD&A 导出（自建 CNINFO 语料链已按 CO-2026-11-20-teacher-only 退役）。
 CORPORA = {
-    "self": {"path": V2, "src_version": "mda_texts", "ver_prefix": "pm_mb_tfidf_v1",
-             "id_col": "code", "year_col": "year"},
     "teacher": {"path": TEACHER, "src_version": "teacher_mda_2023", "ver_prefix": "pm_mb_tfidf_teacher_v1",
                 "id_col": "firm_id", "year_col": "year"},
 }
@@ -56,10 +54,9 @@ COLS = ["network_use_case", "network_version", "focal_id", "source_id",
         "coverage_flag", "missing_reason", "network_support_status"]
 
 
-def load_texts(text_year, corpus="self"):
+def load_texts(text_year, corpus="teacher"):
     """读入某文本年的 (id, text) 列表。
 
-    corpus="self"    → 自建 CNINFO 抽取（mda_texts.csv，status=="ok" 过滤）
     corpus="teacher" → 老师导出的 MD&A 面板（teacher_mda_panel.csv，status=="ok" 过滤）
     两个面板的行语义一致，仅列名与年份类型不同；返回 (panel_code, text)。
     """
@@ -90,7 +87,7 @@ def tokenize(text, jieba):
     return toks
 
 
-def build_similarity(text_year, sample=None, corpus="self"):
+def build_similarity(text_year, sample=None, corpus="teacher"):
     """返回 (codes, Xn_csr)。Xn 已 L2 归一化，余弦 = Xn @ Xn.T。"""
     import jieba
     jieba.setLogLevel(60)
@@ -207,8 +204,8 @@ def main():
     ap.add_argument("--tau", type=float, default=None, help="显式相似度阈值（正式模式）")
     ap.add_argument("--peer-target", type=int, default=10, help="占位校准：中位 peer 数")
     ap.add_argument("--available-at", default="", help="网络公开可得日（默认取覆盖表最晚报告日）")
-    ap.add_argument("--corpus", choices=["self", "teacher"], default="self",
-                    help="文本语料源：self=自建 CNINFO 抽取（对照链）；teacher=老师 MD&A 导出（M-B 主输入）")
+    ap.add_argument("--corpus", choices=["teacher"], default="teacher",
+                    help="文本语料源：老师 MD&A 导出（M-B 唯一口径）")
     ap.add_argument("--out-dir", default=str(OUT_DIR))
     args = ap.parse_args()
     if args.tau is not None and args.peer_target != 10:

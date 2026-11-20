@@ -91,18 +91,21 @@ contracts:
         median_max: 100000000000.0
 
   - id: a5_cliffs
-    title: 除权断崖残留
+    title: 复权引入的断崖（真实行情不计入）
     kind: cliffs
     cliff_threshold: -0.215
     post_adjusted:
       path: data/raw/drive/daily_adj_close_post_20260630.pkl
-      max_cells: 250
+      max_adjusted_only: 0
       review_queue: reports/data_contracts/G0/a5_cliff_cells.csv
     raw:
       path: data/raw/drive/daily_close_none_20260630.pkl
     monthly:
       path: data/processed/monthly_returns_clean.csv
       tolerance: 1.0e-9
+    rule: 只把「后复权 < thr 而未复权同格 >= thr」判为缺陷并计数；两边同为 < thr 的格是真实行情
+      （退市整理期、注册制新股无涨跌幅限制），登记计数与清单但不参与 pass/fail。
+      容差 max_adjusted_only 默认为 0——复权链引入的断崖一条都不放行。
 
   - id: a6_limit_flags
     title: 涨跌停派生口径与供应商 flag 一致
