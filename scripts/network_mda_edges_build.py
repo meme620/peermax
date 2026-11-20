@@ -33,6 +33,7 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 TEACHER = ROOT / "data/processed/teacher_mda_panel.csv"            # 老师导出（M-B 主输入，2026-09-22 起）
 OUT_DIR = ROOT / "data/processed/network_mb_teacher"
+STUB_DIR = ROOT / "data/processed/network_mb_stub"   # 占位产物专用，绝不进正式目录
 NET_USE_CASE = "product_market_mb"
 SRC_VERSION = "teacher_mda_2023"
 # 语料只有老师 MD&A 导出（自建 CNINFO 语料链已按 CO-2026-11-20-teacher-only 退役）。
@@ -206,10 +207,14 @@ def main():
     ap.add_argument("--available-at", default="", help="网络公开可得日（默认取覆盖表最晚报告日）")
     ap.add_argument("--corpus", choices=["teacher"], default="teacher",
                     help="文本语料源：老师 MD&A 导出（M-B 唯一口径）")
-    ap.add_argument("--out-dir", default=str(OUT_DIR))
+    ap.add_argument("--out-dir", default=None,
+                    help="产物目录；缺省时正式模式写 network_mb_teacher/，占位模式写 network_mb_stub/")
     args = ap.parse_args()
     if args.tau is not None and args.peer_target != 10:
         raise SystemExit("--tau 与 --peer-target 互斥")
+    # 占位 τ（tau_mode=placeholder）是骨架产物，不得落进正式目录——data gate 会据此判 fail。
+    if args.out_dir is None:
+        args.out_dir = str(OUT_DIR if args.tau is not None else STUB_DIR)
 
     codes, Xn = build_similarity(args.year, corpus=args.corpus)
     print(f"文本年 {args.year}: {len(codes)} 家入网", flush=True)

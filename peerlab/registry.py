@@ -35,6 +35,26 @@ def headline_sample_path(root=None) -> str:
     """headline 样本 parquet 的相对路径（与 pricing_lib.sample_path 同口径）。"""
     return f'data/processed/pricing_sample_ma_teacher_{headline_sample_label(root)}.parquet'
 
+
+def registry_param(name: str, root=None):
+    """读 parameter_registry 的 headline_value；缺条目即报错（fail-closed）。"""
+    import yaml
+    base = Path(root) if root is not None else Path(__file__).resolve().parents[1]
+    doc = yaml.safe_load((base / REGISTRY_CONFIG).read_text(encoding='utf-8'))
+    entry = next((p for p in doc['parameters'] if p.get('name') == name), None)
+    if entry is None:
+        raise KeyError(f'{name} 未在 {REGISTRY_CONFIG}')
+    return entry['headline_value']
+
+
+def mda_tau() -> str:
+    """M-B 构边的登记阈值：--tau 取 registry m_b_tau_fixed。
+
+    registry step 此前不传 --tau，构边落回占位模式（tau_mode=placeholder），
+    占位产物既进不了 headline、也会让 data gate 判 fail。
+    """
+    return str(registry_param('m_b_tau_fixed'))
+
 CONFIG_FILES: tuple[str, ...] = (
     'configs/parameter_registry.yaml',
     'configs/analyst_spec.yaml',
@@ -138,8 +158,11 @@ EXPERIMENTS: tuple[Experiment, ...] = (
                  args_smoke=('--years', '2021-2021', '--corpus', 'teacher')),
             Step('scripts/network_tau_calibrate.py', ('--corpus', 'teacher'),
                  args_smoke=('--years', '2021', '--corpus', 'teacher')),
-            Step('scripts/network_mda_edges_build.py', ('--year', '2021', '--corpus', 'teacher'),
-                 args_smoke=('--year', '2021', '--corpus', 'teacher')),
+            # --tau 取 registry m_b_tau_fixed：不给就走占位校准，产物是 tau_mode=placeholder
+            # 的骨架边表，data gate 判 fail（骨架不得当正式边表交付）。
+            Step('scripts/network_mda_edges_build.py',
+                 ('--year', '2021', '--corpus', 'teacher', '--tau', mda_tau()),
+                 args_smoke=('--year', '2021', '--corpus', 'teacher', '--tau', mda_tau())),
         ),
         requires=(REGISTRY_CONFIG, 'data/raw/teacher/mda_data_2023.csv',
                   'data/processed/teacher_mda_panel.csv'),

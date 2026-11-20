@@ -239,6 +239,26 @@
       "started_at": "2026-11-20T14:08:28+00:00",
       "seconds": 4.04,
       "git_commit": "8b07701"
+    },
+    {
+      "run_id": "network-mda-text--s1--20261120T134035Z",
+      "exp": "network-mda-text",
+      "seed": 1,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T13:40:35+00:00",
+      "seconds": 2257.36,
+      "git_commit": "5b0a4d7"
+    },
+    {
+      "run_id": "network-mda-text--s1--20261120T135906Z",
+      "exp": "network-mda-text",
+      "seed": 1,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T13:59:06+00:00",
+      "seconds": 1798.57,
+      "git_commit": "5b0a4d7"
     }
   ]
 }

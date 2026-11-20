@@ -140,8 +140,11 @@ def check_sample_metadata(root: Path) -> dict:
         if len(requested) != 1:
             problems.append(_rel(root, path) + ': window_requested 不唯一 ' + str(requested))
 
+    # 交付 CSV 是 10 列（生产者 build_monthly_returns_status 的 OLD_COLS）：sample_version
+    # 在文件里，溯源列（sample_version_source / sample_version_legacy）只进 status 报告。
+    # 门禁按这条交付合同读文件，溯源自报告取——两边认可的是同一份合同，不是各说各话。
     columns = _header(returns)
-    need_ret = ['month', 'sample_version', 'sample_version_source']
+    need_ret = ['month', 'sample_version']
     missing_ret = [c for c in need_ret if c not in columns]
     if missing_ret:
         problems.append(_rel(root, returns) + ': 缺列 ' + str(missing_ret))
@@ -152,11 +155,33 @@ def check_sample_metadata(root: Path) -> dict:
         if versions != [expected_version]:
             problems.append(_rel(root, returns) + ': sample_version=' + str(versions) +
                             '，按数据应为 ' + expected_version)
+        problems.extend(_provenance_from_report(root, returns))
+    return {'problems': problems, 'checked': len(samples) + 1, 'blocked': None}
+
+
+def _provenance_from_report(root: Path, returns: Path) -> list:
+    """sample_version 的溯源核验：CSV 里有该列就查列，没有就查 status 报告。
+
+    文件内溯源列是更直接的证据（有就必须是 computed_from_data）；没有时报告是唯一来源，
+    缺报告即 fail——不能让「没写溯源」和「溯源正确」长得一样。
+    """
+    if 'sample_version_source' in _header(returns):
+        import pandas as pd
+        ret = pd.read_csv(returns, usecols=['sample_version_source'], dtype=str)
         sources = sorted(set(ret['sample_version_source']))
         if sources != ['computed_from_data']:
-            problems.append(_rel(root, returns) + ': sample_version_source=' + str(sources) +
-                            '（应为 computed_from_data）')
-    return {'problems': problems, 'checked': len(samples) + 1, 'blocked': None}
+            return [_rel(root, returns) + ': sample_version_source=' + str(sources) +
+                    '（应为 computed_from_data）']
+        return []
+    report = root / 'reports' / 'data_gates' / 'G0' / 'monthly_returns_status_report.json'
+    if not report.is_file():
+        return [_rel(root, returns) + ': 交付 CSV 无溯源列，且缺 ' + _rel(root, report) +
+                '（sample_version 来源不可判定）']
+    doc = json.loads(report.read_text(encoding='utf-8'))
+    if doc.get('sample_version_rule') != 'min(month)..max(month)':
+        return [_rel(root, report) + ': sample_version_rule=' +
+                repr(doc.get('sample_version_rule')) + '（应为 min(month)..max(month)）']
+    return []
 
 
 def check_daily_returns_board(root: Path) -> dict:

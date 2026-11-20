@@ -61,6 +61,22 @@ def test_static_source_fails(tmp_path: Path) -> None:
     assert any('sample_version_source' in p for p in problems)
 
 
+def test_provenance_falls_back_to_status_report(tmp_path: Path) -> None:
+    """交付 CSV 是 10 列：无溯源列时看 status 报告，缺报告即 fail。"""
+    _write_sample(tmp_path, '2018-05..2018-06')
+    _write_returns(tmp_path, ['2018-05', '2018-06'], '2018-05..2018-06')
+    ret = tmp_path / 'data/processed/monthly_returns_clean_v2.csv'
+    keep = pd.read_csv(ret)
+    keep.drop(columns=['sample_version_source']).to_csv(ret, index=False)
+    problems = gates.check_sample_metadata(tmp_path)['problems']
+    assert any('缺' in p and 'report' in p for p in problems), problems
+
+    report = tmp_path / 'reports/data_gates/G0/monthly_returns_status_report.json'
+    report.parent.mkdir(parents=True, exist_ok=True)
+    report.write_text('{"sample_version_rule": "min(month)..max(month)"}', encoding='utf-8')
+    assert gates.check_sample_metadata(tmp_path)['problems'] == []
+
+
 def test_missing_columns_fail(tmp_path: Path) -> None:
     path = tmp_path / 'data' / 'processed' / 'pricing_sample_ma_v3.parquet'
     path.parent.mkdir(parents=True, exist_ok=True)
