@@ -56,19 +56,20 @@ def audit(name, df):
         r['null_rate_max'] = round(float(num.isna().mean().max()), 4)
     return r
 
-for f in sorted(D.glob('*.pkl')):
-    name = f.name
-    try:
-        df = pd.read_pickle(f)
-        if isinstance(df, dict):
-            report[name] = {'type': 'dict', 'keys': list(df.keys())[:5], 'n_keys': len(df)}
-            continue
-        report[name] = audit(name, df)
-        print(f"--- {name}: {report[name]}", flush=True)
-    except Exception as e:
-        report[name] = {'error': str(e)[:200]}
-        print(f"FAIL {name}: {e}", flush=True)
+if __name__ == '__main__':
+    for f in sorted(D.glob('*.pkl')):
+        name = f.name
+        try:
+            df = pd.read_pickle(f)
+            if isinstance(df, dict):
+                report[name] = {'type': 'dict', 'keys': list(df.keys())[:5], 'n_keys': len(df)}
+                continue
+            report[name] = audit(name, df)
+            print(f"--- {name}: {report[name]}", flush=True)
+        except Exception as e:
+            report[name] = {'error': str(e)[:200]}
+            print(f"FAIL {name}: {e}", flush=True)
 
-Path('reports/data_gates/G0/drive_batch1_schema.json').write_text(
-    json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
-print("DONE -> reports/data_gates/G0/drive_batch1_schema.json")
+    Path('reports/data_gates/G0/drive_batch1_schema.json').write_text(
+        json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
+    print("DONE -> reports/data_gates/G0/drive_batch1_schema.json")

@@ -19,7 +19,6 @@
   stdout 对账结论（行数/逐位一致率）
 """
 import argparse
-import pickle
 import sys
 from pathlib import Path
 

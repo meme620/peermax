@@ -16,7 +16,6 @@ import json
 from pathlib import Path
 import numpy as np
 import pandas as pd
-import pickle
 
 from dates import next_month as _next_month
 from analyst_cf_mom_replication import EDGES, RET, MEQ, NET_VER

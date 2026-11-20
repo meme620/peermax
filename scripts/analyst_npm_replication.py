@@ -14,7 +14,7 @@ import pandas as pd
 import numpy as np
 
 from dates import next_month as _next_month
-from analyst_cf_mom_replication import EDGES, RET, MEQ, NET_VER, SPEC, _SPEC
+from analyst_cf_mom_replication import EDGES, RET, MEQ, SPEC, _SPEC
 from statsutil import nw_t
 from analyst_meta import attach_meta
 from fileio import file_size

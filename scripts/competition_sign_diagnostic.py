@@ -792,7 +792,7 @@ def run_H6(m, S, fmonth) -> dict:
 
     # (2) 行业 FE（月 × 申万二级 组内去均值）
     merged_reg = reg.copy()
-    merged['sw2'] = sw2_asof(merged['month'], merged['focal_id'])
+    merged_reg['sw2'] = sw2_asof(merged_reg['month'], merged_reg['focal_id'])
     cols = ['R_next', 'PC'] + CONTROLS
     dd = merged_reg.dropna(subset=cols + ['sw2']).copy()
     counts = dd.groupby(['month', 'sw2'])['R_next'].transform('size')

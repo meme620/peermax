@@ -24,7 +24,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import yaml
-from fileio import file_size
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = ROOT / 'configs/analyst_spec.yaml'

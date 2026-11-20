@@ -12,7 +12,6 @@
 """
 import csv
 import json
-import sys
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -29,7 +28,7 @@ out = {'run_at': datetime.now(timezone.utc).isoformat(), 'year': YEAR, 'checks':
 
 # ---------- C1/C2：M-B 边集与权重（重算相似度）----------
 def c1_c2_mb():
-    from network_mda_edges_build import build_similarity, DF_CUTOFF
+    from network_mda_edges_build import build_similarity
     codes, Xn = build_similarity(YEAR)
     with open(MB / f'{YEAR}_build_report.json', encoding='utf-8') as f:
         rep = json.load(f)

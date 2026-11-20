@@ -15,7 +15,6 @@ data/processed/analyst/firm_analyst_derived.csv 填充 analyst_cov（analyst-net
 import csv
 import glob
 import math
-import pickle
 import os
 import sys
 from collections import defaultdict

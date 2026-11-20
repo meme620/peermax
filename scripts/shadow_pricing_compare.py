@@ -26,12 +26,10 @@
 from __future__ import annotations
 
 from pathlib import Path
-from fileio import assert_path_allowed, atomic_write_text, json_default, write_csv_rows, write_json_atomic
+from fileio import assert_path_allowed, json_default, write_csv_rows, write_json_atomic
 
 import argparse
-import csv as _csv
 import json
-import os
 from datetime import datetime, timezone
 import numpy as np
 import pandas as pd
@@ -1251,6 +1249,7 @@ def promotion_block(matrix_by_teacher: dict, blocks: dict, calib: dict,
             'own_max_direction': criterion_state,
             'pseudo_zero': criterion_coverage,
             'sample_loss': criterion_robust_rows,
+            'promotion_gate': criterion_promotion,
             'max_tail': criterion_max_tail,
             'reproducibility': criterion_reproducibility,
             'conclusion_robustness': criterion_robustness,

@@ -264,7 +264,6 @@ def load_sw2() -> pd.DataFrame:
     return s[['firm_id', 'l1_code', 'l2_code']]
 
 def load_st() -> pd.DataFrame:
-    import pickle
     import warnings
     warnings.filterwarnings('ignore')
     d = read_pickle(ST_PKL)
@@ -302,7 +301,6 @@ def _drive_monthly_wide(pkl, how: str) -> pd.DataFrame:
     注意：不得写 ``resample('ME').mean(min_count=1)``——``DatetimeIndexResampler.mean()``
     不接受 ``min_count``，pandas 2.3.1 抛 ``pandas.errors.UnsupportedFunctionCall``。
     """
-    import pickle
     import warnings
     warnings.filterwarnings('ignore')
     d = read_pickle(pkl)

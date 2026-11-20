@@ -7,7 +7,6 @@ R3 对抗：编码/全半角/空白/大小写/嵌套包含/ASCII 词/空文本 �
 产物：reports/data_gates/G0/network_business_lexicon_check.json
 """
 import json
-import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path

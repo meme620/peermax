@@ -167,8 +167,9 @@ def em_former_names(code6: str):
         os.makedirs(BASE, exist_ok=True)
         with open(EM_NAMES_JSON, "w", encoding="utf-8") as f:
             json.dump(cache, f, ensure_ascii=False)
-    except (OSError,):
-        pass
+    except OSError as e:
+        # 缓存写失败不影响本次返回；但会让后续每次运行重复拉取全量名称，必须留痕
+        print(f"[WARN] 曾用名缓存写入失败（{EM_NAMES_JSON}）：{e}", file=sys.stderr, flush=True)
     return names
 
 

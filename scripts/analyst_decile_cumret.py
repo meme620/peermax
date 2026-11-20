@@ -8,7 +8,6 @@
 输出: reports/data_gates/G0/analyst_decile_cumret.json
 """
 import json
-import sys
 from pathlib import Path
 import numpy as np
 import pandas as pd

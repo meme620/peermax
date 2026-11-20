@@ -9,11 +9,9 @@ D. 基本面与收益（AH Table 12）：focal 收益 ~ peer 加权营收增速 
 输出: reports/data_gates/G0/analyst_extra_tests.json
 """
 import json
-import sys
 from pathlib import Path
 import numpy as np
 import pandas as pd
-import pickle
 
 from dates import next_month as _next_month
 from analyst_cf_mom_replication import EDGES, RET, NET_VER
@@ -82,6 +80,7 @@ def main():
 
     files = sorted(EDGES.glob(f'edges_{NET_VER}_*.csv'))
     rows_a, rows_b, rows_c, rows_d = [], [], [], []
+    n_rank_deficient = 0        # 奇异设计矩阵（lstsq 抛 LinAlgError）被跳过的月-规格数
     share_unknown_mean = []
     c300 = read_pickle(DRIVE / 'daily_csi300_components.pkl')
     c300.columns = [c.split('.')[0] for c in c300.columns]
@@ -125,7 +124,7 @@ def main():
                 beta, *_ = np.linalg.lstsq(X, yy, rcond=None)
                 rows_a.append({'month': sig, 'beta_ind': beta[1], 'beta_size': beta[2], 'beta_bm': beta[3]})
             except np.linalg.LinAlgError:
-                pass
+                n_rank_deficient += 1
 
         # ---- B/C/D: focal 面板 ----
         m = edges.merge(r_sig, left_on='source_id', right_on='firm_id', how='inner')
@@ -172,7 +171,7 @@ def main():
                 bb, *_ = np.linalg.lstsq(Xb, yb, rcond=None)
                 rows_b.append({'month': pred, 'beta_cf': bb[1], 'beta_cfxdeg': bb[2], 'beta_deg': bb[3]})
             except np.linalg.LinAlgError:
-                pass
+                n_rank_deficient += 1
 
         # C: 小盘连接→大盘焦点（焦点 csi300，连接公司按完整形成月市值分组）
         gc = g[g['firm_id'].isin(c300m[c300m['month'] == sig]['firm_id'])]
@@ -214,7 +213,7 @@ def main():
                         bc, *_ = np.linalg.lstsq(Xc, yc, rcond=None)
                         rows_c.append({'month': pred, 'var': x, 'beta': bc[1]})
                     except np.linalg.LinAlgError:
-                        pass
+                        n_rank_deficient += 1
 
         # D: 基本面与收益（focal 收益 ~ peer 加权营收增速）
         # 2026-09-10 Gate 4.11：BM 缺失时**不得**用全零列替代控制变量；改为按当月实际
@@ -232,7 +231,7 @@ def main():
                 rows_d.append({'month': pred, 'beta_peer_grow': bd[1],
                                'controls_used': 'peer_grow,size,bm' if use_bm else 'peer_grow,size'})
             except np.linalg.LinAlgError:
-                pass
+                n_rank_deficient += 1
         n_done += 1
         if n_done % 24 == 0:
             print(f"处理 {n_done} 个月（{pred}）", flush=True)
@@ -285,6 +284,9 @@ def main():
                                          _d['controls_used'].value_counts().items()}
         res['D_controls_note'] = ('BM 可得月纳入 BM 列；BM 缺失月仅用 peer_grow,size，'
                                   '不做零列替代（2026-09-10 Gate 4.11）')
+    res['n_rank_deficient_skips'] = int(n_rank_deficient)
+    res['n_rank_deficient_note'] = ('lstsq 遇奇异设计矩阵（LinAlgError）的月-规格被跳过，'
+                                    '计数在此；对应 beta 不进入月均，非静默丢弃')
     attach_meta(res, __file__, NET_VER)
     OUT.write_text(json.dumps(res, ensure_ascii=False, indent=2), encoding='utf-8')
     print(json.dumps(res, ensure_ascii=False)[:800], flush=True)

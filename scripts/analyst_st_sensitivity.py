@@ -1,7 +1,7 @@
 """analyst-network 9D：ST 剔除敏感性——CF/NPM 复刻剔除 ST 股（st_flag，Drive 批次1）。
 口径：与 analyst_npm_replication 完全一致，仅形成期股票若为 ST（月末 flag=True）则剔除。
 """
-import pickle, sys, warnings
+import sys, warnings
 import pandas as pd, numpy as np
 from pathlib import Path
 from fileio import read_pickle

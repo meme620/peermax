@@ -65,7 +65,8 @@ def main():
     n_conf = sum(1 for r in out if r['needs_sensitivity'])
     n_handover = sum(1 for r in out if any(d['class'] == 'suspected_handover' for d in r['alt_names']))
     n_reuse = sum(1 for r in out if any(d['class'] == 'code_reuse' for d in r['alt_names']))
-    print(f"多姓名 ID 总数: {len(df)} | 无害变体尾巴: {n_tail} | 疑似换人: {n_handover} | code 复用: {n_reuse}")
+    print(f"多姓名 ID 总数: {len(df)} | 无害变体尾巴: {n_tail} | 需敏感性判定: {n_conf} "
+          f"| 疑似换人: {n_handover} | code 复用: {n_reuse}")
 
     # 影响量级：疑似换人/复用 ID 的 alt-name 记录数与覆盖公司
     conf_ids = [r['analyst_id'] for r in out if r['needs_sensitivity']]

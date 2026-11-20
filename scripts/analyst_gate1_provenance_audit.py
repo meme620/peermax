@@ -18,7 +18,6 @@ import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from fileio import file_size
 from pricing_lib import file_shape, load_input_contracts
 
 ROOT = Path(__file__).resolve().parents[1]

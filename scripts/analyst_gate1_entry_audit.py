@@ -13,7 +13,6 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from fileio import file_size
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = ROOT / 'configs/analyst_spec.yaml'

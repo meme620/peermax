@@ -70,7 +70,6 @@ import argparse
 import csv
 import json
 import math
-import os
 import time
 from datetime import datetime, timezone
 import numpy as np

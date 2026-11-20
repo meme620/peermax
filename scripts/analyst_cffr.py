@@ -57,7 +57,7 @@ def build_consensus():
 def fm_one(panel, x_name, y='fr', controls=('fr_lag',)):
     """单列 FM 回归：每月横截面，系数为时间序列均值，NW1 校正。"""
     xs = [x_name] + list(controls)
-    coefs, t_iid, t_nw = [], [], []
+    coefs, t_iid = [], []
     months = []
     for mp, sub in panel.groupby('month'):
         d = sub[[y] + xs].replace([np.inf, -np.inf], np.nan).dropna()

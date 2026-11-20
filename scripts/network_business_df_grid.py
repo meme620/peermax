@@ -96,7 +96,6 @@ def metrics(net: Path, y: int, sw2: dict, freeze_years: dict) -> dict:
     edges = CA.read_edges(net, y)
     ps = CA.peer_stats(sup, edges)
     lf = CA.sw2_lift(edges, sw2, set(sup['focal_id']))
-    iso = CA.isolation(edges, sup)
     cr = CA.corpus_richness(net, y)
     fy = freeze_years.get(str(y), {})
     return {'text_year': y, 'network_year': y + 1, 'n_nodes': ps['focal_nodes_total'],

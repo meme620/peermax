@@ -39,7 +39,6 @@ from pathlib import Path
 from fileio import assert_path_allowed, json_default, write_csv_rows, write_json_atomic, write_parquet_atomic
 
 import argparse
-import csv
 import importlib
 import json
 import os

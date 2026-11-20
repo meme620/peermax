@@ -19,7 +19,6 @@ Plan §8 Phase B1 的可执行实现：
 import argparse
 import csv
 import json
-import sys
 from datetime import datetime, timezone
 from pathlib import Path
 

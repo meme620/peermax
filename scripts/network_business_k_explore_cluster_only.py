@@ -8,7 +8,6 @@
 产物：reports/data_gates/G0/network_business_k_explore_cluster_only.json
 """
 import json
-import sys
 from pathlib import Path
 
 import numpy as np

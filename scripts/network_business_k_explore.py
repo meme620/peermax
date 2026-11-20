@@ -6,7 +6,6 @@
 产物：reports/data_gates/G0/network_business_k_explore.json
 """
 import json
-import sys
 import time
 from pathlib import Path
 

@@ -25,7 +25,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
 from pathlib import Path
 
 import numpy as np
@@ -566,7 +565,12 @@ def _write_md(report, hr_report, sfx=''):
     _v2 = report[f'{other}_sensitivity']['ma_teacher']
     _v3_same = ((_v3['ew']['coefs']['PeerMAXraw']['beta'] > 0)
                 == (_v3['vw']['coefs']['PeerMAXraw']['beta'] > 0))
+    _b3 = _v3['ew']['coefs']['PeerMAXraw']['beta']
+    _b2 = _v2['ew']['coefs']['PeerMAXraw']['beta']
+    _cross_same = (_b3 > 0) == (_b2 > 0)
     L.append(f"\n> v3 vs v2 一致性：headline 列 EW/VW {'同号' if _v3_same else '**符号不一致**'}；"
+             f"跨版本（EW）{'同号' if _cross_same else '**符号翻转**'}"
+             f"（v3 {_b3:+.5f} / {other} {_b2:+.5f}）。"
              f"v3 仅因 complete_month 改为有效交易日口径发生样本/量级变化。"
              f"符号是否翻转以本表读数为准，翻转即停机。")
     L.append(f'\n## 主口径全系数（EW，NW lag=6，{ver}）\n')

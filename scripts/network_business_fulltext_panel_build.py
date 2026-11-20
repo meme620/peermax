@@ -130,7 +130,6 @@ def _init_worker(lex_path: str, ident_path: str, idmap_path: str):
 
 def _work(item):
     """读单文件 -> (row dict, hits int32 array)。文本置空规则与 text_mda_extract 一致。"""
-    from network_business_lexicon import normalize
     code6, year, rel = item
     p = TXT / code6 / f'{year}.txt'
     try:
@@ -170,8 +169,9 @@ _TIDX = None
 
 def _hits_iter(text):
     """产出 (词条行号, 词条)；首次调用时建 term->行号表。"""
-    global _TIDX
     from network_business_lexicon import normalize
+
+    global _TIDX
     if _TIDX is None:
         _TIDX = {t: i for i, t in enumerate(_TERMS)}
     for _pos, t in _A.iter(normalize(text)):

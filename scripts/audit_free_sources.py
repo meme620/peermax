@@ -20,7 +20,6 @@
 
 产物：reports/data_gates/G0/free_source_audit_20260914.json + 控制台摘要
 """
-import csv
 import gzip
 import json
 import sys

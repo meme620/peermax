@@ -52,7 +52,6 @@ v2 在 K 网格上直接评估三类指标：
 """
 import argparse
 import json
-import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path

@@ -14,8 +14,6 @@ A12：R = a + beta*PeerMAXraw + gamma*IndustryMAX + phi*PeerReturn + theta*OwnMA
 from __future__ import annotations
 
 import argparse
-import sys
-from pathlib import Path
 
 import numpy as np
 import pandas as pd

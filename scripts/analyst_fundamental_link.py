@@ -19,7 +19,7 @@
 
 输出: data/processed/analyst/fundamental_link.json
 """
-import json, glob, pickle, sys
+import json, glob
 from pathlib import Path
 import pandas as pd
 import numpy as np

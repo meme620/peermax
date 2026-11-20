@@ -27,7 +27,6 @@ R3 对抗：
 import argparse
 import csv
 import json
-import sys
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -164,7 +163,6 @@ def main(argv=None):
         ss_ret = d['support_status_ret'].fillna('')
         miss_max = d['missing_mass_max'].fillna(0)
         miss_ret = d['missing_mass_ret'].fillna(0)
-        zero = pd.Series(0.0, index=d.index)
         bad = 0
         bad += int(((ss_max == 'complete') & d['PeerMAXraw'].isna()).sum())
         bad += int(((ss_max != 'complete') & (ss_max != '') & d['PeerMAXraw'].notna()).sum())
