@@ -116,8 +116,9 @@ def check_hygiene(root: pathlib.Path) -> list:
     import ast
 
     problems = []
-    # runpy 不会把脚本目录放进 sys.path[0]，bootstrap 必须自己插；其余脚本禁插。
-    PATH_INSERT_EXEMPT = {'peerlab/bootstrap.py'}
+    # 按路径载入脚本的宿主必须自己把 scripts/ 插进搜索路径：bootstrap 走 runpy、
+    # gates 走 importlib（进程内取生产者规则函数）。其余脚本禁插。
+    PATH_INSERT_EXEMPT = {'peerlab/bootstrap.py', 'peerlab/gates.py'}
     for base in ('scripts', 'peerlab'):
         for path in sorted((root / base).glob('*.py')):
             rel = path.relative_to(root).as_posix()

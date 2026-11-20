@@ -34,10 +34,23 @@ def _rel(root: Path, path: Path) -> str:
         return str(path)
 
 
+def _scripts_on_path() -> None:
+    """把 scripts/ 放进 sys.path：按路径载入的脚本要 import 同级模块（pricing_lib 等）。
+
+    bootstrap 走 runpy，同样自己插这一条；两处都是「谁按路径载入脚本，谁负责脚本目录
+    在搜索路径上」。缺这一条时 pricing_sample_build 的顶层 import 直接 ModuleNotFoundError，
+    数据门从 blocked 变成崩。
+    """
+    scripts = str(ROOT / 'scripts')
+    if scripts not in sys.path:
+        sys.path.insert(0, scripts)
+
+
 def _script(name: str):
     """按文件路径载入 scripts/<name>.py，取生产者的规则函数。"""
     if name in sys.modules:
         return sys.modules[name]
+    _scripts_on_path()
     path = ROOT / 'scripts' / f'{name}.py'
     spec = importlib.util.spec_from_file_location(name, path)
     module = importlib.util.module_from_spec(spec)

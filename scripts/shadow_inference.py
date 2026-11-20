@@ -85,6 +85,8 @@ from peermax_panel_build import (
 
 ROOT = Path(__file__).resolve().parents[1]
 
+# 产物目录按 seed 分：3.4_* 整套随 --seed 变化（bootstrap/置换 rep），
+# 同一目录会让 5 个 seed 互相覆盖，anchor sha 台账也会串。
 ART = ROOT / 'artifacts/phase3'
 
 HEADLINE_NET = ROOT / 'data/processed/network_ma_teacher'
@@ -1618,6 +1620,31 @@ class RewireEngine:
 # ---------------------------------------------------------------- steps
 
 
+def _bind_seed_dir(seed: int) -> None:
+    """把整套 3.4_* 产物绑定到 artifacts/phase3/seed_{seed}/ 下。
+
+    这些文件随 --seed 变化（bootstrap / 置换 rep），共用同一目录会让多 seed 相互覆盖，
+    anchor 台账也会串到别的 seed 上。
+    """
+    global ART, INF_CSV, STRUCT_CSV, VAR_CSV, PC_CSV, NULL_CSV, NULL_SUMMARY
+    global BLOCKPERM_CSV, COUNTS_JSON, ANCHOR_PRE, ANCHOR_POST, OUTPUT_SHA, RUN_LOG
+    global ALLOWED_ROOTS
+    ART = ROOT / 'artifacts/phase3' / f'seed_{int(seed)}'
+    ALLOWED_ROOTS = (ART,)
+    INF_CSV = ART / '3.4_inference.csv'
+    STRUCT_CSV = ART / '3.4_struct_layers.csv'
+    VAR_CSV = ART / '3.4_variance_decomposition.csv'
+    PC_CSV = ART / '3.4_pc_inference.csv'
+    NULL_CSV = ART / '3.4_placebo_null.csv'
+    NULL_SUMMARY = ART / '3.4_null_summary.json'
+    BLOCKPERM_CSV = ART / '3.4_blockperm_reps.csv'
+    COUNTS_JSON = ART / '3.4_counts.json'
+    ANCHOR_PRE = ART / '3.4_anchor_pre.json'
+    ANCHOR_POST = ART / '3.4_anchor_post.json'
+    OUTPUT_SHA = ART / '3.4_output_bytes.json'
+    RUN_LOG = ART / '3.4_run.log'
+
+
 def main():
     global _TEE
     ap = argparse.ArgumentParser(description='Phase 3.4 N-1/N-8/N-11 推断 shadow')
@@ -1634,6 +1661,7 @@ def main():
     args = ap.parse_args()
     steps = (['preflight', 'n1', 'n11', 'n8', 'n8perm', 'postflight']
              if args.steps == 'all' else [s.strip() for s in args.steps.split(',') if s.strip()])
+    _bind_seed_dir(args.seed)
     ART.mkdir(parents=True, exist_ok=True)
     _TEE = _Tee(RUN_LOG)
     t_all = time.time()

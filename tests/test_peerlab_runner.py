@@ -38,6 +38,40 @@ def test_smoke_args_replace_per_step_not_append():
     assert '--corpus' in smoke and smoke[smoke.index('--corpus') + 1] == 'teacher'
 
 
+def test_sfx_placeholder_expands_per_seed():
+    """requires / outputs / args 里的 {sfx} 必须按 seed 展开。
+
+    gate-report 的 --input-suffix 与 requires 若一边带后缀一边不带，就绪判定与
+    实际读取会对不上（status 报 ready 而 run 读不到文件）。
+    """
+    exp = registry.get('gate-report')
+    e3 = exp.expanded(3)
+    assert [p for p in e3.requires if 'pricing_table' in p] == [
+        'reports/data_gates/G0/pricing_table_s3.json']
+    assert e3.steps[0].args == ('--input-suffix', '_s3')
+    cmd = runner.build_command(exp, exp.steps[0], 3)
+    assert '--input-suffix' in cmd and cmd[cmd.index('--input-suffix') + 1] == '_s3'
+
+
+def test_seed_placeholder_in_step_args():
+    """随 seed 变化的实验必须把 seed 传进脚本，否则多 seed 跑出同一份产物。"""
+    exp = registry.get('robustness-checks')
+    e2 = exp.expanded(2)
+    assert e2.steps[0].args == ('--seed', '2')
+    assert e2.outputs[0].endswith('pricing_robustness_placebo_s2.json')
+    cmd = runner.build_command(exp, exp.steps[0], 2)
+    assert cmd[cmd.index('--seed') + 1] == '2'
+    assert cmd[cmd.index('--out-suffix') + 1] == '_s2'
+
+
+def test_seed_dependent_outputs_do_not_collide():
+    """两个 seed 的产物路径集合必须不同，否则后跑的覆盖先跑的。"""
+    for exp_id in ('robustness-checks', 'density-null', 'shadow-inference', 'fm-main-table'):
+        exp = registry.get(exp_id)
+        a, b = exp.expanded(0).outputs, exp.expanded(1).outputs
+        assert set(a) != set(b), f'{exp_id} 的产物不随 seed 变化'
+
+
 def test_readiness_reports_missing(tmp_path: Path):
     exp = registry.get('fm-main-table')
     check = runner.readiness(exp, tmp_path)

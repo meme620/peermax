@@ -180,9 +180,9 @@ EXPERIMENTS: tuple[Experiment, ...] = (
                     ('--sample-version', headline_sample_label())),),
         requires=(REGISTRY_CONFIG, headline_sample_path()),
         outputs=(
-            'reports/data_gates/G0/pricing_table*.json',
-            'reports/data_gates/G0/pricing_table*.md',
-            'reports/data_gates/G0/pricing_horse_race*.json',
+            'reports/data_gates/G0/pricing_table{sfx}.json',
+            'reports/data_gates/G0/pricing_table{sfx}.md',
+            'reports/data_gates/G0/pricing_horse_race{sfx}.json',
         ),
         metrics=(
             MetricSpec('beta_peer', 'reports/data_gates/G0/pricing_table{sfx}.json',
@@ -200,8 +200,8 @@ EXPERIMENTS: tuple[Experiment, ...] = (
                     ('--sample-version', headline_sample_label())),),
         requires=(REGISTRY_CONFIG, headline_sample_path()),
         outputs=(
-            'reports/data_gates/G0/pricing_portfolio_deciles*.json',
-            'reports/data_gates/G0/pricing_diagnostics*.json',
+            'reports/data_gates/G0/pricing_portfolio_deciles{sfx}.json',
+            'reports/data_gates/G0/pricing_diagnostics{sfx}.json',
         ),
         suffix_arg='--out-suffix',
         runtime_hint='分钟级',
@@ -234,8 +234,8 @@ EXPERIMENTS: tuple[Experiment, ...] = (
                   'reports/data_gates/G0/pricing_table{sfx}.json',
                   'reports/data_gates/G0/pricing_portfolio_deciles{sfx}.json'),
         outputs=(
-            'reports/data_gates/G0/pricing_gate_report*.json',
-            'reports/data_gates/G0/pricing_gate_report*.md',
+            'reports/data_gates/G0/pricing_gate_report{sfx}.json',
+            'reports/data_gates/G0/pricing_gate_report{sfx}.md',
         ),
         suffix_arg='--out-suffix',
         runtime_hint='秒级到分钟级',
@@ -245,7 +245,7 @@ EXPERIMENTS: tuple[Experiment, ...] = (
         title='Phase3 shadow 推断层（bootstrap，随 seed 变化）',
         steps=(Step('scripts/shadow_inference.py'),),
         requires=(REGISTRY_CONFIG, 'artifacts/phase3'),
-        outputs=('artifacts/phase3/3.4_*.csv',),
+        outputs=('artifacts/phase3/seed_{seed}/3.4_*',),
         accepts_seed=True,
         runtime_hint='分钟级',
     ),

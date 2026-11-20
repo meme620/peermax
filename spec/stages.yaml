@@ -33,7 +33,7 @@ stages:
   - id: pricing
     title: 月度定价事实与门禁报告
     scripts: [pricing_sample_build, pricing_fm_main, pricing_portfolio_sorts, pricing_robustness_placebo, pricing_length_industry_control, pricing_gate_report]
-    outputs: [reports/data_gates/G0/pricing_gate_report.json]
+    outputs: [reports/data_gates/G0/pricing_gate_report_s0.json]
   - id: shadow
     title: Phase2/3 shadow 对照（只读 headline、只写 shadow）
     scripts: [shadow_monthly_status, shadow_inference, shadow_asof_industry, shadow_weight_matrix]
