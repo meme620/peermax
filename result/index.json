@@ -259,6 +259,16 @@
       "started_at": "2026-11-20T13:59:06+00:00",
       "seconds": 1798.57,
       "git_commit": "5b0a4d7"
+    },
+    {
+      "run_id": "network-mda-text--s2--20261120T141812Z",
+      "exp": "network-mda-text",
+      "seed": 2,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T14:18:12+00:00",
+      "seconds": 1478.5,
+      "git_commit": "0ca7652"
     }
   ]
 }
