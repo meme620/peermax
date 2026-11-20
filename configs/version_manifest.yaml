@@ -36,13 +36,6 @@ network_versions:
     version_prefix: pm_ma_ewcos_teacher_df100_v1
     years: *teacher_years
     available_at_rule: (y+1)-04-30
-  # 占位模式产物目录（edges_build 不给 --tau 时的落点）：版本前缀随语料走 teacher。
-  # 只为让占位产物有处安放、且不混进 network_mb_teacher 的正式年份对账。
-  network_mb_stub:
-    version_prefix: pm_mb_tfidf_teacher_v1
-    years:
-      - 2021
-    available_at_rule: (y+1)-04-30
 deliverables:
   - file: data/processed/monthly_returns_clean_v2.csv
     status: pending
