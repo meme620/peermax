@@ -604,8 +604,18 @@ def main(argv=None):
         own_out = np.where(np.isnan(own), '', np.round(own, 8))
         own_inc = np.array([int(f in cm and cm.get(f, 0) != 1) for f in fid_arr])
 
+        # 逐行写盘前一次性把要用到的列取成 ndarray：循环里 agg[c].iloc[i] 每次都走
+        # pandas 的 _getitem_axis 路径（28k 行 × 12 列实测 0.55s，104 个月约 57s）。
+        col = {c: agg[c].to_numpy() for c in (
+            'zero_trading_days_mass_ret', 'n_sources_max', 'n_covered_max', 'n_covered_ret',
+            'n_incomplete_max', 'n_incomplete_ret', 'n_missing_statistic_max', 'n_excluded_max',
+            'n_missing_statistic_ret', 'n_zero_trading_days_ret', 'incomplete_mass_max',
+            'incomplete_mass_ret', 'limit_hit_weight_share_max', 'weighted_value_max_all')}
+        col.update({c: agg[c].to_numpy(dtype=object) for c in (
+            'support_status_max', 'support_status_ret', 'missing_reason_max', 'missing_reason_ret')})
+
         for i, fid in enumerate(fid_arr):
-            zero_by_row[(month, fid)] = float(agg['zero_trading_days_mass_ret'].iloc[i])
+            zero_by_row[(month, fid)] = float(col['zero_trading_days_mass_ret'][i])
             sup_by_row[(month, fid)] = float(sup[i])
             rows.append({
                 'focal_id': fid, 'month': month, 'network_use_case': args.use_case,
@@ -617,31 +627,32 @@ def main(argv=None):
                 'PeerReturn': peer_ret[i],
                 'PeerMAXraw_partial': peer_max_partial[i],
                 'PeerReturn_partial': peer_ret_partial[i],
-                'n_sources': int(agg['n_sources_max'].iloc[i]),
-                'n_max_sources': int(agg['n_covered_max'].iloc[i]),
-                'n_ret_sources': int(agg['n_covered_ret'].iloc[i]),
-                'n_max_incomplete': int(agg['n_incomplete_max'].iloc[i]),
-                'n_ret_incomplete': int(agg['n_incomplete_ret'].iloc[i]),
-                'n_max_missing_statistic': int(agg['n_missing_statistic_max'].iloc[i]),
-                'n_max_excluded_limit_unknown': int(agg['n_excluded_max'].iloc[i]),
-                'n_ret_missing_statistic': int(agg['n_missing_statistic_ret'].iloc[i]),
-                'n_ret_zero_trading_days': int(agg['n_zero_trading_days_ret'].iloc[i]),
+                'n_sources': int(col['n_sources_max'][i]),
+                'n_max_sources': int(col['n_covered_max'][i]),
+                'n_ret_sources': int(col['n_covered_ret'][i]),
+                'n_max_incomplete': int(col['n_incomplete_max'][i]),
+                'n_ret_incomplete': int(col['n_incomplete_ret'][i]),
+                'n_max_missing_statistic': int(col['n_missing_statistic_max'][i]),
+                'n_max_excluded_limit_unknown': int(col['n_excluded_max'][i]),
+                'n_ret_missing_statistic': int(col['n_missing_statistic_ret'][i]),
+                'n_ret_zero_trading_days': int(col['n_zero_trading_days_ret'][i]),
                 'support_mass': round(sup[i], 8),
                 'covered_mass_max': round(wmax[i], 8),
                 'covered_mass_ret': round(wret[i], 8),
-                'incomplete_mass_max': round(float(agg['incomplete_mass_max'].iloc[i]), 8),
-                'incomplete_mass_ret': round(float(agg['incomplete_mass_ret'].iloc[i]), 8),
+                'incomplete_mass_max': round(float(col['incomplete_mass_max'][i]), 8),
+                'incomplete_mass_ret': round(float(col['incomplete_mass_ret'][i]), 8),
                 'missing_mass_max': round(miss_max[i], 8),
                 'missing_mass_ret': round(miss_ret[i], 8),
                 'coverage_ratio_max': round(wmax[i] / sup[i], 8) if sup[i] > 0 else '',
                 'coverage_ratio_ret': round(wret[i] / sup[i], 8) if sup[i] > 0 else '',
                 'limit_hit_weight_share': (
-                    round(float(agg['limit_hit_weight_share_max'].iloc[i]), 6)
+                    round(float(col['limit_hit_weight_share_max'][i]), 6)
                     if (ds[i] == 'ok') else ''),
-                'support_status_max': agg['support_status_max'].iloc[i],
-                'support_status_ret': agg['support_status_ret'].iloc[i],
-                'missing_reason_max': agg['missing_reason_max'].iloc[i],
-                'missing_reason_ret': agg['missing_reason_ret'].iloc[i],
+                'support_status_max': col['support_status_max'][i],
+                'support_status_ret': col['support_status_ret'][i],
+                'missing_reason_max': col['missing_reason_max'][i],
+                'missing_reason_ret': col['missing_reason_ret'][i],
+                # 边表里有该 focal 即有支持；support.csv 缺失时不得默认成最强正类而不留痕。
                 'network_support_status': sup_status.get(fid, 'support'),
                 'data_status': ds[i], 'coverage_flag': cov_flag[i],
                 'missing_reason': reason[i],
@@ -650,8 +661,8 @@ def main(argv=None):
                 'PeerMAXraw_renorm': renorm_out[i],
             'PeerMAXraw_la': peer_max_la[i],
             'PeerMAXraw_incl_all': (
-                '' if np.isnan(agg['weighted_value_max_all'].iloc[i])
-                else round(float(agg['weighted_value_max_all'].iloc[i]), 8)),
+                '' if np.isnan(col['weighted_value_max_all'][i])
+                else round(float(col['weighted_value_max_all'][i]), 8)),
             'coverage_ratio_la': (round(float(cov_la[i]), 8)
                                   if np.isfinite(cov_la[i]) else ''),
                 'formula_id_max_renorm': FORMULA_ID_MAX_RENORM if renorm_out[i] != '' else '',
@@ -661,17 +672,19 @@ def main(argv=None):
             st['mass_missing_max'] += miss_max[i]
             st['mass_missing_ret'] += miss_ret[i]
             status_counts[ds[i]] += 1
-            if agg['support_status_max'].iloc[i] == 'complete':
+            ss_max, ss_ret = col['support_status_max'][i], col['support_status_ret'][i]
+            if ss_max == 'complete':
                 st['rows_complete_max'] += 1
-            if agg['support_status_ret'].iloc[i] == 'complete':
+            if ss_ret == 'complete':
                 st['rows_complete_ret'] += 1
-            if agg['support_status_max'].iloc[i] == 'partial':
+            if ss_max == 'partial':
                 st['rows_partial_max'] += 1
-            if agg['support_status_ret'].iloc[i] == 'partial':
+            if ss_ret == 'partial':
                 st['rows_partial_ret'] += 1
-            if agg['n_incomplete_max'].iloc[i] > 0 or agg['n_incomplete_ret'].iloc[i] > 0:
+            n_inc_max, n_inc_ret = col['n_incomplete_max'][i], col['n_incomplete_ret'][i]
+            if n_inc_max > 0 or n_inc_ret > 0:
                 gate['rows_with_any_incomplete_peer'] += 1
-            if int(agg['n_incomplete_max'].iloc[i]) == int(agg['n_sources_max'].iloc[i]):
+            if int(n_inc_max) == int(col['n_sources_max'][i]):
                 gate['rows_all_peer_incomplete'] += 1
             if own_inc[i]:
                 gate['rows_own_incomplete'] += 1

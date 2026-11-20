@@ -158,7 +158,9 @@ def build_next_month(returns: pd.DataFrame, complete_only: bool) -> pd.DataFrame
     if complete_only:
         r = r[(r['complete_month'] == 1) & r['R'].notna()]
     r = r[['firm_id', 'month', 'R']].dropna()
-    r['month'] = r['month'].map(lambda m: ym_add(m, -1))   # 上一月 = event month
+    # 上一月 = event month。逐元素 lambda 调 ym_add 在 84 万行上要 9.2s（每次新建一个
+    # Period 再转 str）；整列 PeriodIndex 平移再转回字符串是 4.2s，取值逐元素相同。
+    r['month'] = (pd.PeriodIndex(r['month'].to_numpy(), freq='M') - 1).astype(str)
     return r.rename(columns={'R': 'R_next'})
 
 

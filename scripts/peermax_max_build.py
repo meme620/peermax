@@ -503,13 +503,19 @@ def run(panel_dir=PANEL, out=OUT, out_json=OUT_JSON, st_flag=ST_FLAG,
              "st_at_argmax": 0, "st_flag_covered": 0,
              "limit_hit_source_vendor": 0, "limit_hit_source_derived": 0}
     firms = set()
+    # listing_days 是 (code, date) 平铺集合，逐 cell 过滤是 O(cells × |listing_days|)：
+    # 两年切片实测 50.8s，占 run 的一半。按 code 分组一次后每次取值是 O(1)。
+    listing_by_code = defaultdict(set)
+    for _c, _d in listing_days:
+        listing_by_code[_c].add(_d)
+    no_listing = frozenset()
     for code, month in rows_keys:
         days = sorted(monthly[(code, month)], key=lambda x: x[0])
         rraw_days = [(d, r) for d, r, _, _ in days if r is not None]
         n_valid = sum(1 for _, _, v, _ in days if v is not None and v > 0)
         flagged = [(d, r, resume, _day_limit(code, d, r)) for d, r, _, resume in days]
         eligible = select_eligible_days(flagged, policy)
-        la_excluded = {d for c, d in listing_days if c == code}
+        la_excluded = listing_by_code.get(code, no_listing)
         eligible_la = select_eligible_days(flagged, policy, la_excluded)
         n_rraw = len(rraw_days)
         n_max = len(eligible)
