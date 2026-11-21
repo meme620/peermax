@@ -30,7 +30,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from pricing_lib import IQR_POOL_REGISTERED, SAMPLE_VERSION_V5, OUT_DIR, ROOT, SAMPLE_VERSION_LABEL, assert_pricing_contract, demean_by, fm_cluster_se, fm_regression, param_value, progress, sample_path, vif_table, write_json
+from pricing_lib import IQR_POOL_REGISTERED, HEADLINE_SAMPLE_VERSION, OUT_DIR, ROOT, SAMPLE_VERSION_LABEL, assert_pricing_contract, demean_by, fm_cluster_se, fm_regression, param_value, progress, sample_path, vif_table, write_json
 
 P = param_value('sample_and_spec_registry')
 NW_LAG = int(param_value('nw_lag'))
@@ -179,7 +179,7 @@ def main(argv=None):
     args = parse_args(argv)
     ver = args.sample_version
     sfx = args.out_suffix
-    ver_id = SAMPLE_VERSION_V5
+    ver_id = HEADLINE_SAMPLE_VERSION  # registry 指针是唯一来源，不写死版本常量
     # Phase 1 I-2：启动即核验登记样本 build report 的四条硬门；失败退出，不写任何新结果。
     sample_report = json.loads(sample_report_path(ver).read_text(encoding='utf-8'))
     assert_pricing_contract(sample_report, where='pricing_fm_main:build_report')

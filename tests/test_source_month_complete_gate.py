@@ -53,7 +53,8 @@ def _fixture(tmp_path):
     for i in range(14):
         rows.append(["sz000002", f"2015-03-{i + 1:02d}", "100", "0.0060"])
     panel = tmp_path / "daily_panel"
-    _write_csv(panel / "2015.csv", ["code", "date", "volume", "rraw"], rows)
+    _write_csv(panel / "2015.csv", ["code", "date", "volume", "rraw", "r_adj"],
+               [r + [r[3]] for r in rows])
     return panel
 
 
@@ -117,7 +118,7 @@ def test_complete_month_boundary_identity_and_d02(tmp_path):
     assert (ok["missing_reason"] == "").all()
     # available_at = 当月全市场最后交易日
     assert set(df["available_at"]) == {"2015-01-16", "2015-02-15", "2015-03-14"}
-    assert set(df["source_month_version"]) == {"src_month_v2_20261116"}
+    assert set(df["source_month_version"]) == {mod.SOURCE_MONTH_VERSION}
     assert set(df["source_version"]) == {"tencent_daily_panel_20260630"}
     assert report["min_valid_days"] == 15
     assert report["complete_month_rows"] == 3

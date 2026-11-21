@@ -1,4 +1,4 @@
-registry_version: 1.7.0-peermax-baseline
+registry_version: 1.8.0-peermax-baseline
 meta:
   baseline_date: '2026-11-19'
   source: 按代码与契约测试重建；非主仓库原文件
@@ -6,6 +6,18 @@ meta:
     主控制集、listing_grace_days、placebo_draws、VIF 阈值、NW 滞后网格、市值/ST/微盘缺失口径；修正
     network_cutoff_rule 与 limit_hit_source 的字面量。change_log 见文件头。'
 change_log:
+  - id: CO-2026-11-21-adj-return-basis
+    date: '2026-11-21'
+    scope: MAX 收益基期改为后复权（r_adj），与 outcome 的 post_adjusted 口径统一
+    rationale: 原 rraw 用不复权 close 环比，除权日产生伪极端收益（实测单日 -47% 级），
+      与 proposal 定义的 corporate-action-corrected 日收益相反；且 outcome R_next 为后复权，
+      treatment 与 outcome 基期不一致。proposal 措辞无需改，改的是实现与被错误登记的口径。
+    params: [sample_and_spec_registry, iqr_pool_value, K_Consist_Pricing, shadow_legacy_sample_version]
+    sample_version_from: pricing_sample_v5_teacher_only_20261120
+    sample_version_to: pricing_sample_v6_adj_20261121
+    version_from: 1.7.0-peermax-baseline
+    version_to: 1.8.0-peermax-baseline
+    approval: 用户批准开 v6 重跑（2026-11-21 本工作区会话）
   - id: CO-2026-11-20-teacher-only
     date: '2026-11-20'
     scope: 样本口径定为老师语料两列（ma_teacher / mb_teacher）
@@ -80,7 +92,7 @@ parameters:
     headline_value: 0.003
     note: portfolio_spread 组合 spread 阈值（月收益单位）；spec/design.yaml pricing_gates 的 registry_key
   - name: K_Consist_Pricing
-    headline_value: 0.177143
+    headline_value: 0.177096
     derived_from: K_Econ_Pricing / iqr_pool_value
     sensitivity_grid:
       - 0.128135
@@ -162,7 +174,7 @@ parameters:
     note: K 目标的定义与可复算口径登记（2026-11-20 审查 P1-2）；改本块必须同步 sw2_target 实现
   - name: sample_and_spec_registry
     headline_value:
-      sample_version: pricing_sample_v5_teacher_only_20261120
+      sample_version: pricing_sample_v6_adj_20261121
       min_focal_count_per_month: 100
       min_effective_month_count: 60
       iqr_scale_rule_id: IQR_POOL_TREATMENT_ONLY_v1
@@ -171,7 +183,7 @@ parameters:
       tost_rule_id: TOST_EW_VW_K_Consist_Pricing
     note: pricing 样本与规格登记块；sample_version 是 headline 唯一指针（pricing_* 与 peerlab 均读此值）
   - name: shadow_legacy_sample_version
-    headline_value: pricing_sample_v5_teacher_only_20261120
+    headline_value: pricing_sample_v6_adj_20261121
     note: shadow_* 读的样本版本；与 sample_and_spec_registry.sample_version 同值，只读同一份两列样本
   - name: pricing_main_controls_v1
     headline_value:
@@ -236,7 +248,7 @@ parameters:
     headline_value: deprecated
     note: ca_flag 由 SHAREBONUS 除权日表替代；仍写入面板仅作审计，消费方不得据此过滤。退役条件 = shadow_adjusted_max_build 的复权 MAX 升为登记口径后删除该列
   - name: iqr_pool_value
-    headline_value: 0.01693548
+    headline_value: 0.016939995
     note: pricing 经济量级的 treatment-only 池化 IQR 登记值（headline 列 ma_teacher）；
       pricing_lib.IQR_POOL_REGISTERED 导入即核对该值，pricing_sample_build 用 iqr_drift_tolerance 查漂移
   - name: pc_coverage_years

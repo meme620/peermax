@@ -106,21 +106,23 @@ AMOUNT_CACHE_META_REQUIRED = (
     'script_path', 'script_bytes', 'created_at_utc',
 )
 
-# 样本版本一律不可变（spec/design.yaml:immutable_versions 登记 v1..v5）：v1–v4 保留为
-# 已落盘 parquet 的读取标识与 v1/v2 敏感性路径，v5 是当前 headline（只有老师 MD&A 两列）。
+# 样本版本一律不可变（spec/design.yaml:immutable_versions 登记 v1..v6）：v1–v4 保留为
+# 已落盘 parquet 的读取标识，v5 为不复权 MAX 口径（已被 v6 取代、保留读取），
+# v6 是当前 headline（只有老师 MD&A 两列 + 后复权 MAX 基期）。
 SAMPLE_VERSION_V1 = 'pricing_sample_v1_2015_2023'
 SAMPLE_VERSION_V2 = 'pricing_sample_v2_2015_2023'
 SAMPLE_VERSION_V3 = 'pricing_sample_v3_20261115'
 SAMPLE_VERSION_V4 = 'pricing_sample_v4_20261116'
 SAMPLE_VERSION_V5 = 'pricing_sample_v5_teacher_only_20261120'
+SAMPLE_VERSION_V6 = 'pricing_sample_v6_adj_20261121'
 
-SAMPLE_VERSION = SAMPLE_VERSION_V5
+SAMPLE_VERSION = SAMPLE_VERSION_V6
 
 _MONTH_RE = re.compile(r'^\d{4}-(0[1-9]|1[0-2])$')
 
 IQR_POOL_RULE_ID = 'IQR_POOL_TREATMENT_ONLY_v1'
 
-IQR_POOL_REGISTERED = 0.01693548
+IQR_POOL_REGISTERED = 0.016939995   # v6 样本 treatment-only 实算（v5 为 0.01693548）
 
 IQR_POOL_REGISTERED_SOURCE = ('configs/parameter_registry.yaml:'
                               'sample_and_spec_registry.iqr_scale_rule_id'
@@ -182,9 +184,10 @@ import os
 import pandas as pd
 import sys
 
-# 可解析的样本版本：headline v5 + shadow 仍登记的 legacy v2
+# 可解析的样本版本：headline v6 + v5（已落盘 parquet，保留读取做口径对照）+ shadow legacy v2
 # （退役条件见 registry 的 shadow_legacy_sample_version）。
-_SAMPLE_SUFFIX = {'v5': 'v5', SAMPLE_VERSION_V5: 'v5',
+_SAMPLE_SUFFIX = {'v6': 'v6', SAMPLE_VERSION_V6: 'v6',
+                  'v5': 'v5', SAMPLE_VERSION_V5: 'v5',
                   'v2': 'v2', 'pricing_sample_v2_2015_2023': 'v2'}
 
 
@@ -1527,9 +1530,9 @@ IQR_POOL_REGISTERED = _IQR_REGISTRY
 # headline 样本指针与 ew_vw_consistency 等价界同样只认 registry，禁止各脚本再写字面量。
 _SAMPLE_REG = param_value('sample_and_spec_registry')
 HEADLINE_SAMPLE_VERSION = str(_SAMPLE_REG['sample_version'])
-# headline 只许 v5；shadow 仍登记在 v2（退役条件见下），因此 label 表需同时容纳两者。
-# 只保留 headline（v5）与 shadow 登记的 legacy 版本（v2）；v1/v3/v4 已退役，不再解析。
-_VERSION_LABELS = {SAMPLE_VERSION_V5: 'v5'}
+# headline 只许 registry 指针指向的版本（当前 v6）；v5 保留为已落盘 parquet 的读取标识。
+# v1/v3/v4 已退役，不再解析。
+_VERSION_LABELS = {SAMPLE_VERSION_V5: 'v5', SAMPLE_VERSION_V6: 'v6'}
 if HEADLINE_SAMPLE_VERSION not in _VERSION_LABELS:
     raise SystemExit(f"[STOP] registry sample_version={HEADLINE_SAMPLE_VERSION!r} 不在已登记版本集")
 SAMPLE_VERSION_LABEL = _VERSION_LABELS[HEADLINE_SAMPLE_VERSION]

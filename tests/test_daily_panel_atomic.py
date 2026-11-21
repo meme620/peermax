@@ -71,7 +71,7 @@ def test_first_run_writes_header_and_rows(tmp_path, monkeypatch):
 
     rows = _read(out / "2015.csv")
     assert rows[0] == mod.COLUMNS == [
-        "code", "date", "close_raw", "close_qfq", "volume", "amount", "rraw", "ca_flag",
+        "code", "date", "close_raw", "close_qfq", "volume", "amount", "rraw", "ca_flag", "r_adj",
     ]
     assert len(rows) == 1 + 2 * len(DATES)
     assert rows[1][:3] == ["sz000001", "2015-01-05", "10.0"]

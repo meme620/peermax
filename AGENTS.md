@@ -29,7 +29,7 @@ make env        # .venv（Python 3.13）+ requirements.txt
 make doctor     # 解释器 / 依赖 / configs / 数据 四块自检
 make imports    # 逐个导入 186 个脚本（会写出零星报告文件，跑完自动清理）
 make smoke      # peerlab L0：10 个实验逐个判就绪
-make lint       # 命名、清单、spec 引用、`scripts/<name>.py` 字面量断链
+make lint       # 命名、清单、spec 引用、`scripts/<name>.py` 字面量断链、codegraph 索引新鲜度
 make status     # 逐实验列出缺什么
 make gate       # 数据不变量门
 make selftest   # 快测：peerlab、共享模块、数据门
@@ -48,6 +48,7 @@ python -m pytest tests/ -q   # 契约测试，必须显式写 tests/；缺 data/
 ## 改动与校验
 
 - 改脚本名要同步三处：文件、`peerlab/registry.py`、测试与文档里的 `scripts/<name>.py` 字面量。
+- `make lint` 会检查 codegraph 索引是否落后于工作区，落后即失败并提示 `codegraph sync`。索引按设计不入库（`.gitignore`），没有 `.codegraph/` 的机器自动跳过。提交门（lefthook pre-commit）走 `--no-codegraph`：提交前工作区必然领先索引，否则每次提交恒红。
 - 每次改动后跑 `make lint` 与相称的 `pytest tests/ -q`；全量慢，先跑相关模块再加全量。
 - 改口径先改 `spec/*.yaml`（或 registry 的 `notes`），再跑 `python -m peerlab spec` 与 `make lint`；引用解析不到就是错，不要靠文档补充说明。
 

@@ -14,9 +14,15 @@ routes:
     blocked_by: G4
 
 variables:
+  - name: r_adj
+    definition: 后复权日收益（close_qfq 环比）；公司行为已调整，与 outcome 的 post_adjusted 基期一致。
+      不做市场/行业调整。这是 headline 收益基期（src_month_v3 起）
+    implemented_by: [daily_panel_build]
   - name: rraw
-    definition: 未复权日收益（raw close 环比）；不做公司行为修正，也不做市场/行业调整
+    definition: 未复权日收益（raw close 环比），保留为审计列；除权日会产生伪极端收益
+      （实测单日 -47% 级），不得用于 MAX 或月收益连乘
     implemented_by: [daily_panel_build, build_daily_returns]
+    status: AUDIT_ONLY
   - name: MAXraw
     definition: 月内最大 rraw，仅取有效交易日；停牌日不填 0
     implemented_by: [peermax_max_build]
@@ -76,7 +82,7 @@ sample:
     distinct_sources: true
     rule: 主口径与敏感性列必须来自两条不同序列（复权 / 未复权）；同源即视为口径登记失效
   missing_states: [missing, not_covered, not_matched, unknown_timing]
-  immutable_versions: [pricing_sample_v5_teacher_only_20261120]
+  immutable_versions: [pricing_sample_v5_teacher_only_20261120, pricing_sample_v6_adj_20261121]
   columns: [ma_teacher, mb_teacher]
   columns_note: 两列都是老师 MD&A 语料网络（M-A 中文法 / M-B TF-IDF）；没有其它语料列。
 
@@ -241,7 +247,9 @@ sample_filters:
   enforced_by: [script:pricing_sample_build]
 
 max_definition:
-  return_basis: raw_close
+  return_basis: post_adjusted_close_qfq
+  return_basis_note: 收益基期为 close_qfq 环比（r_adj）；src_month_v2 及以前为 raw_close（不复权），
+    该口径在除权日产生伪极端收益且与 outcome 基期不一致，已在 v6 样本中退役
   registry_key: max_day_policy
   market_or_industry_adjusted: false
   enforced_by: [script:peermax_max_build]

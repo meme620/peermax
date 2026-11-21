@@ -22,7 +22,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts/peermax_max_build.py"
 REGISTRY = ROOT / "configs/parameter_registry.yaml"
 
-PANEL_HEADER = ["code", "date", "rraw"]
+PANEL_HEADER = ["code", "date", "rraw", "r_adj"]
 
 
 def _load(name="s4_step1_max_i15"):
@@ -59,7 +59,7 @@ def _tie_panel(tmp_path):
         ["sz000002", "2015-02-10", "0.03000000"],
     ]
     panel_dir = tmp_path / "daily_panel"
-    _write_csv(panel_dir / "2015.csv", PANEL_HEADER, rows)
+    _write_csv(panel_dir / "2015.csv", PANEL_HEADER, [r + [r[2]] for r in rows])
     return panel_dir, rows
 
 

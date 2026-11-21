@@ -1,6 +1,6 @@
 # 结果摘要
 
-种子集合：(0, 1, 2, 3, 4)；成功运行 47 次。
+种子集合：(0, 1, 2, 3, 4)；成功运行 64 次。
 
 ## estimation-sample — pricing_gate 样本构建（run-all 只跑一次）
 
@@ -21,8 +21,8 @@
 ## fm-main-table — pricing_gate 主表：Fama-MacBeth + horse race
 
 - 种子：[0, 1, 2, 3, 4]
-- beta_peer：0.0491699（6 个种子完全一致）
-- t_peer：0.739724（6 个种子完全一致）
+- beta_peer：0.0488252 ± 0.000528
+- t_peer：0.734542 ± 0.00794
 
 ## portfolio-sorts — pricing_gate 组合表：五分位/十分位 spread
 

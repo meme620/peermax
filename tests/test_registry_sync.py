@@ -34,4 +34,4 @@ def test_headline_sample_version_is_single_source():
     reg = lib.param_value("sample_and_spec_registry")
     assert lib.HEADLINE_SAMPLE_VERSION == reg["sample_version"]
     assert lib.sample_path("ma_teacher") == lib.sample_path("ma_teacher", lib.SAMPLE_VERSION_LABEL)
-    assert lib.SAMPLE_VERSION_LABEL in ("v1", "v2", "v3", "v4", "v5")
+    assert lib.SAMPLE_VERSION_LABEL in ("v1", "v2", "v3", "v4", "v5", "v6")

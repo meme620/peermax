@@ -55,7 +55,9 @@ def _registry(tmp_path, grace, limit_hit="exclude", resume="exclude"):
 
 def _panel(tmp_path, rows):
     panel = tmp_path / "daily_panel"
-    _write_csv(panel / "2020.csv", ["code", "date", "volume", "rraw"], rows)
+    # headline 收益基期是 r_adj（后复权）；夹具里 r_adj 与 rraw 同值，只验宽限/阈值逻辑
+    _write_csv(panel / "2020.csv", ["code", "date", "volume", "rraw", "r_adj"],
+               [r + [r[3]] for r in rows])
     dates = sorted({r[1] for r in rows})
     codes = sorted({r[0][2:] for r in rows})
     st = _flag_pickle(tmp_path / "st.pkl", dates, codes)

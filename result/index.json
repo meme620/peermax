@@ -739,6 +739,56 @@
       "started_at": "2026-11-20T16:16:53+00:00",
       "seconds": 1.48,
       "git_commit": "53410f7"
+    },
+    {
+      "run_id": "fm-main-table--s0--20261121T092810Z",
+      "exp": "fm-main-table",
+      "seed": 0,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-21T09:28:10+00:00",
+      "seconds": 15.93,
+      "git_commit": "5428d94"
+    },
+    {
+      "run_id": "fm-main-table--s1--20261121T092849Z",
+      "exp": "fm-main-table",
+      "seed": 1,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-21T09:28:49+00:00",
+      "seconds": 18.04,
+      "git_commit": "5428d94"
+    },
+    {
+      "run_id": "fm-main-table--s2--20261121T092909Z",
+      "exp": "fm-main-table",
+      "seed": 2,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-21T09:29:09+00:00",
+      "seconds": 20.98,
+      "git_commit": "5428d94"
+    },
+    {
+      "run_id": "fm-main-table--s3--20261121T092931Z",
+      "exp": "fm-main-table",
+      "seed": 3,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-21T09:29:31+00:00",
+      "seconds": 17.94,
+      "git_commit": "5428d94"
+    },
+    {
+      "run_id": "fm-main-table--s4--20261121T092950Z",
+      "exp": "fm-main-table",
+      "seed": 4,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-21T09:29:50+00:00",
+      "seconds": 17.13,
+      "git_commit": "5428d94"
     }
   ]
 }

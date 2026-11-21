@@ -26,7 +26,7 @@ def test_headline_and_shadow_pointers_are_distinct_registry_entries():
     assert lib.HEADLINE_SAMPLE_VERSION == head
     # shadow 指针已随样本重建推进到 headline 同版本（registry 两个键分别登记，
     # 只是当前取值相同）；两个路径都必须解析到登记的那个版本。
-    assert lib.SHADOW_SAMPLE_VERSION_LABEL in ('v2', 'v5')
+    assert lib.SHADOW_SAMPLE_VERSION_LABEL in ('v2', 'v5', 'v6')
     assert lib.sample_path('ma_teacher').name.endswith(f"_{lib.SAMPLE_VERSION_LABEL}.parquet")
     assert lib.shadow_sample_path('ma_teacher').name.endswith(
         f"_{lib.SHADOW_SAMPLE_VERSION_LABEL}.parquet")

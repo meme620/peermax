@@ -35,7 +35,7 @@ REPORT_PATH = ROOT / "reports/data_gates/G0/daily_panel_build_report.json"
 from pricing_lib import param_value
 
 RATIO_JUMP = float(param_value('ca_ratio_jump'))  # qfq/raw 比值跳变阈值（除权日检测）
-COLUMNS = ["code", "date", "close_raw", "close_qfq", "volume", "amount", "rraw", "ca_flag"]
+COLUMNS = ["code", "date", "close_raw", "close_qfq", "volume", "amount", "rraw", "ca_flag", "r_adj"]
 
 
 def _refuse(msg):
@@ -246,6 +246,8 @@ def run_drive(out_dir=OUT_DIR, years=None, *, mode="default", append_reason=None
     amt = pd.read_pickle(DRIVE_AMT).reindex(index=raw.index, columns=raw.columns)
 
     rraw = raw.pct_change(fill_method=None)
+    # r_adj = 后复权价环比：公司行为已调整，是 MAX 的 headline 口径（spec/design.yaml max_definition）
+    r_adj = adj.pct_change(fill_method=None)
     ratio = adj / raw.where(raw > 0)
     ca = (ratio.pct_change(fill_method=None).abs() > RATIO_JUMP).fillna(False)
 
@@ -262,8 +264,9 @@ def run_drive(out_dir=OUT_DIR, years=None, *, mode="default", append_reason=None
             "amount": amt.loc[m].stack(future_stack=True),
             "rraw": rraw.loc[m].stack(future_stack=True),
             "ca": ca.loc[m].stack(future_stack=True),
+            "r_adj": r_adj.loc[m].stack(future_stack=True),
         }).reset_index()
-        sub.columns = ["date", "code", "close_raw", "close_qfq", "amount", "rraw", "ca"]
+        sub.columns = ["date", "code", "close_raw", "close_qfq", "amount", "rraw", "ca", "r_adj"]
         sub = sub[sub["close_raw"].notna()]
         if sub.empty:
             continue
@@ -278,7 +281,8 @@ def run_drive(out_dir=OUT_DIR, years=None, *, mode="default", append_reason=None
                             "" if pd.isna(rec.close_qfq) else f"{rec.close_qfq:.6f}",
                             vol, vol,
                             "" if pd.isna(rec.rraw) else f"{rec.rraw:.8f}",
-                            int(bool(rec.ca))])
+                            int(bool(rec.ca)),
+                            "" if pd.isna(rec.r_adj) else f"{rec.r_adj:.8f}"])
         finally:
             f.close()
         os.replace(tmp, targets[yr])
@@ -296,7 +300,8 @@ def run_drive(out_dir=OUT_DIR, years=None, *, mode="default", append_reason=None
         "by_year": {y: {"rows": v[0], "ca_flags": v[1], "firms": v[2]} for y, v in sorted(stats.items())},
         "volume_semantics": "amount_proxy_v1（volume 列写成交额；下游只用 >0 判交易日）",
         "close_qfq_semantics": "daily_adj_close_post（后复权）",
-        "note": "rraw=raw close 派生；ca_flag=后复权/不复权比值跳变阈值",
+        "note": ("rraw=raw close 派生（审计列）；r_adj=后复权价环比，headline MAX 口径；"
+                 "ca_flag=后复权/不复权比值跳变阈值"),
     }
     if report_path is not None:
         _write_json_atomic(report_path, summary)

@@ -156,7 +156,8 @@ def test_empty_panel_dir_gives_zero_trade_days(tmp_path):
 # peermax_max_build（口径更正）：complete_month 边界 / D-02=A / registry fail-closed
 # ---------------------------------------------------------------------------
 
-PANEL_HEADER = ["code", "date", "volume", "rraw"]
+# headline 收益基期是 r_adj（后复权）；夹具里与 rraw 同值，只验 complete_month 边界
+PANEL_HEADER = ["code", "date", "volume", "rraw", "r_adj"]
 
 
 def _gate_panel(tmp_path):
@@ -169,7 +170,7 @@ def _gate_panel(tmp_path):
     for i in range(5):
         rows.append(["sz000003", f"2015-01-{i + 1:02d}", "", f"{0.003 * (i + 1):.8f}"])
     panel_dir = tmp_path / "daily_panel"
-    _write_csv(panel_dir / "2015.csv", PANEL_HEADER, rows)
+    _write_csv(panel_dir / "2015.csv", PANEL_HEADER, [r + [r[3]] for r in rows])
     return panel_dir
 
 

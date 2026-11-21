@@ -30,7 +30,7 @@ import sys
 import numpy as np
 import pandas as pd
 
-from pricing_lib import HARD_GATE_KEYS, IQR_POOL_REGISTERED, IQR_POOL_REGISTERED_SOURCE, IQR_POOL_RULE_ID, ILLIQ_FORMULA_ID, AMOUNT_CACHE_NAME, SAMPLE_VERSION_V5, OUT_DIR, PANELS, ROOT, SAMPLE_DIR, SAMPLE_WINDOW_END, SAMPLE_WINDOW_START, add_weight_rules, aggregate_edges, assert_pricing_contract, assert_pricing_inputs, code6, load_analyst_derived, load_chars, load_edges, load_amount_100m_cached, load_input_contracts, load_me, load_panel, load_registry, load_returns_raw, load_returns_v2, load_src_month, load_st, load_sw2, load_turnover_drive, months_between, param_value, progress, require, sample_path, sample_window_bounds, file_size, winsor_bounds, winsorize_by_month, write_json, ym_add
+from pricing_lib import HARD_GATE_KEYS, IQR_POOL_REGISTERED, IQR_POOL_REGISTERED_SOURCE, IQR_POOL_RULE_ID, ILLIQ_FORMULA_ID, AMOUNT_CACHE_NAME, SAMPLE_VERSION_V6, OUT_DIR, PANELS, ROOT, SAMPLE_DIR, SAMPLE_WINDOW_END, SAMPLE_WINDOW_START, add_weight_rules, aggregate_edges, assert_pricing_contract, assert_pricing_inputs, code6, load_analyst_derived, load_chars, load_edges, load_amount_100m_cached, load_input_contracts, load_me, load_panel, load_registry, load_returns_raw, load_returns_v2, load_src_month, load_st, load_sw2, load_turnover_drive, months_between, param_value, progress, require, sample_path, sample_window_bounds, file_size, winsor_bounds, winsorize_by_month, write_json, ym_add
 
 # Phase 1 I-5：winsor 边界与样本窗口一律来自 registry（当前 [0.01,0.99] / 2015-01..2023-12，
 # 与旧硬编码逐值相同 → 零数值变化）。导入即校验，非法 registry 值 SystemExit(2)。
@@ -426,7 +426,7 @@ def main(argv=None):
         progress(f'A4 行业 baseline 就绪（申万一级/二级 × EW/VW，{len(ind):,} 行）')
 
     report = {
-        'sample_version': SAMPLE_VERSION_V5,
+        'sample_version': SAMPLE_VERSION_V6,
         'run_at': pd.Timestamp.utcnow().isoformat(),
         'script': 'scripts/pricing_sample_build.py',
         'phase': 'A：两列 teacher-only 样本构造',
@@ -611,7 +611,7 @@ def main(argv=None):
             'actual_window_available': actual_window != NO_NETWORK_VERSION,
         }
         report['samples'][key] = {
-            'sample_version': SAMPLE_VERSION_V5,
+            'sample_version': SAMPLE_VERSION_V6,
             'status': 'active_headline',
             'path': str(sample_path(key).relative_to(ROOT)),
             'sample_window': WINDOW,                     # I-16：旧列/旧字段保持申请窗（兼容）
@@ -779,7 +779,7 @@ def main(argv=None):
         k: _integrity_checks(pd.read_parquet(sample_path(k))) for k in PANELS}
 
     report['sample_versions'] = {
-        'headline': {'version': SAMPLE_VERSION_V5, 'status': 'active',
+        'headline': {'version': SAMPLE_VERSION_V6, 'status': 'active',
                      'columns': sorted(PANELS),
                      'files': [str(sample_path(k).relative_to(ROOT)) for k in PANELS],
                      'rules_applied': [f'sample_window {WINDOW}（事件月；registry sample_start/sample_end）',
@@ -794,7 +794,7 @@ def main(argv=None):
     write_json(OUT_DIR / 'pricing_sample_report.json', report)
     summary = {
         'artifact': 'pricing_sample_summary',
-        'sample_version': SAMPLE_VERSION_V5,
+        'sample_version': SAMPLE_VERSION_V6,
         'run_at': report['run_at'],
         'sample_period_event_month': WINDOW,
         'sample_window_actual_by_column': actual_windows,

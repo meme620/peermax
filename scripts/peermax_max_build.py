@@ -7,8 +7,10 @@
   n_valid_days_{j,t} = volume>0 的有效交易日数（口径更正 标准；完整月唯一依据）
   n_rraw_days_{j,t}  = rraw 非空日数（旧口径，仅审计）
   n_max_days_{j,t}   = valid_trade=1 & rraw 非空日数（日面板无 valid_trade → 按 rraw 非空派生）
-  MAXraw_{j,t} = max rraw over rraw 非空日；d* = argmax（tie rule 由 registry `tie_rule` 解析）
-  R_{j,t} = prod(1+rraw) - 1 over rraw 非空日
+  MAXraw_{j,t} = max r_adj over r_adj 非空日；d* = argmax（tie rule 由 registry `tie_rule` 解析）
+  R_{j,t} = prod(1+r_adj) - 1 over r_adj 非空日
+  收益基期 = 后复权（r_adj = close_qfq 环比）：公司行为已调整，与 outcome R_next 的
+  post_adjusted 口径一致。旧的不复权 rraw 仅留审计（--return-basis raw 可复现旧读数）。
   complete_month = 1{n_valid_days >= min_valid_days}（min_valid_days 从 registry 顶层参数读取）
   limit_hit 派生（草案口径，登记）：|rraw| >= 0.095（主板）/0.195（创业板/科创板）→ 1；
     ST 5% 无数据 → limit_status_unknown 分层（ST 数据到位后精确）
@@ -51,7 +53,7 @@ IPO_PLACEHOLDER = "2000-01-04"   # firm_id_map 对 925 只主板老股的占位�
 PANEL_START = date(2006, 1, 4)  # 日面板可观测起点
 
 MIN_VALID_DAYS_PARAM = "min_valid_days"
-SOURCE_MONTH_VERSION = "src_month_v2_20261116"
+SOURCE_MONTH_VERSION = "src_month_v3_20261121"   # r_adj 口径；v2 为不复权 rraw 口径
 SOURCE_VERSION = "tencent_daily_panel_20260630"
 FORMULA_ID = "MAXRAW_v1"
 
@@ -409,7 +411,10 @@ def load_ipo_dates(path=IPO_MAP):
     return out
 
 
-def build_monthly(panel_dir, grace_days=0, ipo_dates=None):
+RETURN_COL = "r_adj"   # headline 收益基期；--return-basis raw 时改用 rraw（审计/复现旧读数）
+
+
+def build_monthly(panel_dir, grace_days=0, ipo_dates=None, return_col=RETURN_COL):
     """(code, month) -> [(date, rraw|None, volume|None)]（保留全部日频行）。
 
     同时返回全市场交易日历 month -> max(date)，以及上市宽限窗口内的 (code, date) 集合。
@@ -424,7 +429,7 @@ def build_monthly(panel_dir, grace_days=0, ipo_dates=None):
         with open(yf, encoding="utf-8") as f:
             for r in csv.DictReader(f):
                 vol = _num_or_none(r.get("volume"))
-                recs[r["code"]].append((r["date"], _num_or_none(r.get("rraw")), vol))
+                recs[r["code"]].append((r["date"], _num_or_none(r.get(return_col)), vol))
                 dates.add(r["date"])
                 if vol is not None and vol > 0:
                     volume_months.add(r["date"][:7])
@@ -530,7 +535,7 @@ def _source_month_row(*, code, month, n_valid, n_rraw, n_max, R, maxv, argmax_d,
 
 
 def run(panel_dir=PANEL, out=OUT, out_json=OUT_JSON, st_flag=ST_FLAG,
-        min_valid_days=None, registry_path=None):
+        min_valid_days=None, registry_path=None, return_col=RETURN_COL):
     """构造 source-month 面板。min_valid_days=None → 从 registry 顶层参数读取。"""
     if min_valid_days is None:
         min_valid_days = resolve_min_valid_days(registry_path)
@@ -547,7 +552,8 @@ def run(panel_dir=PANEL, out=OUT, out_json=OUT_JSON, st_flag=ST_FLAG,
 
     ipo_dates = load_ipo_dates(IPO_MAP)
     monthly, calendar, volume_months, listing_days = build_monthly(
-        panel_dir, grace_days=int(policy["listing_grace_days"]), ipo_dates=ipo_dates)
+        panel_dir, grace_days=int(policy["listing_grace_days"]), ipo_dates=ipo_dates,
+        return_col=return_col)
     print(f"上市宽限期: grace={policy['listing_grace_days']}d；"
           f"ipo_date 可用 {len(ipo_dates)} 只（其余按面板最早 N 行回退）", flush=True)
     unobservable = sorted(m for m in calendar if m not in volume_months)
@@ -819,8 +825,12 @@ def main(argv=None):
                     help="显式覆盖 registry min_valid_days（仅测试/审计注入；缺省从 registry 读取）")
     ap.add_argument("--registry", default=None,
                     help="registry YAML（默认 configs/parameter_registry.yaml；仅测试注入用）")
+    ap.add_argument("--return-basis", choices=["adj", "raw"], default="adj",
+                    help="收益基期：adj=后复权 r_adj（headline，口径与 outcome R_next 一致）；"
+                         "raw=不复权 rraw（复现 src_month_v2 旧读数，仅审计）")
     args = ap.parse_args(argv)
-    run(min_valid_days=args.min_valid_days, registry_path=args.registry)
+    run(min_valid_days=args.min_valid_days, registry_path=args.registry,
+        return_col="r_adj" if args.return_basis == "adj" else "rraw")
 
 
 if __name__ == "__main__":

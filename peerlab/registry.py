@@ -15,7 +15,8 @@ SEEDS: tuple[int, ...] = (0, 1, 2, 3, 4)
 
 _LABELS = {'pricing_sample_v1_2015_2023': 'v1', 'pricing_sample_v2_2015_2023': 'v2',
            'pricing_sample_v3_20261115': 'v3', 'pricing_sample_v4_20261116': 'v4',
-           'pricing_sample_v5_teacher_only_20261120': 'v5'}
+           'pricing_sample_v5_teacher_only_20261120': 'v5',
+           'pricing_sample_v6_adj_20261121': 'v6'}
 
 
 def headline_sample_label(root=None) -> str:

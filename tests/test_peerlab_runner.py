@@ -83,8 +83,11 @@ def test_readiness_reports_missing(tmp_path: Path):
     (tmp_path / 'data/processed').mkdir(parents=True)
     check = runner.readiness(exp, tmp_path)
     assert check['ready'] is False
-    assert 'data/processed/pricing_sample_ma_teacher_v5.parquet' in check['missing']
-    (tmp_path / 'data/processed/pricing_sample_ma_teacher_v5.parquet').write_bytes(b'')
+    # 文件名随 headline 样本版本变，从 registry 指针推导，避免每次升版都要改测试
+    label = registry.headline_sample_label()
+    sample = f'data/processed/pricing_sample_ma_teacher_{label}.parquet'
+    assert sample in check['missing']
+    (tmp_path / sample).write_bytes(b'')
     assert runner.readiness(exp, tmp_path)['ready'] is True
 
 

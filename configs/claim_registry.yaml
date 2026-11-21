@@ -10,7 +10,7 @@ claims:
     formula_id:
       - F_PRICING_HEADLINE_v1
     input_tables:
-      - data/processed/pricing_sample_ma_teacher_v5.parquet
+      - data/processed/pricing_sample_ma_teacher_v6.parquet
     input_fields:
       - PeerMAXraw
       - OwnMAXraw
@@ -29,7 +29,7 @@ claims:
     formula_id:
       - F_PRICING_PORTFOLIO_v1
     input_tables:
-      - data/processed/pricing_sample_ma_teacher_v5.parquet
+      - data/processed/pricing_sample_ma_teacher_v6.parquet
     input_fields:
       - PeerMAXraw
       - R_next

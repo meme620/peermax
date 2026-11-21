@@ -9,7 +9,7 @@ gate 定义（registry：alpha_pricing / K_Econ_Pricing / K_Spread_Pricing / K_C
   portfolio_spread portfolio spread：|spread_H - spread_L| >= K_Spread_Pricing（headline=五分位 EW）
   ew_vw_consistency EW/VW 一致性：|beta_EW - beta_VW| <= K_Consist_Pricing 且符号一致、均显著、TOST 等价
 并附硬性数值条件：逐月满秩 / 残差 df>0 / 协方差有限 / T_effective 与每月 N_t 达标 /
-主 portfolio 组别无未处理空组。**仅显著 != PASS**（plan §5.7A economic_magnitude.6）。
+主 portfolio 组别无未处理空组。**仅显著 != PASS**（spec/design.yaml 的 pricing_gates 五条 AND）。
 
 2026-10-10 复核修复批：headline 样本 = pricing_sample_v2_2015_2023（I3 microcap/次新股筛除已施加）；
 v1（未施加 microcap 筛除）gate 逐条重算并报（I4 统一登记 IQR；I5 VIF 作用域 + 跨规格最大值）。
@@ -668,9 +668,9 @@ def main(argv=None):
         'pricing_gate_status=FAIL 只表示未过预注册 gate；不得写成「零效应」或「折价为零」。',
     ]
 
-    rep['gate_and_rule'] = 'sign AND one_sided_significance AND economic_magnitude AND portfolio_spread AND ew_vw_consistency AND 硬性数值与覆盖条件（plan §5.7A economic_magnitude.6 / registry pricing_gate_rules）'
+    rep['gate_and_rule'] = 'sign AND one_sided_significance AND economic_magnitude AND portfolio_spread AND ew_vw_consistency AND 硬性数值与覆盖条件（spec/design.yaml 的 pricing_gates）'
     rep['stop_action'] = ({
-        'action': 'STOP standalone MAX-pricing claim（plan §5.7A economic_magnitude.6）：保留描述性关联，'
+        'action': 'STOP standalone MAX-pricing claim（spec/design.yaml pricing_gates + proposal 第 7 节停止规则第 2 条）：保留描述性关联，'
                   '不进入 S6–S12 强机制叙事；pricing_gate 失败不得用 portfolio / functional-form 诊断补救；'
                   '本停机不因无 turnover 规格为负而解除，也不得用事后更换主控制集（移出 turnover/rev）、'
                   '组合或函数形式补救',
@@ -683,8 +683,8 @@ def main(argv=None):
                           '（PeerReturn 同入后塌缩），horse race 的 pricing_horse_own_ind_l1/l2 不含 PeerReturn、'
                           '吸收幅度被高估，判读以 A12 含 PeerReturn 的规格为准。')
     rep['note_methodology'] = ('methodology §7 pricing_gate 强调 headline 只绑定 primary estimand（FM 系数/NW/方向/量级）；'
-                               'portfolio_spread/ew_vw_consistency 属 supporting evidence 层。本报告的 AND 判定按 plan §5.7A economic_magnitude.6 与 '
-                               'registry pricing_gate_rules 执行，两者差异如实并列。')
+                               'portfolio_spread/ew_vw_consistency 属 supporting evidence 层。本报告的 AND 判定按 '
+                               'spec/design.yaml 的 pricing_gates 执行，与 proposal 停止规则的对应关系逐条登记。')
     write_json(OUT_DIR / f'pricing_gate_report{sfx}.json', rep)
     _write_md(rep, lc, ia, rob, OUT_DIR / f'pricing_gate_report{sfx}.md')
     progress(f"pricing_gate_status={rep['pricing_gate_status']}；"
