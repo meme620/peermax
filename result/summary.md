@@ -21,8 +21,8 @@
 ## fm-main-table — pricing_gate 主表：Fama-MacBeth + horse race
 
 - 种子：[0, 1, 2, 3, 4]
-- beta_peer：0.0488252 ± 0.000528
-- t_peer：0.734542 ± 0.00794
+- beta_peer：0.0480668（5 个种子完全一致）
+- t_peer：0.723141（5 个种子完全一致）
 
 ## portfolio-sorts — pricing_gate 组合表：五分位/十分位 spread
 

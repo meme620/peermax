@@ -826,11 +826,18 @@ def main(argv=None):
     ap.add_argument("--registry", default=None,
                     help="registry YAML（默认 configs/parameter_registry.yaml；仅测试注入用）")
     ap.add_argument("--return-basis", choices=["adj", "raw"], default="adj",
-                    help="收益基期：adj=后复权 r_adj（headline，口径与 outcome R_next 一致）；"
-                         "raw=不复权 rraw（复现 src_month_v2 旧读数，仅审计）")
+                    help="收益基期：adj=后复权 r_adj（headline）；raw=不复权 rraw（仅审计，"
+                         "写独立文件名，不覆盖 headline 面板）")
+    ap.add_argument("--out", default=None, help="输出 CSV（默认按 return-basis 推导）")
+    ap.add_argument("--out-json", default=None, help="输出报告 JSON（默认按 return-basis 推导）")
     args = ap.parse_args(argv)
+    adj = args.return_basis == "adj"
+    # raw 是审计口径：默认写 *_raw_basis.csv，绝不覆盖 headline 面板与报告
+    out = args.out or (OUT if adj else OUT.with_name(OUT.stem + "_raw_basis.csv"))
+    out_json = args.out_json or (OUT_JSON if adj else OUT_JSON.with_name(
+        OUT_JSON.stem + "_raw_basis.json"))
     run(min_valid_days=args.min_valid_days, registry_path=args.registry,
-        return_col="r_adj" if args.return_basis == "adj" else "rraw")
+        out=out, out_json=out_json, return_col="r_adj" if adj else "rraw")
 
 
 if __name__ == "__main__":

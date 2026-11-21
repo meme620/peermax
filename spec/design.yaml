@@ -24,7 +24,7 @@ variables:
     implemented_by: [daily_panel_build, build_daily_returns]
     status: AUDIT_ONLY
   - name: MAXraw
-    definition: 月内最大 rraw，仅取有效交易日；停牌日不填 0
+    definition: 月内最大 r_adj（后复权日收益），仅取有效交易日；停牌日不填 0
     implemented_by: [peermax_max_build]
   - name: PeerMAXraw
     definition: 事前网络权重加权的 peer MAX，唯一 headline treatment
@@ -257,7 +257,7 @@ max_definition:
   la_column: MAXraw_la
   note: MAXraw 剔除涨跌停日与停牌复牌首日；MAXraw_la 另剔上市后前 listing_grace_days 个交易日
     （新股无涨跌幅限制期）；MAXraw_incl_all 为含全部日的并列列。三列并报，headline 固定为 MAXraw。
-    月收益 R 与 PeerReturn 在全部 rraw 非空日上连乘（含被 MAX 剔除的涨跌停日与复牌首日），
+    月收益 R 与 PeerReturn 在全部 r_adj 非空日上连乘（含被 MAX 剔除的涨跌停日与复牌首日），
     因此 treatment 与 control 的日样本集不同；这是已登记口径，不视为缺陷，但写方法节时必须说明
 
 windows:

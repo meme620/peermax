@@ -106,9 +106,10 @@ AMOUNT_CACHE_META_REQUIRED = (
     'script_path', 'script_bytes', 'created_at_utc',
 )
 
-# 样本版本一律不可变（spec/design.yaml:immutable_versions 登记 v1..v6）：v1–v4 保留为
-# 已落盘 parquet 的读取标识，v5 为不复权 MAX 口径（已被 v6 取代、保留读取），
-# v6 是当前 headline（只有老师 MD&A 两列 + 后复权 MAX 基期）。
+# 样本版本一律不可变。spec/design.yaml:immutable_versions 只登记当前在用的 v5/v6；
+# v1–v4 仅保留为本文件里的读取标识（历史 parquet 已退役）。
+# v5 = 不复权 MAX 口径（已被 v6 取代、保留读取做对照）；v6 = 当前 headline
+# （老师 MD&A 两列 + 后复权 MAX 基期）。
 SAMPLE_VERSION_V1 = 'pricing_sample_v1_2015_2023'
 SAMPLE_VERSION_V2 = 'pricing_sample_v2_2015_2023'
 SAMPLE_VERSION_V3 = 'pricing_sample_v3_20261115'

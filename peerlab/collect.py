@@ -157,6 +157,12 @@ def write_summary(result_dir: Path, experiments, seeds=registry.SEEDS) -> Path:
             lines.append('无成功运行。')
             lines.append('')
             continue
+        # 每个 seed 只取**最新**一次 run：同 seed 重跑会留下多条历史记录，
+        # 把旧口径（如 v5 样本）与新口径一起平均会让 summary 与 tables 互相矛盾。
+        latest_by_seed = {}
+        for record in sorted(exp_runs, key=lambda r: (r.get('started_at') or '', r['run_id'])):
+            latest_by_seed[record['seed']] = record
+        exp_runs = list(latest_by_seed.values())
         seeds_seen = sorted({r['seed'] for r in exp_runs})
         lines.append('- 种子：' + str(seeds_seen))
         for spec in exp.metrics:
