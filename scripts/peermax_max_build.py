@@ -31,7 +31,7 @@ import json
 import re
 import sys
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -44,6 +44,11 @@ REGISTRY = ROOT / "configs/parameter_registry.yaml"
 # 供应商涨跌停 flag 可得时优先用 flag（data/raw/drive/daily_limit_up_flag_*.pkl），阈值口径降为回退路径
 LIMIT_THRESHOLDS_PARAM = "limit_thresholds"
 LIMIT_HIT_FLAG = ROOT / "data/raw/drive/daily_limit_up_flag_20260630.pkl"
+# 上市宽限期的唯一日期来源：firm_id_map.ipo_date（原实现按「面板最早 N 行」推定，
+# 把 2006 年面板起点误当上市日，2006 年 1,420 只被判为新股，其中真正的 ipo_date>=2005 只有 78 只）
+IPO_MAP = ROOT / "data/processed/firm_id_map.csv"
+IPO_PLACEHOLDER = "2000-01-04"   # firm_id_map 对 925 只主板老股的占位值
+PANEL_START = date(2006, 1, 4)  # 日面板可观测起点
 
 MIN_VALID_DAYS_PARAM = "min_valid_days"
 SOURCE_MONTH_VERSION = "src_month_v2_20261116"
@@ -372,11 +377,44 @@ def resolve_max_day_policy(registry_path=None) -> dict:
     return out
 
 
-def build_monthly(panel_dir, grace_days=0):
+def load_ipo_dates(path=IPO_MAP):
+    """firm_id -> 真实上市日（date 或 None），覆盖表里登记过的全部股票。
+
+    值为 None 表示「登记了但上市日不可判定」，有两种形态：
+      - 占位值 2000-01-04（925 只主板老股的统一填充，一天不可能上市 925 家）；
+      - 早于面板起点（2006-01-04）：这些公司在面板第一天就已在市，其上市初期不在可观测窗口内。
+    None 与「表里没有这只」必须区分：前者不能退回面板最早 N 行（会剔到面板起点那几天），
+    后者才允许回退推定。
+    """
+    p = Path(path)
+    if not p.is_file():
+        print(f"[WARN] 缺 {_rel(p)}：上市宽限期退回「面板最早 N 行」推定，"
+              "该推定把面板起点误当上市日，仅作无 ipo_date 时的回退", flush=True)
+        return {}
+    out = {}
+    with open(p, encoding="utf-8", newline="") as f:
+        for r in csv.DictReader(f):
+            raw = (r.get("ipo_date") or "").strip()
+            if not raw:
+                continue
+            try:
+                d = datetime.strptime(raw, "%Y-%m-%d").date()
+            except ValueError:
+                out[r["firm_id"]] = None
+                continue
+            if d.isoformat() == IPO_PLACEHOLDER or d < PANEL_START:
+                out[r["firm_id"]] = None
+                continue
+            out[r["firm_id"]] = d
+    return out
+
+
+def build_monthly(panel_dir, grace_days=0, ipo_dates=None):
     """(code, month) -> [(date, rraw|None, volume|None)]（保留全部日频行）。
 
-    同时返回全市场交易日历 month -> max(date)，以及上市宽限窗口内的 (code, date) 集合：
-    每只股票在面板中最早出现的 grace_days 个有行情交易日（新股无涨跌幅限制期）。
+    同时返回全市场交易日历 month -> max(date)，以及上市宽限窗口内的 (code, date) 集合。
+    宽限窗口 = 真实上市日（ipo_dates）之后的 grace_days 个有行情交易日；
+    上市日不可判定时退回「面板最早 grace_days 行」（无 ipo_dates 的回退路径，会写进报告）。
     行集（D-11=A）：只保留至少 1 个 rraw 非空日的 (code, month)；不新增零交易日 skeleton 行。
     """
     recs = defaultdict(list)
@@ -394,10 +432,20 @@ def build_monthly(panel_dir, grace_days=0):
     prev_of = {d: (all_dates[i - 1] if i else None) for i, d in enumerate(all_dates)}
     monthly = defaultdict(list)
     listing_days = set()
+    ipo_map = ipo_dates or {}
     for code, rows in recs.items():
         rows.sort(key=lambda x: x[0])
         if grace_days:
-            listing_days.update((code, d) for d, _, _ in rows[:grace_days])
+            if code in ipo_map:
+                ipo = ipo_map[code]
+                if ipo is not None:
+                    # 上市日当天及之后的 grace_days 个有行情交易日（新股无涨跌幅限制期）
+                    after = [d for d, _, _ in rows if d >= ipo.isoformat()]
+                    listing_days.update((code, d) for d in after[:grace_days])
+                # ipo 为 None：上市日不可判定，不剔任何日（面板最早 N 行会把面板起点误当上市日）
+            else:
+                # 表里没有这只股票：唯一允许回退的路径，按面板最早 grace_days 行推定
+                listing_days.update((code, d) for d, _, _ in rows[:grace_days])
         last = None
         for d, rraw, vol in rows:
             resume = last is not None and prev_of[d] != last
@@ -497,8 +545,11 @@ def run(panel_dir=PANEL, out=OUT, out_json=OUT_JSON, st_flag=ST_FLAG,
     print(f"tie_rule: {tie_rule} (source={tie['source']}); "
           f"min_valid_days={min_valid_days}", flush=True)
 
+    ipo_dates = load_ipo_dates(IPO_MAP)
     monthly, calendar, volume_months, listing_days = build_monthly(
-        panel_dir, grace_days=int(policy["listing_grace_days"]))
+        panel_dir, grace_days=int(policy["listing_grace_days"]), ipo_dates=ipo_dates)
+    print(f"上市宽限期: grace={policy['listing_grace_days']}d；"
+          f"ipo_date 可用 {len(ipo_dates)} 只（其余按面板最早 N 行回退）", flush=True)
     unobservable = sorted(m for m in calendar if m not in volume_months)
     pre2014 = [m for m in unobservable if m < "2014-01"]
     if pre2014:
@@ -706,6 +757,11 @@ def run(panel_dir=PANEL, out=OUT, out_json=OUT_JSON, st_flag=ST_FLAG,
         "limit_thresholds_source": "configs/parameter_registry.yaml:parameters[name=limit_thresholds].headline_value",
         "max_day_policy": policy,
         "listing_grace_days": int(policy["listing_grace_days"]),
+        "listing_grace_source": "data/processed/firm_id_map.csv:ipo_date（上市日之后 grace_days 个有行情交易日）",
+        "listing_grace_ipo_date_usable": sum(1 for v in ipo_dates.values() if v is not None),
+        "listing_grace_ipo_date_unusable": sum(1 for v in ipo_dates.values() if v is None),
+        "listing_grace_ipo_date_unusable_rule": "登记值为占位 2000-01-04 或早于面板起点 2006-01-04 → "
+                                               "上市初期不可观测，不剔任何日；表里缺失的股票才回退面板最早 N 行",
         "n_excluded_listing_total": _count_sum_listing(rows),
         "rows_where_la_differs": _count(lambda r: r["MAXraw"] != r["MAXraw_la"]),
         "rows_la_missing": _count(lambda r: r["MAXraw_la"] == ""),
