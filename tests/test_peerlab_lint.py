@@ -1,3 +1,5 @@
+import json
+import os
 from pathlib import Path
 
 from peerlab import lint, registry, spec
@@ -235,3 +237,88 @@ def test_class_and_local_names_not_flagged(tmp_path: Path) -> None:
 def test_attribute_call_not_confused_with_bare_name(tmp_path: Path) -> None:
     _mk_script(tmp_path, 'e.py', 'import os\ndef f():\n    return os.path.join("a")\n')
     assert lint.check_undefined_names(tmp_path) == []
+
+
+# ------------------------------------------------------- codegraph 索引新鲜度规则
+def _fake_status(root: Path, payload: dict) -> Path:
+    """在 root 造一个假的 codegraph 可执行文件，status --json 回放 payload。"""
+    (root / 'status.json').write_text(json.dumps(payload), encoding='utf-8')
+    exe = root / 'codegraph'
+    exe.write_text('#!/bin/sh\ncat "$(dirname "$0")/status.json"\n', encoding='utf-8')
+    exe.chmod(0o755)
+    return exe
+
+
+def _prepend(fake_dir: Path, monkeypatch) -> None:
+    """让 shutil 解析到假 codegraph，同时保留真实 PATH 以便子进程正常启动。"""
+    monkeypatch.setenv('PATH', str(fake_dir) + ':' + os.environ.get('PATH', ''))
+
+
+def test_codegraph_absent_is_skipped(tmp_path: Path) -> None:
+    """索引不入库：机器上没 .codegraph 时不算规范问题。"""
+    assert lint.check_codegraph_index(tmp_path) == []
+
+
+def test_codegraph_up_to_date_passes(tmp_path: Path, monkeypatch) -> None:
+    (tmp_path / '.codegraph').mkdir()
+    _fake_status(tmp_path, {
+        'initialized': True, 'unparsedLanguages': [], 'rebuildInProgress': False,
+        'pendingChanges': {'added': 0, 'modified': 0, 'removed': 0},
+        'index': {'state': 'complete', 'filesWithParseErrors': 0},
+    })
+    _prepend(tmp_path, monkeypatch)
+    assert lint.check_codegraph_index(tmp_path) == []
+
+
+def test_codegraph_stale_index_reported(tmp_path: Path, monkeypatch) -> None:
+    """半新索引是最危险的形态：能返回结果，但 blast radius 漏边。"""
+    (tmp_path / '.codegraph').mkdir()
+    _fake_status(tmp_path, {
+        'initialized': True, 'unparsedLanguages': [], 'rebuildInProgress': False,
+        'pendingChanges': {'added': 1, 'modified': 10, 'removed': 0},
+        'index': {'state': 'complete', 'filesWithParseErrors': 0},
+    })
+    _prepend(tmp_path, monkeypatch)
+    problems = lint.check_codegraph_index(tmp_path)
+    assert any('落后 11 个文件' in p for p in problems), problems
+    assert any('codegraph sync' in p for p in problems), problems
+
+
+def test_codegraph_not_initialized_skipped(tmp_path: Path, monkeypatch) -> None:
+    (tmp_path / '.codegraph').mkdir()
+    _fake_status(tmp_path, {'initialized': False})
+    _prepend(tmp_path, monkeypatch)
+    assert lint.check_codegraph_index(tmp_path) == []
+
+
+def test_codegraph_parse_errors_and_incomplete_reported(tmp_path: Path, monkeypatch) -> None:
+    (tmp_path / '.codegraph').mkdir()
+    _fake_status(tmp_path, {
+        'initialized': True, 'unparsedLanguages': ['rust'], 'rebuildInProgress': False,
+        'pendingChanges': {'added': 0, 'modified': 0, 'removed': 0},
+        'index': {'state': 'complete', 'filesWithParseErrors': 2},
+    })
+    _prepend(tmp_path, monkeypatch)
+    problems = lint.check_codegraph_index(tmp_path)
+    assert any('解析失败' in p for p in problems), problems
+    assert any('未解析语种' in p for p in problems), problems
+
+
+def test_codegraph_incomplete_state_reported(tmp_path: Path, monkeypatch) -> None:
+    (tmp_path / '.codegraph').mkdir()
+    _fake_status(tmp_path, {
+        'initialized': True, 'unparsedLanguages': [], 'rebuildInProgress': True,
+        'pendingChanges': {'added': 0, 'modified': 0, 'removed': 0},
+        'index': {'state': 'indexing', 'filesWithParseErrors': 0},
+    })
+    _prepend(tmp_path, monkeypatch)
+    problems = lint.check_codegraph_index(tmp_path)
+    assert any('索引未完成' in p for p in problems), problems
+
+
+def test_run_can_skip_codegraph(monkeypatch) -> None:
+    """提交门用 --no-codegraph：提交前工作区必然领先索引，否则每次提交恒红。"""
+    calls = []
+    monkeypatch.setattr(lint, 'check_codegraph_index', lambda root: calls.append(root) or [])
+    lint.run(ROOT, codegraph=False)
+    assert calls == []

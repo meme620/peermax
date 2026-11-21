@@ -5,6 +5,7 @@ from __future__ import annotations
 import ast
 import builtins
 import collections
+import json
 import pathlib
 import re
 import subprocess
@@ -359,7 +360,47 @@ def check_undefined_names(root: pathlib.Path) -> list:
     return problems
 
 
-def run(root: pathlib.Path = ROOT, experiments=None) -> tuple:
+CODEGRAPH_STATUS_TIMEOUT = 20
+
+
+def check_codegraph_index(root: pathlib.Path) -> list:
+    """codegraph 索引落后于工作区时报警：explore 的 blast radius 会静默漏边。
+
+    半新比全旧更危险——没人会怀疑一个能返回结果的索引，但它可能只认得一半的调用方。
+    未装 codegraph 或目录未初始化时跳过：索引按设计不入库（.gitignore），
+    CI 与别人机器上没有它，缺它不算规范问题。
+    """
+    index_dir = root / '.codegraph'
+    if not index_dir.is_dir():
+        return []
+    try:
+        out = subprocess.run(['codegraph', 'status', '--json'], cwd=root,
+                             capture_output=True, text=True, timeout=CODEGRAPH_STATUS_TIMEOUT)
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return []
+    try:
+        status = json.loads(out.stdout)
+    except json.JSONDecodeError:
+        return [f'.codegraph: codegraph status 输出无法解析（{out.stdout[:80]!r}）']
+    if not status.get('initialized'):
+        return []
+    problems = []
+    index = status.get('index') or {}
+    if index.get('state') not in (None, 'complete') or status.get('rebuildInProgress'):
+        problems.append(f'.codegraph: 索引未完成（state={index.get("state")!r}）；跑 codegraph index')
+    pending = status.get('pendingChanges') or {}
+    stale = sum(pending.get(key) or 0 for key in ('added', 'modified', 'removed'))
+    if stale:
+        problems.append(f'.codegraph: 索引落后 {stale} 个文件（新增 {pending.get("added", 0)} / '
+                        f'修改 {pending.get("modified", 0)} / 删除 {pending.get("removed", 0)}）；跑 codegraph sync')
+    if index.get('filesWithParseErrors'):
+        problems.append(f'.codegraph: {index["filesWithParseErrors"]} 个文件解析失败，索引缺符号')
+    if status.get('unparsedLanguages'):
+        problems.append(f'.codegraph: 未解析语种 {", ".join(status["unparsedLanguages"])}')
+    return problems
+
+
+def run(root: pathlib.Path = ROOT, experiments=None, codegraph: bool = True) -> tuple:
     experiments = experiments or registry.EXPERIMENTS
     problems = (check_spec(root)
                 + change_order.check(root)
@@ -372,5 +413,6 @@ def run(root: pathlib.Path = ROOT, experiments=None) -> tuple:
                 + check_hygiene(root)
                 + check_undefined_names(root)
                 + check_script_literals(root)
-                + check_teacher_only_panels(root))
+                + check_teacher_only_panels(root)
+                + (check_codegraph_index(root) if codegraph else []))
     return (0 if not problems else 1), problems

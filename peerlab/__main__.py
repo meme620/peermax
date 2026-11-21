@@ -142,7 +142,7 @@ def cmd_doctor(args) -> int:
 
 
 def cmd_lint(args) -> int:
-    code, problems = lint.run(ROOT)
+    code, problems = lint.run(ROOT, codegraph=not args.no_codegraph)
     if not problems:
         print('规范检查通过')
         return code
@@ -270,6 +270,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_doctor.set_defaults(func=cmd_doctor)
 
     p_lint = sub.add_parser('lint', help='命名与实验文档规范检查')
+    p_lint.add_argument('--no-codegraph', action='store_true',
+                        help='跳过 codegraph 索引新鲜度检查（提交门用：提交前工作区必然领先索引）')
     p_lint.set_defaults(func=cmd_lint)
 
     p_run = sub.add_parser('run', help='跑一个实验的一次 seed')

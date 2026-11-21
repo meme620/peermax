@@ -4,7 +4,8 @@ pre-commit:
   parallel: true
   commands:
     lint:
-      run: .venv/bin/python -m peerlab lint
+      # 跳过 codegraph 索引新鲜度：提交前工作区必然领先索引，这项只在 make lint 判。
+      run: .venv/bin/python -m peerlab lint --no-codegraph
     selftest:
       run: .venv/bin/python -m pytest tests/test_peerlab_*.py tests/test_script_utils.py tests/test_gate_*.py -q
 
