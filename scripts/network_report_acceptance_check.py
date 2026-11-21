@@ -25,8 +25,6 @@ REPD = ROOT / 'reports/data_gates/G0'
 TXTS = [2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025]
 TXTS_TEACHER = [2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022]   # 老师语料（B′3）
 CORPORA = {
-    'self': {'path': ROOT / 'data/processed/mda_texts.csv', 'id_col': 'code',
-             'ver_prefix': 'pm_mb_tfidf_v1', 'years': TXTS},
     'teacher': {'path': ROOT / 'data/processed/teacher_mda_panel.csv', 'id_col': 'firm_id',
                 'ver_prefix': 'pm_mb_tfidf_teacher_v1', 'years': TXTS_TEACHER},
 }

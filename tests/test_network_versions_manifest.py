@@ -27,6 +27,9 @@ MAIN_DIRS = ('network_ma_teacher', 'network_mb_teacher')
 SHADOW_NET_DIRS = ('network_ma_teacher_p3asof',                                    # 3.1（N1）
                    'network_ma_teacher_p3yt', 'network_ma_teacher_p3ydf',           # 3.2（N2/N3）
                    'network_ma_teacher_p3yt_ydf', 'network_ma_teacher_p3yt_latest')  # 3.2（N4/N5）
+# 占位 τ 骨架目录（network_mda_edges_build 的 tau_mode=placeholder 输出）：中间态，
+# 不是可被定价链消费的网络版本，同样不登记 manifest。
+STUB_NET_DIRS = ('network_mb_stub',)
 RULE = '(y+1)-04-30'
 
 
@@ -95,8 +98,9 @@ def test_manifest_covers_all_dirs_with_build_reports():
                 if d.is_dir() and list(d.glob('*_build_report.json'))}
     # Phase 3 shadow 网络目录（`artifacts/phase3/3.0_plan.md` §版本治理）：**故意不登记** manifest
     # （Phase 3 不改 configs）；headline 与既有已登记变体的「目录 ⊆ manifest」断言逐值不变。
+    # 占位 τ 骨架目录同理：中间态，不是可消费的网络版本。
     assert set(SHADOW_NET_DIRS).isdisjoint(specs), '已登记的目录不得被当作 shadow 跳过'
-    reported = reported - set(SHADOW_NET_DIRS)
+    reported = reported - set(SHADOW_NET_DIRS) - set(STUB_NET_DIRS)
     # 在盘的已登记目录必须是 manifest 的子集（未登记目录不得偷偷产出边表）；
     # manifest 里其余登记项只是"还没跑"，不是口径缺陷。
     assert reported <= set(specs), f'出现未登记的边表目录：{sorted(reported - set(specs))}'

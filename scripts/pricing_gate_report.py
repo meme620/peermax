@@ -46,7 +46,7 @@ NW_LAG = int(param_value('nw_lag'))
 P = param_value('sample_and_spec_registry')
 MIN_N = P['min_focal_count_per_month']
 MIN_MONTHS = P['min_effective_month_count']
-COLUMNS = ['ma_teacher', 'mb_teacher', 'ma', 'mb']
+COLUMNS = ['ma_teacher', 'mb_teacher']
 NW_LAG_GRID = [int(x) for x in param_value('nw_lag_sensitivity')]
 VIF_MAX = float(param_value('vif_per_month_max'))
 PLACEBO_DRAWS = int(param_value('placebo_draws'))
@@ -474,8 +474,7 @@ def main(argv=None):
                            'tost_rule_id': P['tost_rule_id'],
                            'mde_power_note': ('MDE80 单侧 = (1.645+0.8416)*se；双侧 = (1.96+0.8416)*se；'
                                               '阈值处功效 = Phi(K/se - z_alpha)；均为解释层，不参与 pass。')},
-           'gates': {}, 'supporting': {}, 'four_column_table': {},
-           'v2_sensitivity': {},
+           'gates': {}, 'supporting': {}, 'two_column_table': {},
            'per_month_diagnostics_ref': None,
            'main_column': 'ma_teacher（主口径，主表列）',
            'outcome': '后复权（R_NEXT_MONTH_COMPLETE_v1）为主；未复权（R_NEXT_MONTH_RAW_v1）为口径敏感性',
@@ -564,31 +563,10 @@ def main(argv=None):
             any(v['delta_lt_0'] or v['sign_flip'] for v in ia['stop_condition'].values()),
     }
 
-    # ---------------- 前一版本敏感性：同一定义重算 5 条 gate
-    sens_key = 'v2_sensitivity' if 'v2_sensitivity' in price else 'v1_sensitivity'
-    prev_ver = SAMPLE_VERSION_V2 if sens_key == 'v2_sensitivity' else SAMPLE_VERSION_V1
-    v1_block = price[sens_key][main_col]
-    v1_spread = ((pf or {}).get(sens_key) or {}).get('quintile', {})
-    g1, v1_support = judge(v1_block, v1_spread, v1_block['per_month_series'], None)
-    rep[sens_key] = {
-        'status': (f'{prev_ver}（superseded；旧 complete_month 口径）'
-                   if sens_key == 'v2_sensitivity' else
-                   'v1_superseded_registered_deviation（未施加 microcap/次新股筛除）'),
-        'sample_version': prev_ver,
-        'gates': g1,
-        'summary': v1_support,
-        'note': ('前一版本与 v3 的 gate 判定逐条同向（均 FAIL）；差异仅来自 sign-01 完整月口径修正 '
-                 '→ 结论不因语义修复而改变' if sens_key == 'v2_sensitivity' else
-                 'v1 与 v2 的 gate 判定逐条同向（均 FAIL）；差异仅来自 microcap（与次新股）筛除 '
-                 '→ 结论不因 I3 修复而改变'),
-    }
-
-    # ---------------- 四列并报（同一行）
-    prev_blk = price[sens_key]
-    prev_prefix = 'v2' if sens_key == 'v2_sensitivity' else 'v1'
+    # ---------------- 两列并报（同一行）
     for k in COLUMNS:
         m = price['main'][k]
-        rep['four_column_table'][k] = {
+        rep['two_column_table'][k] = {
             'role': m['role'], 'n_rows': m['n_rows'], 'n_months': m['ew']['n_months_used'],
             'fm_window': m['fm_window'],
             'beta_ew': m['ew']['coefs']['PeerMAXraw']['beta'],
@@ -598,9 +576,6 @@ def main(argv=None):
             't_nw_vw': m['vw']['coefs']['PeerMAXraw']['t_nw'],
             'iqr_pool': m['iqr_pool'],
             'economic_magnitude': m['ew']['economic_magnitude_beta_x_iqr'],
-            f'{prev_prefix}_beta_ew': prev_blk[k]['ew']['coefs']['PeerMAXraw']['beta'],
-            f'{prev_prefix}_beta_vw': prev_blk[k]['vw']['coefs']['PeerMAXraw']['beta'],
-            f'{prev_prefix}_n_months': prev_blk[k]['ew']['n_months_used'],
         }
 
     gate_pass = [v['pass'] for v in rep['gates'].values()]
@@ -712,8 +687,8 @@ def main(argv=None):
                                'registry pricing_gate_rules 执行，两者差异如实并列。')
     write_json(OUT_DIR / f'pricing_gate_report{sfx}.json', rep)
     _write_md(rep, lc, ia, rob, OUT_DIR / f'pricing_gate_report{sfx}.md')
-    progress(f"pricing_gate_status={rep['pricing_gate_status']}；sign..ew_vw_consistency(v3) = {[v['pass'] for v in rep['gates'].values()]}；"
-             f"previous_version = {[v['pass'] for v in g1.values()]}")
+    progress(f"pricing_gate_status={rep['pricing_gate_status']}；"
+             f"sign..ew_vw_consistency = {[v['pass'] for v in rep['gates'].values()]}")
 
 
 def _f(x, nd=5):
@@ -744,32 +719,27 @@ def _write_md(rep, lc, ia, rob, out_path):
     L.append(f"> 样本总体（V-sign-6）：{rep['sample_universe_note']}")
     L.append(f"> 控制变量定义（N-7）：{rep['control_definition_note']}")
     L.append(f"- 判定规则：{rep['gate_and_rule']}\n")
-    L.append('## Gate 逐条判定（v3 headline；括号内为前一版本敏感性）\n')
-    L.append('| gate | 实测（v3） | 前一版本敏感性 | 阈值 | 判定 |')
-    L.append('|---|---|---|---|---|')
-    sens_key = 'v2_sensitivity' if 'v2_sensitivity' in rep else 'v1_sensitivity'
-    g, g1 = rep['gates'], rep[sens_key]['gates']
+    L.append('## Gate 逐条判定（headline）\n')
+    L.append('| gate | 实测 | 阈值 | 判定 |')
+    L.append('|---|---|---|---|')
+    g = rep['gates']
     L.append(f"| sign 符号 | beta_EW={_f(g['sign']['beta_ew'])} / beta_VW={_f(g['sign']['beta_vw'])} "
-             f"| {_f(g1['sign']['beta_ew'])} / {_f(g1['sign']['beta_vw'])} "
              f"| beta<0（EW 与 VW） | {'PASS' if g['sign']['pass'] else 'FAIL'} |")
     L.append(f"| one_sided_significance 单侧显著 | p_EW={_f(g['one_sided_significance']['p_one_sided_ew'],4)} / "
              f"p_VW={_f(g['one_sided_significance']['p_one_sided_vw'],4)} "
              f"(t={_f(g['one_sided_significance']['t_nw_ew'],2)}/{_f(g['one_sided_significance']['t_nw_vw'],2)}) "
-             f"| {_f(g1['one_sided_significance']['p_one_sided_ew'],4)} / "
-             f"{_f(g1['one_sided_significance']['p_one_sided_vw'],4)} "
              f"| p < {ALPHA} | {'PASS' if g['one_sided_significance']['pass'] else 'FAIL'} |")
     L.append(f"| economic_magnitude 经济量级 | beta*IQR = {_f(g['economic_magnitude']['economic_magnitude'])} "
              f"(IQR={_f(g['economic_magnitude']['iqr_pool'],8)}) "
-             f"| {_f(g1['economic_magnitude']['economic_magnitude'])} | <= -{K_ECON}（方向） "
+                f"| <= -{K_ECON}（方向） "
              f"| {'PASS' if g['economic_magnitude']['pass'] else 'FAIL'} |")
     L.append(f"| portfolio_spread 组合 spread | EW 五分位 spread = {_f(g['portfolio_spread']['spread_ew'])} "
              f"(t={_f(g['portfolio_spread']['t_nw'],2)}) "
-             f"| {_f(g1['portfolio_spread']['spread_ew'])} | <= -{K_SPREAD}（方向） "
+                f"| <= -{K_SPREAD}（方向） "
              f"| {'PASS' if g['portfolio_spread']['pass'] else 'FAIL'} |")
-    t5, t51 = g['ew_vw_consistency'], g1['ew_vw_consistency']
+    t5 = g['ew_vw_consistency']
     L.append(f"| ew_vw_consistency EW/VW 一致性 | |d|={_f(t5['beta_diff'])}, 同号={t5['sign_same']}, "
              f"均显著={t5['both_significant']} "
-             f"| |d|={_f(t51['beta_diff'])}, 同号={t51['sign_same']} "
              f"| |d| <= {K_CONSIST} + 三条件 | {'PASS' if t5['pass'] else 'FAIL'} |")
     # ---------------- 2026-10-27 Phase 0.1：MDE/功效 / TOST 尺度 / 三行拆分（不改判定）
     L.append('\n## MDE / 功效说明（S-1；不改 gate 判定）\n')
@@ -786,7 +756,7 @@ def _write_md(rep, lc, ia, rob, out_path):
                  f"| {_f(r.get('mde80_pct_one_sided'),3)} | {_f(r.get('mde80_pct_two_sided'),3)} "
                  f"| {_f(r.get('power_at_threshold_reject_zero_one_sided'),3)} / "
                  f"{_f(r.get('power_at_threshold_reject_zero_two_sided'),3)} |")
-    g3v, g4v = g1['economic_magnitude'], g1['portfolio_spread']
+    g3v, g4v = g['economic_magnitude'], g['portfolio_spread']
     v1_vals = [g3v.get('mde80_pct_one_sided'), (g3v.get('mde80_vw') or {}).get('mde80_pct_one_sided'),
                g4v.get('mde80_pct_one_sided')]
     v1_pow = [g3v.get('power_at_threshold_reject_zero_one_sided'),
@@ -901,23 +871,19 @@ def _write_md(rep, lc, ia, rob, out_path):
              f"registry 登的「VIF max 6.13 / cond 5.88」只覆盖主规格；跨规格成因见 "
              f"pricing_table.json:vif_scope.cross_spec_cause（NPM_lin 与 PeerReturn 机械共线，"
              f"v1 样本下对应值 cond 31.41 / mean VIF 30.52）")
-    L.append('\n## 四列并报（主规格 EW/VW；v3 headline，前一版本括号对照）\n')
-    _first = next(iter(rep['four_column_table'].values()), {})
-    prev_prefix = 'v2' if 'v2_beta_ew' in _first else 'v1'
-    L.append(f'| 列 | 角色 | N | 月份 | FM 窗口 | beta(EW) | t | 单侧 p | beta(VW) | t | beta·IQR | beta_EW({prev_prefix}) |')
-    L.append('|---|---|---|---|---|---|---|---|---|---|---|---|')
-    for k, v in rep['four_column_table'].items():
+    L.append('\n## 两列并报（主规格 EW/VW）\n')
+    L.append('| 列 | 角色 | N | 月份 | FM 窗口 | beta(EW) | t | 单侧 p | beta(VW) | t | beta·IQR |')
+    L.append('|---|---|---|---|---|---|---|---|---|---|---|')
+    for k, v in rep['two_column_table'].items():
         L.append(f"| {k} | {v['role']} | {v['n_rows']:,} | {v['n_months']} | {v['fm_window'][0]}..{v['fm_window'][1]} | "
                  f"{_f(v['beta_ew'])} | {_f(v['t_nw_ew'],2)} | {_f(v['p_one_sided_ew'],4)} | "
-                 f"{_f(v['beta_vw'])} | {_f(v['t_nw_vw'],2)} | {_f(v['economic_magnitude'])} | "
-                 f"{_f(v[f'{prev_prefix}_beta_ew'])} |")
+                 f"{_f(v['beta_vw'])} | {_f(v['t_nw_vw'],2)} | {_f(v['economic_magnitude'])} |")
     extra = []
     if lc is not None:
-        extra.append(f"- A11 篇幅控制（v2）：beta 无控制 {_f(lc['beta_without']['beta'])} → 含控制 "
+        extra.append(f"- A11 篇幅控制：beta 无控制 {_f(lc['beta_without']['beta'])} → 含控制 "
                      f"{_f(lc['beta_with']['beta'])}；篇幅系数 {_f(lc['length_coefficient']['beta'])} "
                      f"(t={_f(lc['length_coefficient']['t_nw'],2)})；停机={lc['stop_condition']['stop']}"
-                     f"；v1 对照：{_f(lc['v1_sensitivity']['beta_without']['beta'])} → "
-                     f"{_f(lc['v1_sensitivity']['beta_with']['beta'])}")
+                     )
     if ia is not None:
         for sid, v in ia['specs'].items():
             mech = ('δ<0' if (v['retention_delta'] is not None and v['retention_delta'] < 0) else '') + \

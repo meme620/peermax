@@ -147,6 +147,8 @@ EXPERIMENTS: tuple[Experiment, ...] = (
         requires=('configs/version_manifest.yaml', 'data/raw/teacher/mda_data_2023.csv',
                   'data/processed/product_lexicon_v2_teacher.csv'),
         outputs=('data/processed/network_ma_teacher/**',),
+        # 只跑一次：产物路径固定、不随 seed 变；按 seed 并发会互相踩 tmp 文件。
+        scope='prepare',
         runtime_hint='分钟级',
     ),
     Experiment(
@@ -170,6 +172,8 @@ EXPERIMENTS: tuple[Experiment, ...] = (
             'data/processed/network_mb_teacher/**',
             'reports/data_gates/G0/network_tau_calibration*.json',
         ),
+        # 只跑一次：产物路径固定、不随 seed 变；按 seed 并发会互相踩 tmp 文件。
+        scope='prepare',
         runtime_hint='分钟级',
     ),
     Experiment(
@@ -194,6 +198,8 @@ EXPERIMENTS: tuple[Experiment, ...] = (
             'data/processed/monthly_pricing_panel_ma_teacher.csv',
             'reports/data_gates/G0/peermax_panel_build_ma_teacher_report.json',
         ),
+        # 只跑一次：产物路径固定、不随 seed 变；按 seed 并发会互相踩 tmp 文件。
+        scope='prepare',
         runtime_hint='分钟级',
     ),
     Experiment(
@@ -241,8 +247,8 @@ EXPERIMENTS: tuple[Experiment, ...] = (
         requires=(REGISTRY_CONFIG, headline_sample_path()),
         outputs=(
             'reports/data_gates/G0/pricing_robustness_placebo{sfx}.json',
-            'reports/data_gates/G0/pricing_length_control.json',
-            'reports/data_gates/G0/pricing_industry_absorb.json',
+            'reports/data_gates/G0/pricing_length_control{sfx}.json',
+            'reports/data_gates/G0/pricing_industry_absorb{sfx}.json',
         ),
         suffix_arg='--out-suffix',
         runtime_hint='分钟级',
@@ -346,7 +352,7 @@ EXPERIMENT_NOTES: dict[str, dict] = {
         'purpose': 'placebo、篇幅控制、行业吸收',
         'notes': (
             '参数：--sample-version 缺省 v2',
-            '产物：G0/pricing_robustness_placebo.json、pricing_length_control.json、pricing_industry_absorb.json',
+            '产物：G0/pricing_robustness_placebo_s{seed}.json、pricing_length_control_s{seed}.json、pricing_industry_absorb_s{seed}.json',
             '验收：placebo 不显著；行业吸收后符号方向与主表一致',
         ),
     },
@@ -370,7 +376,7 @@ EXPERIMENT_NOTES: dict[str, dict] = {
         'purpose': '网络密度零模型（同 N 同 E 随机重连）',
         'notes': (
             '参数：--reps 缺省读 registry rewiring_reps=1000，冒烟用 --reps 10',
-            '真随种子变化；产物 G0/network_density_null.json',
+            '真随种子变化；产物 G0/network_density_null_s{seed}.json（按 seed 分文件，不互相覆盖）',
             '验收：观测密度与零分布同时落盘，R 与 seed 记在产物里',
         ),
     },

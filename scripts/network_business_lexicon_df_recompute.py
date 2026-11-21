@@ -48,7 +48,6 @@ from network_business_lexicon import build_automaton, normalize  # noqa: E402
 
 CORPORA = {
     'teacher': {'path': ROOT / 'data/processed/teacher_mda_panel.csv', 'id_col': 'firm_id'},
-    'self': {'path': ROOT / 'data/processed/business_texts.csv', 'id_col': 'code'},
 }
 LEXICON = ROOT / 'data/processed/product_lexicon_v2.csv'
 ORIG_DF_REPORT = ROOT / 'reports/data_gates/G0/product_lexicon_df_report.json'

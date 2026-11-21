@@ -79,17 +79,6 @@ from network_business_cluster_grid import build_vectors, load_refs, row_median_e
 # 语料口径（Phase B″2 参数化）：与 network_business_cluster_grid.CORPORA 同构（此处独立一份，
 # 因为本脚本还需 ver_prefix/net_dir/years/net_use_case；两处数值必须一致，回归测试覆盖）。
 CORPORA = {
-    'self': {
-        'path': ROOT / 'data/processed/business_texts.csv',
-        'id_col': 'code',
-        'ver_prefix': 'pm_ma_ewcos_v1',
-        'net_dir': ROOT / 'data/processed/network_ma',
-        'src_version': 'business_texts+product_lexicon_v2',
-        'lexicon': ROOT / 'data/processed/product_lexicon_v2.csv',
-        'years': list(range(2017, 2026)),
-        'k_rule': 'per_year_target_peer_match(56)',
-        'weighting': 'ew',
-    },
     'teacher': {
         'path': ROOT / 'data/processed/teacher_mda_panel.csv',
         'id_col': 'firm_id',

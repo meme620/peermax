@@ -47,6 +47,8 @@ def parse_args(argv=None):
     ap.add_argument('--sample-version', choices=[SAMPLE_VERSION_LABEL],
                     default=SAMPLE_VERSION_LABEL,
                     help='样本版本，默认取 registry 的 headline 指针')
+    ap.add_argument('--out-suffix', default='',
+                    help="产物文件名后缀，如 '_s0'（与同实验内 placebo 步骤同口径；默认空）")
     return ap.parse_args(argv)
 
 
@@ -54,7 +56,8 @@ def main(argv=None):
     args = parse_args(argv)
     ver = args.sample_version
     ver_id = HEADLINE_SAMPLE_VERSION
-    progress(f'A11 开始：MD&A 篇幅控制（headline={ver_id}）')
+    sfx = args.out_suffix
+    progress(f'A11 开始：MD&A 篇幅控制（headline={ver_id}；out_suffix={sfx or "(空)"}）')
     base = pd.read_parquet(sample_path('ma_teacher', ver))
     fm = base[base['pricing_in_fm_sample'].astype(bool)].copy()
     fm['text_year'] = pd.to_numeric(fm['network_version'], errors='coerce').astype('Int64')
@@ -111,34 +114,12 @@ def main(argv=None):
         'acceptance': '① 主系数 beta 方向/显著性与无控制规格并报；② 篇幅系数量级与符号报告；'
                       '③ 篇幅—PeerMAX 相关性诊断（防机械共线掩盖）',
     }
-    # A11 v1 敏感性（未施加 microcap 筛除）
-    fm1 = pd.read_parquet(sample_path('ma_teacher', 'v1'))
-    fm1 = fm1[fm1['pricing_in_fm_sample'].astype(bool)].copy()
-    fm1['text_year'] = pd.to_numeric(fm1['network_version'], errors='coerce').astype('Int64')
-    fm1 = fm1.merge(mda.rename(columns={'firm_id': 'focal_id'}), on=['focal_id', 'text_year'], how='left')
-    fm1['ln_mda_length'] = np.log(fm1['mda_length'])
-    r1_wo, _ = fm_regression(fm1, 'R_next', MAIN, min_n=MIN_N, nw_lag=NW_LAG)
-    sample_with_length = fm1[fm1['ln_mda_length'].notna()]
-    r1_w, _ = fm_regression(sample_with_length, 'R_next', MAIN + ['ln_mda_length'], min_n=MIN_N, nw_lag=NW_LAG)
-    c1wo, c1w = r1_wo['coefs']['PeerMAXraw'], r1_w['coefs']['PeerMAXraw']
-    lc1 = r1_w['coefs']['ln_mda_length']
-    rep['v1_sensitivity'] = {
-        'status': 'v1_superseded_registered_deviation（未施加 microcap/次新股筛除）',
-        'n_rows_without': int(len(fm1)), 'n_rows_with': int(len(sample_with_length)),
-        'beta_without': {'beta': c1wo['beta'], 't_nw': c1wo['t_nw'], 'p_one_sided': c1wo['p_one_sided']},
-        'beta_with': {'beta': c1w['beta'], 't_nw': c1w['t_nw'], 'p_one_sided': c1w['p_one_sided']},
-        'length_coefficient': lc1,
-        'stop_condition': {'beta_sign_flip': bool(c1wo['beta'] is not None and c1w['beta'] is not None
-                                                 and np.sign(c1wo['beta']) != np.sign(c1w['beta'])),
-                           'weak_and_reversed': bool(c1w['t_nw'] is not None and abs(c1w['t_nw']) < 1.65
-                                                     and np.sign(c1wo['beta']) != np.sign(c1w['beta']))},
-    }
-    write_json(OUT_DIR / 'pricing_length_control.json', rep)
+    write_json(OUT_DIR / f'pricing_length_control{sfx}.json', rep)
     progress(f"A11 完成：beta_without={b_wo['beta']:.5f}(t={b_wo['t_nw']:.2f}) -> "
              f"beta_with={b_w['beta']:.5f}(t={b_w['t_nw']:.2f})；篇幅系数={len_c['beta']:.5f}"
              f"(t={len_c['t_nw']:.2f})；停机={rep['stop_condition']['stop']}")
     # ---------------- A12 行业吸收
-    progress('A12 开始：行业吸收检验（v2 headline）')
+    progress('A12 开始：行业吸收检验')
     rows = ['ind_l1_max_ew', 'ind_l2_max_ew']
     out = {'specification_id': 'pricing_industry_absorb', 'formula_id': 'PRICING_INDUSTRY_ABSORB_v1',
            'sample_version': ver_id,
@@ -151,13 +132,7 @@ def main(argv=None):
                             '故「含 PeerReturn」的规格才是可判读的基准（见 industry_max_momentum_diagnostic 与 '
                             'pricing_horse_race.json 的 reading_note——horse race 的 pricing_horse_own_ind_l1/l2 '
                             '不含 PeerReturn，吸收幅度被高估）'),
-           'v1_review_reference': {
-               'status': '已确认正确（复核结论，供引用；数值为 v1 样本）',
-               'loo_verification': 'IndustryMAX 构造经独立 LOO 手算验证正确（差 ≤7e-18）',
-               'momentum_evidence_v1': {'ind_l1_max_ew 单独（无 PeerReturn）': 'γ = +0.1716（t = +1.75）',
-                                        'ind_l1_max_ew + PeerReturn 同入': 'γ = +0.0478（t = +0.33）',
-                                        'PeerReturn 单独': '+0.0696（t = +3.30）'},
-           }}
+           }
     # γ 的动量来源诊断（同一样本、只换 x 集）：IndustryMAX 单独 vs 与 PeerReturn 同入
     diag = {}
     for lab, xs in [('ind_l1_wo_peerret', ['OwnMAXraw', 'ind_l1_max_ew'] + CONTROLS),
@@ -207,26 +182,7 @@ def main(argv=None):
                                    'sign_flip': v['sign_flip']}
                              for sid, v in out['specs'].items()}
     out['acceptance'] = 'delta 与 IndustryMAX 并报（delta>=0.5 记「含行业之上的增量」、<0.5 记「部分被行业吸收」，两种都并报）'
-    # A12 v1 敏感性（未施加 microcap 筛除；只重跑 EW L1/L2 两个截面吸收规格）
-    fm1a = pd.read_parquet(sample_path('ma_teacher', 'v1'))
-    fm1a = fm1a[fm1a['pricing_in_fm_sample'].astype(bool)].copy()
-    r1b, _ = fm_regression(fm1a, 'R_next', MAIN, min_n=MIN_N, nw_lag=NW_LAG)
-    b1 = r1b['coefs']['PeerMAXraw']
-    v1s = {'status': 'v1_superseded_registered_deviation（未施加 microcap/次新股筛除）',
-           'beta_without': {'beta': b1['beta'], 't_nw': b1['t_nw']}, 'specs': {}}
-    for sid, xs in {'pricing_industry_absorb_l1': ['PeerMAXraw', 'ind_l1_max_ew'] + BASE_X,
-                    'pricing_industry_absorb_l2': ['PeerMAXraw', 'ind_l2_max_ew'] + BASE_X}.items():
-        sample_with_length = fm1a.dropna(subset=xs)
-        r1, _ = fm_regression(sample_with_length, 'R_next', xs, min_n=MIN_N, nw_lag=NW_LAG)
-        bb = r1['coefs']['PeerMAXraw']
-        d1 = (None if (b1['beta'] in (None, 0) or bb['beta'] is None)
-              else 1.0 - abs(bb['beta']) / abs(b1['beta']))
-        v1s['specs'][sid] = {'beta_with': {'beta': bb['beta'], 't_nw': bb['t_nw']},
-                             'retention_delta': d1,
-                             'sign_flip': bool(b1['beta'] is not None and bb['beta'] is not None
-                                               and np.sign(b1['beta']) != np.sign(bb['beta']))}
-    out['v1_sensitivity'] = v1s
-    write_json(OUT_DIR / 'pricing_industry_absorb.json', out)
+    write_json(OUT_DIR / f'pricing_industry_absorb{sfx}.json', out)
     progress('A12 完成：pricing_industry_absorb.json 落盘')
 
 

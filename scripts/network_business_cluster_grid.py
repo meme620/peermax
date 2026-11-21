@@ -80,20 +80,6 @@ SIM_ADJUST_CHOICES = ['none', 'median']
 # 语料口径（Phase B″2 参数化）：路径 / id 列名 / 版本前缀 / 网络目录 / 年份默认值。
 # 冻结阈值与筛选规则（MIN_TERMS / IPO_MIN_YEARS / J,S 门类 / linkage / df_max）不随语料变。
 CORPORA = {
-    'self': {
-        'path': ROOT / 'data/processed/business_texts.csv',
-        'id_col': 'code',
-        'ver_prefix': 'pm_ma_ewcos_v1',
-        'net_dir': ROOT / 'data/processed/network_ma',
-        'src_version': 'business_texts+product_lexicon_v2',
-        'lexicon': ROOT / 'data/processed/product_lexicon_v2.csv',
-        'years': list(range(2017, 2026)),
-        # grid_years 同时是该语料下 `--years` 的**默认值**（self 保持历史默认 [2019,2021,2023] 不变）
-        'grid_years': [2019, 2021, 2023],
-        'report': REPD / 'network_business_cluster_grid.json',
-        'weighting': 'ew',
-        'sim_adjust': 'none',
-    },
     'teacher': {
         'path': ROOT / 'data/processed/teacher_mda_panel.csv',
         'id_col': 'firm_id',

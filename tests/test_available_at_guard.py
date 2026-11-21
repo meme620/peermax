@@ -24,6 +24,11 @@ MAIN_DIRS = ('network_ma_teacher', 'network_mb_teacher')
 SHADOW_NET_DIRS = ('network_ma_teacher_p3asof',                                    # 3.1（N1）
                    'network_ma_teacher_p3yt', 'network_ma_teacher_p3ydf',           # 3.2（N2/N3）
                    'network_ma_teacher_p3yt_ydf', 'network_ma_teacher_p3yt_latest')  # 3.2（N4/N5）
+# 占位 τ 骨架产物目录（network_mda_edges_build 在 tau_mode=placeholder 时的输出）：
+# 与 shadow 目录同理，故意不登记 manifest——它是中间态，不是可被定价链消费的网络版本。
+# 判定「未登记目录」时必须先剔除，否则跑过占位构边就会让不变量测试变红。
+STUB_NET_DIRS = ('network_mb_stub',)
+
 SHADOW_VERSION_PREFIX_BY_DIR = {
     'network_ma_teacher_p3asof': 'pm_ma_ewcos_teacher_p3asof_v1',
     'network_ma_teacher_p3yt': 'pm_ma_ewcos_teacher_p3yt_v1',
@@ -118,7 +123,8 @@ def test_real_all_network_dirs_79_reports_pass(mod):
         pytest.skip('缺网络产物目录（先跑网络构边）')
     dirs = sorted(
         p for p in NET_ROOT.glob('network*')
-        if p.is_dir() and list(p.glob('*_build_report.json')))
+        if p.is_dir() and list(p.glob('*_build_report.json'))
+        and p.name not in STUB_NET_DIRS)
     # 只对**在盘**的目录断言 available_at：manifest 登记了 10 个目录，但未跑出来的
     # 目录不该让本测试红（那是「还没跑」，不是「口径坏了」）。数量上限由 manifest 约束。
     specs = _manifest()['network_versions'] if '_manifest' in globals() else None
