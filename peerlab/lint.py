@@ -47,6 +47,8 @@ def check_path_names(paths) -> list:
         pure = pathlib.PurePosixPath(rel)
         if pure.name == '.gitkeep':
             continue  # 占位文件不承载内容，不参与命名与层级约束
+        if rel.startswith('result/'):
+            continue  # 结果层由 peerlab collect 按运行实测写出（含 _schema_probe.md），命名不归源码规则管
         for part in pure.parts[:-1]:
             if STAGE_CODE.search(part):
                 problems.append(f'{rel}: 目录名含阶段代号 {part!r}')
@@ -215,8 +217,8 @@ def check_artifact_names(root: pathlib.Path, paths=None) -> list:
         paths = [line for line in out.stdout.split('\0') if line]
     problems = []
     for rel in paths:
-        if rel.startswith(('tests/', 'ref/', 'data/')):
-            continue
+        if rel.startswith(('tests/', 'ref/', 'data/', 'result/')):
+            continue  # result/ 是运行实测回填：_schema_probe.md 记的是别的脚本的产物名
         if pathlib.PurePosixPath(rel).suffix not in TEXT_SUFFIXES and rel != 'Makefile':
             continue
         path = root / rel

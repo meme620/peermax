@@ -8,9 +8,9 @@ A 股产品市场同侪的彩票型收益（MAX）溢出研究：计算链代码
 
 | 路径 | 内容 |
 |---|---|
-| `scripts/` | 计算链：191 个 `.py` + 1 个 `.sh`，平铺；命名规则由 `peerlab lint` 强制 |
-| `tests/` | 56 个测试模块（含 peerlab 单测、数据门单测、within 变换与 skip 判定自检）+ `conftest.py` |
-| `ref/` | 权威输入：立项文档 5、老师材料与参考论文 3、组内论文 2 |
+| `scripts/` | 计算链：186 个 `.py` + 1 个 `.sh`，平铺；命名规则由 `peerlab lint` 强制 |
+| `tests/` | 65 个测试模块（含 peerlab 单测、数据门单测、within 变换与 skip 判定自检）+ `conftest.py` |
+| `ref/` | 权威输入：立项文档 4 份 PDF + 1 份真源 tex、老师材料与参考论文 3、组内论文 2 |
 | `spec/` | 可执行 spec：`design.yaml`（口径、pricing 判据、数据门、约束、红线）、`stages.yaml`（阶段→脚本→产物）、`inputs.yaml`（外部输入与消费者） |
 | `peerlab/` | 执行 CLI：实验注册、种子注入、运行记录、结果聚合，`python -m peerlab --help` |
 | `result/` | 结果层：`tables/` 跨种子聚合表、`summary.md` 摘要、`runs/` 运行记录 |
@@ -23,11 +23,11 @@ A 股产品市场同侪的彩票型收益（MAX）溢出研究：计算链代码
 make env          # 建 .venv（Python 3.13）并装 requirements.txt
 lefthook install  # 装 git hooks：pre-commit 跑 lint + selftest，pre-push 跑数据门
 make doctor       # 解释器 / 依赖 / configs / 数据 四块自检
-make imports      # 逐个导入 scripts/ 下 191 个脚本
+make imports      # 逐个导入 scripts/ 下 186 个脚本
 make smoke        # L0 冒烟：10 个实验逐个判就绪
 make lint         # 命名与结构规范检查
 make status       # 每个实验缺什么
-make run-all      # 全部实验 × SEEDS=(0,1,2,3,4)，当前 0 就绪 / 10 受阻（上游产物未生成）
+make run-all      # 全部实验 × SEEDS=(0,1,2,3,4)
 make report       # 重算 result/tables 与 summary.md
 # 取原始数据（4.1 GB）：gh release download data-raw-v1 --repo meme620/peermax \
 #   --pattern 'peermax-data-raw.tar.zst' --dir /tmp
@@ -42,11 +42,11 @@ make selftest     # peerlab、共享模块与数据门单测
 |---|---|
 | 研究状态 | `pricing_gate_status = FAIL`：pricing 五项 gate 全未过，standalone MAX-pricing claim 停止、只保留描述性关联（判据见 `spec/design.yaml` 的 `pricing_gates`，claim 见 `configs/claim_registry.yaml`） |
 | 环境 | 就绪：Python 3.13.12，14 个直接依赖与传递依赖全部固定版本 |
-| 脚本导入 | 191 个：182 ok / 0 缺配置 / 10 缺数据目录 / 0 依赖问题 / 0 其它 |
+| 脚本导入 | 186 个（`make imports` 实测，逐次跑后更新） |
 | 教师数据 | 就绪：42 个文件在 `data/raw/` 与 `data/external/`；`raw/` 的 4.1 GB 二进制走 `data-raw-v1` Release 附件，不入 Git 历史 |
 | `configs/` | 六个 YAML 已按新基线重建（`configs/README.md`）；pricing 九个主输入的 rows / columns 待 `data/processed/` 产出后登记 |
-| `data/processed/` | 空：需要按 `python -m peerlab experiments` 列出的实验生成上游产物 |
-| 全量 `pytest tests` | 423 passed / 278 skipped / 0 failed：缺产物的契约用例降级为 skip（`require_artifacts`），不再与真实缺陷混在一起 |
+| `data/processed/` | 已产出网络、面板与定价样本（本地生成，不入 Git）；重建用 `python -m peerlab run-all` |
+| 全量 `pytest tests` | 763 个用例；缺产物的契约用例降级为 skip（`require_artifacts`），不与真实缺陷混在一起 |
 
 ## spec 与校验
 

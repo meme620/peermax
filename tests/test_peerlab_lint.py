@@ -88,6 +88,21 @@ def test_clean_config_yaml_passes() -> None:
     assert not any('阶段代号' in p or 'final' in p for p in problems)
 
 
+def test_result_layer_exempt_from_source_naming(tmp_path: Path) -> None:
+    """result/ 由 peerlab collect 按运行实测写出：_schema_probe.md 记的是别处脚本的产物名，
+    用源码命名规则扫它必然误报（曾让 pre-commit 拦下一次提交）。
+
+    只断言豁免的两项，不夹带单文件目录等无关规则。
+    """
+    (tmp_path / 'result' / 'tables').mkdir(parents=True)
+    (tmp_path / 'result' / 'tables' / '_schema_probe.md').write_text(
+        "- reports/G0/pricing_table_s1.json：available_at, n_edges\n", encoding='utf-8')
+    rel = 'result/tables/_schema_probe.md'
+    naming = [p for p in lint.check_path_names([rel]) if '目录只装一个文件' not in p]
+    assert naming == []
+    assert lint.check_artifact_names(tmp_path, paths=[rel]) == []
+
+
 def test_artifact_name_with_stage_code_rejected(tmp_path: Path) -> None:
     (tmp_path / 'scripts').mkdir()
     (tmp_path / 'scripts' / 'a.py').write_text(

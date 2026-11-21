@@ -1,41 +1,40 @@
 # 结果摘要
 
-种子集合：(0, 1, 2, 3, 4)；成功运行 0 次。
+种子集合：(0, 1, 2, 3, 4)；成功运行 47 次。
 
-当前没有有效运行：实验在就绪检查阶段被拦下（缺 configs/ 或上游产物）。
-用 python -m peerlab status 查看每个实验缺什么。
+## estimation-sample — pricing_gate 样本构建（run-all 只跑一次）
 
-## estimation-sample — pricing 样本构建（run-all 只跑一次）
-
-无成功运行。
+- 种子：[0]
 
 ## network-business-text — M-A 产品市场竞争网络构边（老师 MD&A 语料）
 
-无成功运行。
+- 种子：[0, 1, 2, 3, 4]
 
 ## network-mda-text — M-B 文本竞争网络：全期矩阵 → τ 校准 → 构边
 
-无成功运行。
+- 种子：[0, 1, 2, 3, 4]
 
 ## peermax-panel — panel：MAX/PeerMAX 面板（主口径 ma_teacher）
 
-无成功运行。
+- 种子：[0, 1, 2]
 
-## fm-main-table — pricing 主表：Fama-MacBeth + horse race
+## fm-main-table — pricing_gate 主表：Fama-MacBeth + horse race
 
-无成功运行。
+- 种子：[0, 1, 2, 3, 4]
+- beta_peer：0.0491699（6 个种子完全一致）
+- t_peer：0.739724（6 个种子完全一致）
 
-## portfolio-sorts — pricing 组合表：五分位/十分位 spread
+## portfolio-sorts — pricing_gate 组合表：五分位/十分位 spread
 
-无成功运行。
+- 种子：[0, 1, 2, 3, 4]
 
-## robustness-checks — pricing 稳健性：placebo 与长度/行业控制
+## robustness-checks — pricing_gate 稳健性：placebo 与长度/行业控制
 
-无成功运行。
+- 种子：[0]
 
-## gate-report — pricing 数据门报告
+## gate-report — pricing_gate 数据门报告
 
-无成功运行。
+- 种子：[0]
 
 ## shadow-inference — Phase3 shadow 推断层（bootstrap，随 seed 变化）
 
@@ -43,4 +42,4 @@
 
 ## density-null — 网络密度零模型（随机重连，随 seed 变化）
 
-无成功运行。
+- 种子：[0]

@@ -269,6 +269,476 @@
       "started_at": "2026-11-20T14:18:12+00:00",
       "seconds": 1478.5,
       "git_commit": "0ca7652"
+    },
+    {
+      "run_id": "network-mda-text--s2--20261120T142905Z",
+      "exp": "network-mda-text",
+      "seed": 2,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T14:29:05+00:00",
+      "seconds": 1521.89,
+      "git_commit": "53410f7"
+    },
+    {
+      "run_id": "robustness-checks--s0--20261120T140832Z",
+      "exp": "robustness-checks",
+      "seed": 0,
+      "status": "failed",
+      "smoke": false,
+      "started_at": "2026-11-20T14:08:33+00:00",
+      "seconds": 3432.43,
+      "git_commit": "53410f7"
+    },
+    {
+      "run_id": "network-mda-text--s3--20261120T144251Z",
+      "exp": "network-mda-text",
+      "seed": 3,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T14:42:51+00:00",
+      "seconds": 1383.14,
+      "git_commit": "53410f7"
+    },
+    {
+      "run_id": "network-mda-text--s3--20261120T145427Z",
+      "exp": "network-mda-text",
+      "seed": 3,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T14:54:27+00:00",
+      "seconds": 1256.92,
+      "git_commit": "53410f7"
+    },
+    {
+      "run_id": "network-mda-text--s4--20261120T150554Z",
+      "exp": "network-mda-text",
+      "seed": 4,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T15:05:54+00:00",
+      "seconds": 1251.48,
+      "git_commit": "53410f7"
+    },
+    {
+      "run_id": "peermax-panel--s0--20261120T152645Z",
+      "exp": "peermax-panel",
+      "seed": 0,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T15:26:45+00:00",
+      "seconds": 182.99,
+      "git_commit": "53410f7"
+    },
+    {
+      "run_id": "peermax-panel--s1--20261120T152948Z",
+      "exp": "peermax-panel",
+      "seed": 1,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T15:29:48+00:00",
+      "seconds": 184.02,
+      "git_commit": "53410f7"
+    },
+    {
+      "run_id": "network-mda-text--s4--20261120T151524Z",
+      "exp": "network-mda-text",
+      "seed": 4,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T15:15:24+00:00",
+      "seconds": 1232.53,
+      "git_commit": "53410f7"
+    },
+    {
+      "run_id": "peermax-panel--s2--20261120T153252Z",
+      "exp": "peermax-panel",
+      "seed": 2,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T15:32:52+00:00",
+      "seconds": 186.6,
+      "git_commit": "53410f7"
+    },
+    {
+      "run_id": "peermax-panel--s0--20261120T153556Z",
+      "exp": "peermax-panel",
+      "seed": 0,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T15:35:56+00:00",
+      "seconds": 205.56,
+      "git_commit": "53410f7"
+    },
+    {
+      "run_id": "peermax-panel--s3--20261120T153559Z",
+      "exp": "peermax-panel",
+      "seed": 3,
+      "status": "failed",
+      "smoke": false,
+      "started_at": "2026-11-20T15:35:59+00:00",
+      "seconds": 203.19,
+      "git_commit": "53410f7"
+    },
+    {
+      "run_id": "peermax-panel--s4--20261120T153922Z",
+      "exp": "peermax-panel",
+      "seed": 4,
+      "status": "failed",
+      "smoke": false,
+      "started_at": "2026-11-20T15:39:22+00:00",
+      "seconds": 200.23,
+      "git_commit": "53410f7"
+    },
+    {
+      "run_id": "peermax-panel--s1--20261120T153922Z",
+      "exp": "peermax-panel",
+      "seed": 1,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T15:39:22+00:00",
+      "seconds": 201.87,
+      "git_commit": "53410f7"
+    },
+    {
+      "run_id": "fm-main-table--s0--20261120T154242Z",
+      "exp": "fm-main-table",
+      "seed": 0,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T15:42:42+00:00",
+      "seconds": 7.65,
+      "git_commit": "53410f7"
+    },
+    {
+      "run_id": "fm-main-table--s1--20261120T154250Z",
+      "exp": "fm-main-table",
+      "seed": 1,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T15:42:50+00:00",
+      "seconds": 7.68,
+      "git_commit": "53410f7"
+    },
+    {
+      "run_id": "fm-main-table--s2--20261120T154258Z",
+      "exp": "fm-main-table",
+      "seed": 2,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T15:42:58+00:00",
+      "seconds": 7.65,
+      "git_commit": "53410f7"
+    },
+    {
+      "run_id": "fm-main-table--s3--20261120T154305Z",
+      "exp": "fm-main-table",
+      "seed": 3,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T15:43:05+00:00",
+      "seconds": 7.6,
+      "git_commit": "53410f7"
+    },
+    {
+      "run_id": "fm-main-table--s4--20261120T154313Z",
+      "exp": "fm-main-table",
+      "seed": 4,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T15:43:13+00:00",
+      "seconds": 8.03,
+      "git_commit": "53410f7"
+    },
+    {
+      "run_id": "portfolio-sorts--s0--20261120T154321Z",
+      "exp": "portfolio-sorts",
+      "seed": 0,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T15:43:21+00:00",
+      "seconds": 2.58,
+      "git_commit": "53410f7"
+    },
+    {
+      "run_id": "portfolio-sorts--s1--20261120T154324Z",
+      "exp": "portfolio-sorts",
+      "seed": 1,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T15:43:24+00:00",
+      "seconds": 2.42,
+      "git_commit": "53410f7"
+    },
+    {
+      "run_id": "portfolio-sorts--s2--20261120T154326Z",
+      "exp": "portfolio-sorts",
+      "seed": 2,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T15:43:26+00:00",
+      "seconds": 2.3,
+      "git_commit": "53410f7"
+    },
+    {
+      "run_id": "portfolio-sorts--s3--20261120T154328Z",
+      "exp": "portfolio-sorts",
+      "seed": 3,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T15:43:28+00:00",
+      "seconds": 2.28,
+      "git_commit": "53410f7"
+    },
+    {
+      "run_id": "portfolio-sorts--s4--20261120T154331Z",
+      "exp": "portfolio-sorts",
+      "seed": 4,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T15:43:31+00:00",
+      "seconds": 2.39,
+      "git_commit": "53410f7"
+    },
+    {
+      "run_id": "estimation-sample--s0--20261120T154431Z",
+      "exp": "estimation-sample",
+      "seed": 0,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T15:44:31+00:00",
+      "seconds": 48.53,
+      "git_commit": "53410f7"
+    },
+    {
+      "run_id": "robustness-checks--s0--20261120T150730Z",
+      "exp": "robustness-checks",
+      "seed": 0,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T15:07:30+00:00",
+      "seconds": 2704.26,
+      "git_commit": "53410f7"
+    },
+    {
+      "run_id": "gate-report--s0--20261120T155315Z",
+      "exp": "gate-report",
+      "seed": 0,
+      "status": "failed",
+      "smoke": false,
+      "started_at": "2026-11-20T15:53:15+00:00",
+      "seconds": 0.35,
+      "git_commit": "53410f7"
+    },
+    {
+      "run_id": "density-null--s0--20261120T155316Z",
+      "exp": "density-null",
+      "seed": 0,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T15:53:16+00:00",
+      "seconds": 2.83,
+      "git_commit": "53410f7"
+    },
+    {
+      "run_id": "gate-report--s0--20261120T155325Z",
+      "exp": "gate-report",
+      "seed": 0,
+      "status": "failed",
+      "smoke": false,
+      "started_at": "2026-11-20T15:53:25+00:00",
+      "seconds": 0.35,
+      "git_commit": "53410f7"
+    },
+    {
+      "run_id": "gate-report--s0--20261120T155504Z",
+      "exp": "gate-report",
+      "seed": 0,
+      "status": "failed",
+      "smoke": false,
+      "started_at": "2026-11-20T15:55:04+00:00",
+      "seconds": 0.33,
+      "git_commit": "53410f7"
+    },
+    {
+      "run_id": "gate-report--s0--20261120T155533Z",
+      "exp": "gate-report",
+      "seed": 0,
+      "status": "failed",
+      "smoke": false,
+      "started_at": "2026-11-20T15:55:33+00:00",
+      "seconds": 0.34,
+      "git_commit": "53410f7"
+    },
+    {
+      "run_id": "gate-report--s0--20261120T155557Z",
+      "exp": "gate-report",
+      "seed": 0,
+      "status": "failed",
+      "smoke": false,
+      "started_at": "2026-11-20T15:55:57+00:00",
+      "seconds": 0.34,
+      "git_commit": "53410f7"
+    },
+    {
+      "run_id": "gate-report--s0--20261120T155620Z",
+      "exp": "gate-report",
+      "seed": 0,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T15:56:20+00:00",
+      "seconds": 0.34,
+      "git_commit": "53410f7"
+    },
+    {
+      "run_id": "gate-report--s0--20261120T155635Z",
+      "exp": "gate-report",
+      "seed": 0,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T15:56:35+00:00",
+      "seconds": 0.37,
+      "git_commit": "53410f7"
+    },
+    {
+      "run_id": "estimation-sample--s0--20261120T155635Z",
+      "exp": "estimation-sample",
+      "seed": 0,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T15:56:35+00:00",
+      "seconds": 40.09,
+      "git_commit": "53410f7"
+    },
+    {
+      "run_id": "network-business-text--s0--20261120T155715Z",
+      "exp": "network-business-text",
+      "seed": 0,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T15:57:15+00:00",
+      "seconds": 214.93,
+      "git_commit": "53410f7"
+    },
+    {
+      "run_id": "network-mda-text--s0--20261120T160050Z",
+      "exp": "network-mda-text",
+      "seed": 0,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T16:00:50+00:00",
+      "seconds": 812.79,
+      "git_commit": "53410f7"
+    },
+    {
+      "run_id": "peermax-panel--s0--20261120T161423Z",
+      "exp": "peermax-panel",
+      "seed": 0,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T16:14:23+00:00",
+      "seconds": 117.26,
+      "git_commit": "53410f7"
+    },
+    {
+      "run_id": "fm-main-table--s0--20261120T161620Z",
+      "exp": "fm-main-table",
+      "seed": 0,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T16:16:20+00:00",
+      "seconds": 5.41,
+      "git_commit": "53410f7"
+    },
+    {
+      "run_id": "fm-main-table--s1--20261120T161626Z",
+      "exp": "fm-main-table",
+      "seed": 1,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T16:16:26+00:00",
+      "seconds": 5.38,
+      "git_commit": "53410f7"
+    },
+    {
+      "run_id": "fm-main-table--s2--20261120T161631Z",
+      "exp": "fm-main-table",
+      "seed": 2,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T16:16:31+00:00",
+      "seconds": 5.37,
+      "git_commit": "53410f7"
+    },
+    {
+      "run_id": "fm-main-table--s3--20261120T161637Z",
+      "exp": "fm-main-table",
+      "seed": 3,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T16:16:37+00:00",
+      "seconds": 5.43,
+      "git_commit": "53410f7"
+    },
+    {
+      "run_id": "fm-main-table--s4--20261120T161642Z",
+      "exp": "fm-main-table",
+      "seed": 4,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T16:16:42+00:00",
+      "seconds": 5.36,
+      "git_commit": "53410f7"
+    },
+    {
+      "run_id": "portfolio-sorts--s0--20261120T161647Z",
+      "exp": "portfolio-sorts",
+      "seed": 0,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T16:16:47+00:00",
+      "seconds": 1.49,
+      "git_commit": "53410f7"
+    },
+    {
+      "run_id": "portfolio-sorts--s1--20261120T161649Z",
+      "exp": "portfolio-sorts",
+      "seed": 1,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T16:16:49+00:00",
+      "seconds": 1.48,
+      "git_commit": "53410f7"
+    },
+    {
+      "run_id": "portfolio-sorts--s2--20261120T161650Z",
+      "exp": "portfolio-sorts",
+      "seed": 2,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T16:16:50+00:00",
+      "seconds": 1.49,
+      "git_commit": "53410f7"
+    },
+    {
+      "run_id": "portfolio-sorts--s3--20261120T161652Z",
+      "exp": "portfolio-sorts",
+      "seed": 3,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T16:16:52+00:00",
+      "seconds": 1.48,
+      "git_commit": "53410f7"
+    },
+    {
+      "run_id": "portfolio-sorts--s4--20261120T161653Z",
+      "exp": "portfolio-sorts",
+      "seed": 4,
+      "status": "ok",
+      "smoke": false,
+      "started_at": "2026-11-20T16:16:53+00:00",
+      "seconds": 1.48,
+      "git_commit": "53410f7"
     }
   ]
 }

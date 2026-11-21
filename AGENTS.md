@@ -16,18 +16,18 @@ PeerMAX（A 股产品市场同侪的彩票型收益溢出）的代码与材料�
 
 ## 目录
 
-- `scripts/`：192 个 `.py` + `ocr_tesseract_chunk.sh`，平铺一层；脚本用 `Path(__file__).resolve().parents[1]` 定位仓库根。
-- `tests/`：56 个测试模块 + `conftest.py`（含 5 peerlab 单测、7 数据门单测、1 共享模块单测）。
+- `scripts/`：186 个 `.py` + `ocr_tesseract_chunk.sh`，平铺一层；脚本用 `Path(__file__).resolve().parents[1]` 定位仓库根。
+- `tests/`：65 个测试模块 + `conftest.py`（含 5 peerlab 单测、7 数据门单测、1 共享模块单测）。
 - `peerlab/`：执行 CLI 与注册表（10 个实验、`SEEDS = (0, 1, 2, 3, 4)`）。
 - `configs/`：六个 YAML，按新基线重建（`configs/README.md` 记来源与未锚项）。
-- `ref/`：权威外部输入（立项文档 5、老师团队材料 3、组内论文 2）。`data/raw/`：老师包与 Drive，二进制走 Release `data-raw-v1`。`data/processed/`：空。`result/`：结果层。
+- `ref/`：权威外部输入（立项文档 4 份 PDF + 1 份真源 tex、老师团队材料 3、组内论文 2）。`data/raw/`：老师包与 Drive，二进制走 Release `data-raw-v1`。`data/processed/`：派生产物。`result/`：结果层。
 
 ## 命令
 
 ```bash
 make env        # .venv（Python 3.13）+ requirements.txt
 make doctor     # 解释器 / 依赖 / configs / 数据 四块自检
-make imports    # 逐个导入 192 个脚本（会写出零星报告文件，跑完自动清理）
+make imports    # 逐个导入 186 个脚本（会写出零星报告文件，跑完自动清理）
 make smoke      # peerlab L0：10 个实验逐个判就绪
 make lint       # 命名、清单、spec 引用、`scripts/<name>.py` 字面量断链
 make status     # 逐实验列出缺什么
