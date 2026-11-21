@@ -19,6 +19,14 @@
 2. 升 `registry_version`，同步 `analyst_spec.yaml` 的 `governance.registry_version`（`pricing_lib` 导入即核对，不一致退出 2）；
 3. 跑 `python -m peerlab spec`、`make lint` 与相称的 pytest。
 
+第 1、2 步由 `peerlab.change_order` 在 `make lint` 里机械校验，不再靠人工遵守：字段完整、
+id 唯一且为 `CO-YYYY-MM-DD-slug`、日期最新在上、`version_to > version_from`、版本链首尾相接且
+末端等于 `registry_version`、`params` 逐项可解析、不得空改。
+
+`params` 条目写「顶层参数名」或「顶层参数名.子键」：登记表里带子键的参数（如
+`sample_filter_thresholds`）要改其中一个子键时，必须写 `sample_filter_thresholds.limit_hit_source`，
+只写子键名会被判为不存在的参数。
+
 派生参数不得手填：`K_Consist_Pricing` 必须等于 `K_Econ_Pricing / iqr_pool_value`，`pricing_lib` 导入即断言。样本指针只有两个：`sample_and_spec_registry.sample_version`（headline）与 `shadow_legacy_sample_version`（shadow 全套，重跑后删除）。
 
 ## 输入合同的登记步骤

@@ -33,7 +33,7 @@ change_log:
     rationale: 登记值与执行口径不一致、预注册条款无执行者、样本版本四层漂移
     params: [K_Consist_Pricing, max_day_policy, pricing_main_controls_v1, placebo_draws, vif_per_month_max,
       nw_lag_sensitivity, shadow_legacy_sample_version, market_value_basis, st_policy,
-      microcap_missing_policy, network_cutoff_rule, limit_hit_source]
+      microcap_missing_policy, network_cutoff_rule, sample_filter_thresholds.limit_hit_source]
     version_from: 1.5.33-peermax-baseline
     version_to: 1.6.0-peermax-baseline
     approval: 用户批准彻底修复计划（2026-11-19 本工作区会话）

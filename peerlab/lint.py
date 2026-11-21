@@ -10,7 +10,7 @@ import re
 import subprocess
 import sys
 
-from . import registry
+from . import change_order, registry
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
@@ -360,6 +360,7 @@ def check_undefined_names(root: pathlib.Path) -> list:
 def run(root: pathlib.Path = ROOT, experiments=None) -> tuple:
     experiments = experiments or registry.EXPERIMENTS
     problems = (check_spec(root)
+                + change_order.check(root)
                 + check_ids(experiments)
                 + check_paths(root)
                 + check_local_imports(root)
