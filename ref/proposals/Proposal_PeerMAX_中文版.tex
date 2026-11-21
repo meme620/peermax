@@ -3,9 +3,11 @@
 \usepackage{amsmath,amssymb,booktabs,longtable,array,enumitem,microtype}
 \usepackage{hyperref}
 \hypersetup{colorlinks=true,linkcolor=black,urlcolor=blue}
-\setCJKmainfont[Path=C:/Windows/Fonts/,Extension=.ttf]{NotoSerifSC-VF}
-\setCJKsansfont[Path=C:/Windows/Fonts/,Extension=.ttf]{NotoSansSC-VF}
-\setmainfont{TeX Gyre Termes}
+% 字体按名字探测：原稿写死 C:/Windows/Fonts 路径，在非 Windows 机器上编译直接失败。
+% 退役条件：构建环境固定为单一字库（容器内预装 Noto Serif/Sans SC）后，删去分支只留该字库。
+\IfFontExistsTF{Noto Serif SC}{\setCJKmainfont{Noto Serif SC}}{\setCJKmainfont{Songti SC}}
+\IfFontExistsTF{Noto Sans SC}{\setCJKsansfont{Noto Sans SC}}{\setCJKsansfont{Hiragino Sans GB}}
+\IfFontExistsTF{TeX Gyre Termes}{\setmainfont{TeX Gyre Termes}}{\setmainfont{Times New Roman}}
 \setlength{\parindent}{2em}
 \setlength{\parskip}{0.35em}
 \setlist{nosep,leftmargin=2.5em}
@@ -76,18 +78,18 @@
 
 \subsection{核心 MAX 处理变量}
 源企业 $j$ 在月份 $t$ 的 raw MAX 定义为：
-\[
+\begin{equation}
 MAX^{raw}_{j,t}=\max_{d\in t}r^{raw}_{j,d},
-\]
+\end{equation}
 其中 $r^{raw}_{j,d}$ 是经过公司行为调整的日收益，不扣除市场或行业收益，也不除以估计波动率。令 $Similarity_{ij,y-1}$ 表示 focal $i$ 与源企业 $j$ 的事前产品相似度，在 focal 企业的 peer 集合内归一化：
-\[
+\begin{equation}
 w_{ij,y-1}=\frac{Similarity_{ij,y-1}}
 {\sum_{k\ne i}Similarity_{ik,y-1}}.
-\]
+\end{equation}
 核心处理变量为：
-\[
+\begin{equation}
 PeerMAX^{raw}_{i,t}=\sum_{j\ne i}w_{ij,y-1}MAX^{raw}_{j,t}.
-\]
+\end{equation}
 这一连续变量直接连接自身 MAX 文献，不需要临界值 $c$，并贯穿月度分析。市场或行业调整 MAX、标准化异常收益 MAX 仅作为诊断：前者检验关系是否由市场或行业冲击驱动，后者检验 raw MAX 是否只是在选择波动率不同的企业。它们不替代式（3）。若只有研究者标准化的变量有效，而 raw MAX 无效，则很难维持“直接可观察收益”的解释。
 
 \subsection{控制变量与竞争变量}
@@ -103,10 +105,10 @@ PeerMAX^{raw}_{i,t}=\sum_{j\ne i}w_{ij,y-1}MAX^{raw}_{j,t}.
 \section{月度资产定价设计}
 \subsection{基准检验}
 核心月度规格为 Fama--MacBeth 横截面回归：
-\[
+\begin{equation}
 R_{i,t+1}=\alpha_t+\beta PeerMAX^{raw}_{i,t}+\theta OwnMAX^{raw}_{i,t}
 +\phi PeerReturn_{i,t}+\Gamma'X_{i,t}+\varepsilon_{i,t+1},
-\]
+\end{equation}
 其中 $X_{i,t}$ 包括规模、价值、动量、短期反转、流动性、换手率、分析师覆盖和网络度数。主要预测为 $\beta<0$。报告系数的时间序列平均值、PeerMAX 四分位距或标准差变化对应的经济意义，以及适合收益期限的 Newey--West 推断。
 
 组合检验按 PeerMAXraw 对股票排序，同时报告等权和市值加权收益。双重排序或特征调整后的组合收益用来判断收益差是否在自身 MAX 和普通 peer 收益之后仍然存在。还将在排除微型股、近期 IPO 和受涨跌停影响的源观测后评估结果。这些限制不是为了寻找最佳子样本，而是检验定价事实是否超越最难投资的股票仍具经济意义。
@@ -121,9 +123,9 @@ R_{i,t+1}=\alpha_t+\beta PeerMAX^{raw}_{i,t}+\theta OwnMAX^{raw}_{i,t}
 \section{源事件与事件时间设计}
 \subsection{事件定义}
 月度定价检验不需要阈值，但日度事件分析需要规则来确定显著源企业实现。对源企业 $j$ 在日期 $\tau$ 的事件定义为：
-\[
+\begin{equation}
 Jackpot_{j,\tau}(q)=1\left\{Rank^{board\times day}_{j,\tau}\ge q\right\},
-\]
+\end{equation}
 其中排名依据相关交易板块和日期内、经公司行为调整的 raw 日收益。主展示使用 $q=0.99$，取一个事件序列中的首次越过，并对 $q\in\{0.95,0.975,0.99,0.995\}$ 报告反应路径。该网格必须在查看 focal 注意力或未来收益前选定。
 
 该规则不使论文的主要结果依赖阈值；它的唯一作用是为事件研究确定日期。按板块—日期排名可以适应不同涨跌停制度。由于这种排名即使在平静日也可能选出最高百分位，研究将报告源企业绝对收益分布并核验事件是否具有经济显著性。涨跌停事件将从主要非涨跌停样本排除并单独分析：它们可能是最可见的 A 股事件，但收益受到交易规则删失，价格路径需要单独处理。
@@ -132,11 +134,11 @@ Jackpot_{j,\tau}(q)=1\left\{Rank^{board\times day}_{j,\tau}\ge q\right\},
 对每个源事件 $(j,\tau)$，focal 企业分为三个具有经济含义的组：产品相似度高的强 peer；同一大行业但产品相似度低的弱 peer；以及事前特征相似、但没有产品联系的匹配非 peer。事件图展示三组路径以及强 peer 减弱 peer、或强 peer 减匹配非 peer 的差异。连续规格使用完整相似度梯度。
 
 对事件时间跨度 $h$ 内的结果 $Y$，基准堆叠规格为：
-\[
+\begin{equation}
 Y_{i,j,\tau,h}=\alpha_{j,\tau,h}+\mu_i+\beta_h Similarity_{ij,y-1}
 +\rho_h Similarity_{ij,y-1}\times Recognizability_{ij,y-1}
 +\Gamma'_hX_{i,\tau-1}+\varepsilon_{i,j,\tau,h}.
-\]
+\end{equation}
 源事件—时间跨度固定效应保证 focal 企业是在同一源企业实现条件下比较；focal 企业固定效应吸收其持续性特征。交互项系数 $\rho_h$ 检验当经济联系在事件前更可识别时，传导是否更强。控制变量和匹配变量均需早于 $\tau$。
 
 推断必须反映源企业重复出现、focal 企业重复出现和共同日历日期。主实现将在实际样本结构允许时采用多维聚类，并报告源事件层面和 focal 企业层面的聚类敏感性。保持度数和行业结构的网络重连将生成安慰剂分布，在保留重要网络结构的同时打断真实 source--focal 联系。该随机化检验补充而不替代常规推断。
@@ -207,24 +209,33 @@ PeerReturn、PeerIVOL、PeerSkew 和 PeerID 进入月度独特性检验，因为
 
 \subsection{信息离散度}
 沿用 Da 等（2014）的零收益修正源企业指标：
-\[
+\begin{equation}
 ID_{j,t}=sign(PRET_{j,t})\frac{\%Neg_{j,t}-\%Pos_{j,t}}
 {\%Neg_{j,t}+\%Pos_{j,t}},\qquad
 PeerID_{i,t}=\sum_jw_{ij,y-1}ID_{j,t}.
-\]
+\end{equation}
 报告一个月、三个月和十二个月窗口。一个月版本预计噪声较大，不作为决定性控制变量。ID 是竞争性的收益路径代理，不是直接注意力指标。
 
+\section{详细经验规格}
 \subsection{月度规格}
 完整独特性规格为：
-\[
+\begin{equation}
 \begin{aligned}
 R_{i,t+1}={}&\alpha_t+\beta PeerMAX^{raw}_{i,t}+\theta OwnMAX^{raw}_{i,t}
 +\phi PeerReturn_{i,t}\\
 &+\lambda_1PeerIVOL_{i,t}+\lambda_2PeerSkew_{i,t}
 +\lambda_3PeerID_{i,t}+\Gamma'X_{i,t}+\varepsilon_{i,t+1}.
 \end{aligned}
-\]
+\end{equation}
 函数形式规格以分组和限制性三次样条估计 $f(PeerMAX^{raw}_{i,t})$。组合排序、连续回归和调整收益定义将联合解释，而不是选择统计量最大的规格。
+
+\subsection{回程诊断}
+在累计收益单元格内，可选的源企业层面诊断规格为：
+\begin{equation}
+Y_{j,t}=\alpha+\beta MAX^{raw}_{j,t}+\phi MonthlyReturn_{j,t}
++\delta ID_{j,t}+\eta IVOL_{j,t}+\kappa Skew_{j,t}+\Gamma'Z_{j,t}+u_{j,t}.
+\end{equation}
+事件图可在累计收益、大行业、规模、换手率和观测新闻状态匹配的前提下，比较高 MAX 与低 MAX 的源月份。收益生成的变量之间不强制完全平衡；分析将报告共同支撑、剔除观测与回归调整后的估计。该诊断不是主检验、不是 lottery 偏好的识别策略，也不是停止规则。
 
 \subsection{事件推断}
 式（6）分别对注意力、交易和收益期限估计。推断将处理源企业和 focal 企业重复出现以及共同日期依赖。具体多维聚类根据实际依赖结构选择并透明报告。网络随机化保持源企业和 focal 企业度数以及大行业构成。重叠事件规则将在查看事件后结果之前冻结。
