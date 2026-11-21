@@ -316,9 +316,35 @@ def test_codegraph_incomplete_state_reported(tmp_path: Path, monkeypatch) -> Non
     assert any('索引未完成' in p for p in problems), problems
 
 
-def test_run_can_skip_codegraph(monkeypatch) -> None:
-    """提交门用 --no-codegraph：提交前工作区必然领先索引，否则每次提交恒红。"""
-    calls = []
-    monkeypatch.setattr(lint, 'check_codegraph_index', lambda root: calls.append(root) or [])
-    lint.run(ROOT, codegraph=False)
-    assert calls == []
+def test_codegraph_warning_does_not_block_lint() -> None:
+    """索引落后只提示，不进 problems：本地可选工具不该让规范检查失败。"""
+    code, problems = lint.run(ROOT)
+    assert not any('codegraph' in p for p in problems)
+    assert code == (0 if not problems else 1)
+
+
+def test_codegraph_warnings_exposed_separately(tmp_path: Path, monkeypatch) -> None:
+    (tmp_path / '.codegraph').mkdir()
+    _fake_status(tmp_path, {'initialized': True, 'unparsedLanguages': [],
+                            'rebuildInProgress': False,
+                            'pendingChanges': {'added': 0, 'modified': 1, 'removed': 0},
+                            'index': {'state': 'complete', 'filesWithParseErrors': 0}})
+    _prepend(tmp_path, monkeypatch)
+    assert lint.codegraph_warnings(tmp_path)
+
+
+def test_codegraph_missing_cli_is_silent(tmp_path: Path, monkeypatch) -> None:
+    """没装 codegraph 的机器静默通过：不硬失败、不拦提交。"""
+    (tmp_path / '.codegraph').mkdir()
+    monkeypatch.setenv('PATH', str(tmp_path / 'empty-bin'))
+    assert lint.check_codegraph_index(tmp_path) == []
+
+
+def test_codegraph_malformed_output_is_warning_not_problem(tmp_path: Path, monkeypatch) -> None:
+    (tmp_path / '.codegraph').mkdir()
+    exe = tmp_path / 'codegraph'
+    exe.write_text('#!/bin/sh\necho "not json"\n', encoding='utf-8')
+    exe.chmod(0o755)
+    _prepend(tmp_path, monkeypatch)
+    warnings = lint.check_codegraph_index(tmp_path)
+    assert any('无法解析' in w for w in warnings), warnings

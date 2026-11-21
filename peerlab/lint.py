@@ -364,11 +364,11 @@ CODEGRAPH_STATUS_TIMEOUT = 20
 
 
 def check_codegraph_index(root: pathlib.Path) -> list:
-    """codegraph 索引落后于工作区时报警：explore 的 blast radius 会静默漏边。
+    """codegraph 索引新鲜度只作提示，返回警告而非规范问题，不影响退出码。
 
-    半新比全旧更危险——没人会怀疑一个能返回结果的索引，但它可能只认得一半的调用方。
-    未装 codegraph 或目录未初始化时跳过：索引按设计不入库（.gitignore），
-    CI 与别人机器上没有它，缺它不算规范问题。
+    索引按设计不入库（.gitignore），CI 与他人机器上没有这条链路；缺 CLI、未初始化
+    或 CLI 卡住时静默跳过，绝不阻拦 lint——本地可选工具不该成为规范红线。
+    半新的索引仍然报出来：它能返回结果却只认得一半调用方，这种漏最不容易被察觉。
     """
     index_dir = root / '.codegraph'
     if not index_dir.is_dir():
@@ -381,26 +381,31 @@ def check_codegraph_index(root: pathlib.Path) -> list:
     try:
         status = json.loads(out.stdout)
     except json.JSONDecodeError:
-        return [f'.codegraph: codegraph status 输出无法解析（{out.stdout[:80]!r}）']
+        return [f'codegraph status 输出无法解析（{out.stdout[:80]!r}）']
     if not status.get('initialized'):
         return []
-    problems = []
+    warnings = []
     index = status.get('index') or {}
     if index.get('state') not in (None, 'complete') or status.get('rebuildInProgress'):
-        problems.append(f'.codegraph: 索引未完成（state={index.get("state")!r}）；跑 codegraph index')
+        warnings.append(f'codegraph 索引未完成（state={index.get("state")!r}）；跑 codegraph index')
     pending = status.get('pendingChanges') or {}
     stale = sum(pending.get(key) or 0 for key in ('added', 'modified', 'removed'))
     if stale:
-        problems.append(f'.codegraph: 索引落后 {stale} 个文件（新增 {pending.get("added", 0)} / '
+        warnings.append(f'codegraph 索引落后 {stale} 个文件（新增 {pending.get("added", 0)} / '
                         f'修改 {pending.get("modified", 0)} / 删除 {pending.get("removed", 0)}）；跑 codegraph sync')
     if index.get('filesWithParseErrors'):
-        problems.append(f'.codegraph: {index["filesWithParseErrors"]} 个文件解析失败，索引缺符号')
+        warnings.append(f'codegraph 有 {index["filesWithParseErrors"]} 个文件解析失败，索引缺符号')
     if status.get('unparsedLanguages'):
-        problems.append(f'.codegraph: 未解析语种 {", ".join(status["unparsedLanguages"])}')
-    return problems
+        warnings.append(f'codegraph 未解析语种 {", ".join(status["unparsedLanguages"])}')
+    return warnings
 
 
-def run(root: pathlib.Path = ROOT, experiments=None, codegraph: bool = True) -> tuple:
+def codegraph_warnings(root: pathlib.Path = ROOT) -> list:
+    """单独暴露给 CLI 打印：警告不进 problems，退出码不受影响。"""
+    return check_codegraph_index(root)
+
+
+def run(root: pathlib.Path = ROOT, experiments=None) -> tuple:
     experiments = experiments or registry.EXPERIMENTS
     problems = (check_spec(root)
                 + change_order.check(root)
@@ -413,6 +418,5 @@ def run(root: pathlib.Path = ROOT, experiments=None, codegraph: bool = True) -> 
                 + check_hygiene(root)
                 + check_undefined_names(root)
                 + check_script_literals(root)
-                + check_teacher_only_panels(root)
-                + (check_codegraph_index(root) if codegraph else []))
+                + check_teacher_only_panels(root))
     return (0 if not problems else 1), problems

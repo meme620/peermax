@@ -142,13 +142,15 @@ def cmd_doctor(args) -> int:
 
 
 def cmd_lint(args) -> int:
-    code, problems = lint.run(ROOT, codegraph=not args.no_codegraph)
+    code, problems = lint.run(ROOT)
     if not problems:
         print('规范检查通过')
-        return code
-    print('规范检查发现 ' + str(len(problems)) + ' 处问题：')
-    for item in problems:
-        print('  - ' + item)
+    else:
+        print('规范检查发现 ' + str(len(problems)) + ' 处问题：')
+        for item in problems:
+            print('  - ' + item)
+    for item in (lint.codegraph_warnings(ROOT) if not args.no_codegraph else []):
+        print('[warn] ' + item)
     return code
 
 
